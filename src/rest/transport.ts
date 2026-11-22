@@ -343,9 +343,15 @@ export class RestTransport {
   }
 
   async request<T>(method: RestMethod, path: string, { body, signal, query, reason, anonymous, idempotent }: RestRequestOptions = {}): Promise<T> {
-    if (!path.startsWith('/') || path.startsWith('//') || /[\\?#\u0000-\u0020]/.test(path) ||
+    if (!['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) throw new TypeError('Unsupported Micup REST method');
+    if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') || /[\\?#\u0000-\u0020]/.test(path) ||
         path.split('/').some((part) => /^(?:\.|%2e){1,2}$/i.test(part))) {
       throw new TypeError('Micup REST path must be relative to the versioned API');
+    }
+    if ((method === 'GET' || method === 'HEAD') && body !== undefined) throw new TypeError(method + ' Micup requests cannot include a body');
+    if (query !== undefined && !(query instanceof URLSearchParams)) throw new TypeError('Micup REST query must be URLSearchParams');
+    if (anonymous !== undefined && typeof anonymous !== 'boolean' || idempotent !== undefined && typeof idempotent !== 'boolean') {
+      throw new TypeError('Micup REST anonymous and idempotent options must be booleans');
     }
     const target = new URL('.' + path, this.#api);
     if (target.origin !== this.#api.origin || !target.pathname.startsWith(this.#api.pathname)) {

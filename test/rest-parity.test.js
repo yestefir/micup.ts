@@ -153,6 +153,11 @@ test('uses token-only webhook requests, forwards messages and searches in contex
   });
   assert.equal((await bot.webhooks.execute('60', 'test/token', 'hello', { threadId: '30', wait: true, username: 'fixture' })).id, '91');
   assert.equal((await bot.searchMessages({ context_guild_id: '10', pinned: false, page: 1 })).total, 1);
+  assert.throws(() => bot.searchMessages({ context_guild_id: '10', content: 4 }), TypeError);
+  assert.throws(() => bot.searchMessages({ context_guild_id: '10', channel_ids: Array(1) }), TypeError);
+  assert.throws(() => bot.searchMessages({ context_guild_id: '10', author_type: ['integration'] }), TypeError);
+  assert.throws(() => bot.searchMessages({ context_guild_id: '10', pinned: 'false' }), TypeError);
+  assert.throws(() => bot.searchMessages({ context_guild_id: '10', sort_by: 'latest' }), TypeError);
   assert.equal((await bot.forwardMessage('30', { channel_id: '20', message_id: '90', attachment_ids: ['80'] })).id, '92');
   assert.throws(() => bot.forwardMessage('30', { channel_id: '20', message_id: '90', attachment_ids: Array(1) }), TypeError);
   assert.throws(() => bot.forwardMessage('30', { channel_id: '20', message_id: '90', embed_indices: Array(1) }), RangeError);

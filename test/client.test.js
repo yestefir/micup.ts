@@ -45,6 +45,14 @@ test('discovers the API, authenticates the bot and sends replies', async (t) => 
   assert.throws(() => client.sendMessage('202', { content: 'test', attachments: 'invalid' }), TypeError);
   assert.throws(() => client.sendMessage('202', { content: 'test', attachments: [{ id: 'invalid' }] }), TypeError);
   assert.throws(() => client.sendMessage('202', { content: 'test', attachments: [{ id: '12' }, { id: '12' }] }), TypeError);
+  assert.throws(() => client.editMessage('202', '404', { content: 4 }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', embeds: 'invalid' }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', components: Array(1) }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', components: [null] }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', flags: -1 }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', nonce: 1 }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', enforce_nonce: 'yes' }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', tts: 1 }), TypeError);
   assert.equal(fetch.mock.callCount(), 4);
 });
 
@@ -298,5 +306,10 @@ test('retries an explicit rate limit, preserves file metadata, and never retries
   await assert.rejects(client.request('GET', '/%2e%2e/escape'), /relative to the versioned API/);
   await assert.rejects(client.request('GET', '/users/../users/@me'), /relative to the versioned API/);
   await assert.rejects(client.request('GET', '/users/%2e%2e/users/@me'), /relative to the versioned API/);
+  await assert.rejects(client.request('TRACE', '/users/@me'), /Unsupported Micup REST method/);
+  await assert.rejects(client.request('GET', '/users/@me', { body: {} }), /cannot include a body/);
+  await assert.rejects(client.request('GET', '/users/@me', { query: {} }), /query must be URLSearchParams/);
+  await assert.rejects(client.request('POST', '/messages', { idempotent: 'yes' }), /must be booleans/);
+  await assert.rejects(client.request('POST', '/messages', { anonymous: 'yes' }), /must be booleans/);
   assert.equal(fetch.mock.callCount(), 5);
 });

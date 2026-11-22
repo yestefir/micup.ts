@@ -96,9 +96,9 @@ export function selectRow(menu: SelectMenu): ActionRow {
 }
 
 export function disableComponents(rows: readonly ActionRow[]): ActionRow[] {
-  return rows.map((row) => ({
+  return Array.from(rows, (row) => ({
     ...row,
-    components: row.components.map((original) => {
+    components: Array.from(row.components as readonly (Button | SelectMenu)[], (original) => {
       const component = structuredClone(original);
       if (component.type !== 2 || component.style !== 5) component.disabled = true;
       return component;

@@ -85,8 +85,22 @@ export function messageBody(
   extra: object = {},
 ): object {
   if (!Array.isArray(files) || !Array.isArray(uploads)) throw new TypeError('Message files and uploads must be arrays');
+  if (message.content !== undefined && message.content !== null && typeof message.content !== 'string') {
+    throw new TypeError('Message content must be a string or null');
+  }
+  if (message.embeds !== undefined && !Array.isArray(message.embeds)) throw new TypeError('Message embeds must be an array');
   if ((message.embeds?.length ?? 0) > 10) throw new RangeError('A Micup message accepts up to 10 embeds');
   for (const embed of message.embeds ?? []) validateEmbed(embed);
+  if (message.components !== undefined && !Array.isArray(message.components)) throw new TypeError('Message components must be an array');
+  for (const component of message.components ?? []) {
+    if (!component || typeof component !== 'object' || Array.isArray(component)) throw new TypeError('Message components must be objects');
+  }
+  if (message.flags !== undefined && (!Number.isSafeInteger(message.flags) || message.flags < 0)) {
+    throw new TypeError('Message flags must be a nonnegative integer');
+  }
+  if (message.nonce !== undefined && typeof message.nonce !== 'string') throw new TypeError('Message nonce must be a string');
+  if (message.enforce_nonce !== undefined && typeof message.enforce_nonce !== 'boolean') throw new TypeError('Message enforce_nonce must be a boolean');
+  if (message.tts !== undefined && typeof message.tts !== 'boolean') throw new TypeError('Message tts must be a boolean');
   if (message.sticker_ids !== undefined && !Array.isArray(message.sticker_ids)) throw new TypeError('Message sticker IDs must be an array');
   if ((message.sticker_ids?.length ?? 0) > 3) throw new RangeError('A Micup message accepts up to three stickers');
   for (const id of message.sticker_ids ?? []) snowflake(id, 'Sticker ID');

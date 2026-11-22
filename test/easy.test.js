@@ -412,6 +412,9 @@ test('builds slash commands with options first, subcommands and localizations', 
   assert.equal(options[1].autocomplete, true);
   assert.deepEqual(options[6].channel_types, [0, 2]);
   assert.throws(() => new SlashCommand('dup', 'Dup').addString('a', 'A').addString('a', 'A'), /Duplicate/);
+  assert.throws(() => new SlashCommand('sparse', 'Sparse').addString('x', 'X', { choices: Array(1) }), TypeError);
+  assert.throws(() => new SlashCommand('sparse', 'Sparse').addInteger('x', 'X', { choices: Array(1) }), TypeError);
+  assert.throws(() => new SlashCommand('sparse', 'Sparse').addChannel('x', 'X', { channelTypes: Array(1) }), TypeError);
 });
 
 test('registers commands by creating, updating, skipping and pruning', async (t) => {

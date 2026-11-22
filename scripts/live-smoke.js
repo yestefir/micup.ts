@@ -3,10 +3,12 @@ import { MicupClient } from '../dist/index.js';
 
 const token = process.env.MICUP_TEST_BOT_TOKEN;
 if (!token) throw new Error('Set MICUP_TEST_BOT_TOKEN to run the live smoke checks');
+const origin = process.env.MICUP_TEST_ORIGIN;
+if (!origin) throw new Error('Set MICUP_TEST_ORIGIN to the sandbox origin; live smoke checks do not default to production');
 
 const client = await MicupClient.connect({
   token,
-  ...(process.env.MICUP_TEST_ORIGIN && { origin: process.env.MICUP_TEST_ORIGIN }),
+  origin,
 });
 
 assert.equal(client.self.bot, true, 'the credential must belong to a bot');

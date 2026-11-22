@@ -80,6 +80,12 @@ test('localizes a command, its options and its choices from catalog keys', () =>
   assert.equal(original.options[0].name_localizations, undefined);
 });
 
+test('rejects sparse command, option and choice arrays during localization', () => {
+  assert.throws(() => localizeCommand({ name: 'sparse', options: Array(1) }, catalog), TypeError);
+  assert.throws(() => localizeCommand({ name: 'sparse', options: [{ name: 'option', choices: Array(1) }] }, catalog), TypeError);
+  assert.throws(() => localizeCommands(Array(1), catalog), TypeError);
+});
+
 test('localizes subcommands and groups by their dotted path', () => {
   const command = new SlashCommand('play', 'Play a song')
     .addSubcommandGroup('queue', 'Queue', (group) => group.addSubcommand('add', 'Add a song'))

@@ -39,8 +39,8 @@ export function localizeCommand<T extends CommandDefinition>(command: T, catalog
     const localized = withTexts(item, here, true);
     return {
       ...localized,
-      ...(item.choices && { choices: item.choices.map((entry) => choice(entry, here)) }),
-      ...(item.options && { options: item.options.map((child) => option(child, here)) }),
+      ...(item.choices && { choices: Array.from(item.choices, (entry) => choice(entry, here)) }),
+      ...(item.options && { options: Array.from(item.options, (child) => option(child, here)) }),
     };
   };
 
@@ -48,10 +48,10 @@ export function localizeCommand<T extends CommandDefinition>(command: T, catalog
   const localized = withTexts(command, root, chatInput);
   return {
     ...localized,
-    ...(command.options && { options: command.options.map((item) => option(item, root)) }),
+    ...(command.options && { options: Array.from(command.options, (item) => option(item, root)) }),
   } as T;
 }
 
 export function localizeCommands<T extends CommandDefinition>(commands: readonly T[], catalog: MessageCatalog, options: Omit<LocalizeOptions, 'prefix'> = {}): T[] {
-  return commands.map((command) => localizeCommand(command, catalog, options));
+  return Array.from(commands, (command) => localizeCommand(command, catalog, options));
 }

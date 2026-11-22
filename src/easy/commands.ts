@@ -40,6 +40,26 @@ function build(type: number, name: string, description: string, config: OptionCo
   };
 }
 
+function stringChoices(values: StringOptionConfig['choices']): CommandChoice[] | undefined {
+  if (values === undefined) return undefined;
+  if (!Array.isArray(values)) throw new TypeError('String command choices must be an array');
+  return Array.from(values, (choice) => {
+    if (typeof choice === 'string') return { name: choice, value: choice };
+    if (!choice || typeof choice !== 'object') throw new TypeError('String command choices must be strings or choice objects');
+    return choice;
+  });
+}
+
+function numberChoices(values: NumberOptionConfig['choices']): CommandChoice[] | undefined {
+  if (values === undefined) return undefined;
+  if (!Array.isArray(values)) throw new TypeError('Numeric command choices must be an array');
+  return Array.from(values, (choice) => {
+    if (typeof choice === 'number') return { name: String(choice), value: choice };
+    if (!choice || typeof choice !== 'object') throw new TypeError('Numeric command choices must be numbers or choice objects');
+    return choice;
+  });
+}
+
 export class OptionList {
   protected readonly options: CommandOption[] = [];
 
@@ -50,7 +70,7 @@ export class OptionList {
   }
 
   addString(name: string, description: string, config: StringOptionConfig = {}): this {
-    const choices = config.choices?.map((choice): CommandChoice => typeof choice === 'string' ? { name: choice, value: choice } : choice);
+    const choices = stringChoices(config.choices);
     return this.push({
       ...build(CommandOptionType.String, name, description, config),
       ...(choices?.length && { choices }),
@@ -89,9 +109,14 @@ export class OptionList {
   }
 
   addChannel(name: string, description: string, config: ChannelOptionConfig = {}): this {
+    if (config.channelTypes !== undefined && !Array.isArray(config.channelTypes)) throw new TypeError('Channel types must be an array');
+    const channelTypes = config.channelTypes === undefined ? undefined : Array.from(config.channelTypes, (type) => {
+      if (!Number.isSafeInteger(type) || type < 0) throw new TypeError('Channel types must be nonnegative integers');
+      return type;
+    });
     return this.push({
       ...build(CommandOptionType.Channel, name, description, config),
-      ...(config.channelTypes?.length && { channel_types: config.channelTypes }),
+      ...(channelTypes?.length && { channel_types: channelTypes }),
     });
   }
 
@@ -100,7 +125,7 @@ export class OptionList {
   }
 
   #number(type: number, name: string, description: string, config: NumberOptionConfig): this {
-    const choices = config.choices?.map((choice): CommandChoice => typeof choice === 'number' ? { name: String(choice), value: choice } : choice);
+    const choices = numberChoices(config.choices);
     return this.push({
       ...build(type, name, description, config),
       ...(choices?.length && { choices }),

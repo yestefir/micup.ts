@@ -50,9 +50,14 @@ function emojiName(name: string): void {
 
 function stickerText({ name, description, tags }: Omit<StickerInput, 'image'>): void {
   if (typeof name !== 'string' || [...name].length < 2 || [...name].length > 30 ||
-      (description !== undefined && (typeof description !== 'string' || [...description].length > 500)) ||
-      (tags !== undefined && (!Array.isArray(tags) || tags.length > 10 || tags.some((tag: unknown) => typeof tag !== 'string' || !tag || [...tag].length > 30)))) {
+      (description !== undefined && (typeof description !== 'string' || [...description].length > 500))) {
     throw new TypeError('Invalid Micup sticker name, description or tags');
+  }
+  if (tags !== undefined) {
+    if (!Array.isArray(tags) || tags.length > 10) throw new TypeError('Invalid Micup sticker name, description or tags');
+    for (const tag of tags) {
+      if (typeof tag !== 'string' || !tag || [...tag].length > 30) throw new TypeError('Invalid Micup sticker name, description or tags');
+    }
   }
 }
 

@@ -411,6 +411,7 @@ test('validates and manages guild expressions across single and bulk routes', as
   assert.throws(() => bot.expressions.createEmoji('10', { name: 42, image: 'x' }), TypeError);
   assert.throws(() => bot.expressions.createEmoji('10', { name: 'ok', image: 42 }), TypeError);
   assert.throws(() => bot.expressions.createSticker('10', { name: 'Ok', image: 'x', tags: ['ok', 1] }), TypeError);
+  assert.throws(() => bot.expressions.createSticker('10', { name: 'Ok', image: 'x', tags: Array(1) }), TypeError);
   assert.throws(() => bot.expressions.createStickers('10', Array(1)), TypeError);
   assert.throws(() => bot.expressions.createEmojis('10', 'wave'), TypeError);
   assert.throws(() => bot.expressions.editSticker('10', '22', { name: 'Ok', tags: 'wave' }), TypeError);
@@ -598,6 +599,7 @@ test('manages a guild discovery listing', async (t) => {
   assert.throws(() => bot.discovery.apply('10', { description: 'A place to talk.' }), TypeError);
   assert.throws(() => bot.discovery.edit('10', { custom_tags: Array(11).fill('x') }), RangeError);
   assert.throws(() => bot.discovery.edit('10', { custom_tags: 'rust' }), TypeError);
+  assert.throws(() => bot.discovery.edit('10', { custom_tags: Array(1) }), TypeError);
   assert.throws(() => bot.discovery.edit('10', { custom_tags: ['rust', 4] }), TypeError);
   assert.throws(() => bot.discovery.edit('10', { primary_language: 4 }), TypeError);
 });

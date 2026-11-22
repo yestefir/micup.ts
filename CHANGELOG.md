@@ -5,11 +5,18 @@
 ### Reliability and security
 
 - REST and Gateway connection errors retain their original causes; attachment upload and LiveKit connection failures do the same. FFmpeg startup and input stream errors retain their underlying causes, and stream listeners are removed when the process closes.
+- Live smoke checks require an explicit sandbox origin and never default to production.
 - REST accepts HTTP-date `Retry-After` values, rejects dot-segment paths, discards malformed API field errors, bounds learned route and bucket tables, and masks webhook and interaction tokens in permission logs.
 - REST preserves the caller's abort reason when cancellation interrupts a successful response body.
-- REST validates forum tag IDs, archived thread kinds, reaction-user cursors, message mention rules, sticker IDs and attachment references before sending requests.
+- REST validates forum tag IDs, archived thread kinds, reaction-user cursors, discovery and sticker tags, message mention rules, sticker IDs and attachment references before sending requests.
+- Raw REST requests validate methods, query objects and retry/authentication flags, and reject GET or HEAD bodies before sending requests.
 - Bulk deletion, forum thread-data, OAuth invite and message-forward arrays reject malformed and sparse values before sending requests.
+- Command localization rejects sparse command, option and choice arrays instead of preserving holes in the localized output.
+- Component-disabling helpers reject sparse row and component arrays instead of preserving holes in the output.
+- Easy command builders validate choice and channel-type arrays before building command definitions.
+- Message search validates its scalar fields, snowflake filters, string lists, booleans, author types and sort options before sending requests.
 - Message file arrays, including sparse arrays, and uploads supplied to `sendMessage`, interaction replies or webhook execution are checked for complete, well-formed metadata before their payload is built.
+- Message bodies validate content, embeds, components, flags, nonce and boolean options before serialization.
 - Malformed successful REST responses report an SDK error with the JSON parse failure in `cause`.
 - Attachment data is sent only to HTTPS upload URLs, except loopback HTTP endpoints used for local testing.
 - Attachment upload plans are validated before any signed upload URL receives file data.

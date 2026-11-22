@@ -28,6 +28,8 @@ test('builds and validates components, embeds, and media URLs without mutating i
   const disabled = disableComponents([row]);
   assert.equal(disabled[0].components[0].disabled, true);
   assert.equal(row.components[0].disabled, undefined);
+  assert.throws(() => disableComponents(Array(1)), TypeError);
+  assert.throws(() => disableComponents([{ type: 1, components: Array(1) }]), TypeError);
   assert.throws(() => selectRow({ type: 3, custom_id: 'limit', options: [{ label: 'One', value: 'one' }], max_values: 2 }), /Invalid/);
   assert.equal(modalRows({ type: 4, style: 2, custom_id: 'answer', label: 'Answer' })[0].components[0].style, 2);
   assert.deepEqual(new EmbedBuilder().title('Fixture').field('Example', 'Value').build(), {

@@ -74,9 +74,9 @@ export function paragraphInput(customId: string, label: string): TextInput {
 }
 
 export function disableButtons(rows: readonly ActionRow[]): ActionRow[] {
-  return rows.map((row) => ({
+  return Array.from(rows, (row) => ({
     ...row,
-    components: row.components.map((original) => {
+    components: Array.from(row.components as readonly (Button | SelectMenu)[], (original) => {
       const component = structuredClone(original);
       if (component.type === 2 && component.style !== ButtonStyle.Link) component.disabled = true;
       return component;

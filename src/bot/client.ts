@@ -369,11 +369,39 @@ export class MicupClient {
   }
 
   searchMessages(search: MessageSearch, options?: MicupRequestOptions): Promise<MessageSearchResult> {
+    if (!search || typeof search !== 'object' || Array.isArray(search)) throw new TypeError('A message search object is required');
     if (search.context_guild_id === undefined && search.context_channel_id === undefined) {
       throw new TypeError('A Micup message search needs a guild ID or a channel ID');
     }
     if (search.context_guild_id !== undefined) snowflake(search.context_guild_id, 'Guild ID');
     if (search.context_channel_id !== undefined) snowflake(search.context_channel_id, 'Channel ID');
+    if (search.min_id !== undefined) snowflake(search.min_id, 'Minimum message ID');
+    if (search.max_id !== undefined) snowflake(search.max_id, 'Maximum message ID');
+    if (search.content !== undefined && typeof search.content !== 'string') throw new TypeError('Message search content must be a string');
+    const idLists = [search.channel_ids, search.exclude_channel_id, search.author_id, search.exclude_author_id, search.mentions];
+    for (const ids of idLists) {
+      if (ids !== undefined && !Array.isArray(ids)) throw new TypeError('Message search ID filters must be arrays');
+      for (const id of ids ?? []) snowflake(id, 'Message search filter ID');
+    }
+    const textLists = [search.exact_phrases, search.has, search.exclude_has, search.link_hostname,
+      search.attachment_filename, search.attachment_extension];
+    for (const values of textLists) {
+      if (values !== undefined && !Array.isArray(values)) throw new TypeError('Message search text filters must be arrays');
+      for (const value of values ?? []) {
+        if (typeof value !== 'string') throw new TypeError('Message search text filters must contain strings');
+      }
+    }
+    if (search.author_type !== undefined && !Array.isArray(search.author_type)) throw new TypeError('Message search author types must be an array');
+    for (const type of search.author_type ?? []) {
+      if (!['user', 'bot', 'webhook'].includes(type)) throw new TypeError('Invalid message search author type');
+    }
+    for (const [name, value] of Object.entries({
+      mention_everyone: search.mention_everyone, pinned: search.pinned, include_nsfw: search.include_nsfw,
+    })) {
+      if (value !== undefined && typeof value !== 'boolean') throw new TypeError(name + ' must be a boolean');
+    }
+    if (search.sort_by !== undefined && !['timestamp', 'relevance'].includes(search.sort_by)) throw new TypeError('Invalid message search sort_by');
+    if (search.sort_order !== undefined && !['asc', 'desc'].includes(search.sort_order)) throw new TypeError('Invalid message search sort_order');
     if (search.page !== undefined && (!Number.isSafeInteger(search.page) || search.page < 1 || search.page > 400) ||
         search.hits_per_page !== undefined && (!Number.isSafeInteger(search.hits_per_page) || search.hits_per_page < 1 || search.hits_per_page > 25)) {
       throw new RangeError('Micup search takes 1 to 25 hits per page and up to 400 pages');

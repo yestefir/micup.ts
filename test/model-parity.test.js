@@ -65,6 +65,8 @@ test('builds buttons, selects and inputs like the Go helpers', () => {
   assert.equal(disabled[0].components[1].disabled, undefined);
   assert.equal(disabled[1].components[0].disabled, undefined);
   assert.equal(rows[0].components[0].disabled, undefined);
+  assert.throws(() => disableButtons(Array(1)), TypeError);
+  assert.throws(() => disableButtons([{ type: 1, components: Array(1) }]), TypeError);
 });
 
 test('encodes image data', () => {
