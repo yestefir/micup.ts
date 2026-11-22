@@ -22,3 +22,5 @@ export { CommandOptionType, CommandType, InteractionType, commandPath } from './
 export type { CommandChoice, CommandData, CommandDefinition, CommandOption, CommandOptionValue, ComponentData, MicupCommand, MicupInteraction, ModalData } from './model/interaction.js';
 export type { CommandScope, MicupCommands } from './rest/commands.js';
 export type { InteractionReplyOptions, MicupInteractions, MicupModal } from './rest/interactions.js';
+export type { AuditOptions, GuildAuditLog, GuildBan, GuildBanInput, GuildMemberEdit, GuildMemberQuery, GuildRoleEdit, MicupGuilds } from './rest/guilds.js';
+export type { ChannelEdit, MicupChannels, MicupInvite, ThreadList, ThreadStart } from './rest/channels.js';

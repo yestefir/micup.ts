@@ -10,6 +10,9 @@ import { messageBody, messageQuery, messagesPath, snowflake, type ListMessageOpt
 import { MicupCommands } from './commands.js';
 import { MicupInteractions } from './interactions.js';
 
+import { MicupGuilds } from './guilds.js';
+import { MicupChannels } from './channels.js';
+
 const defaultOrigin = 'https://micup.gg';
 const connection = Symbol('Micup connection');
 
@@ -39,6 +42,8 @@ export class MicupClient {
   #botId?: string;
   #commands?: MicupCommands;
   readonly interactions: MicupInteractions;
+  readonly guilds: MicupGuilds;
+  readonly channels: MicupChannels;
 
   private constructor(key: typeof connection, token: string, api: string, gateway?: string, maxAttempts?: number) {
     if (key !== connection) {
@@ -47,6 +52,8 @@ export class MicupClient {
     this.#token = token;
     this.#rest = new RestTransport(api, token, maxAttempts);
     this.interactions = new MicupInteractions(this.#rest);
+    this.guilds = new MicupGuilds(this.#rest);
+    this.channels = new MicupChannels(this.#rest);
     this.#gateway = gateway;
   }
 
