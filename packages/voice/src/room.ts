@@ -1,7 +1,7 @@
 import type { Room } from '@livekit/rtc-node';
 import { withAbort } from './abort.js';
-import type { PCMTrack } from './pcm.js';
-import { VoiceTrack, type RTC, type VoiceTrackOptions } from './track.js';
+import type { PCMTrack, VoiceTrack, VoiceTrackOptions } from './pcm.js';
+import { LiveKitVoiceTrack, type RTC } from './track.js';
 
 export interface VoiceGrant {
   endpoint: string;
@@ -74,7 +74,7 @@ export class VoiceRoom implements PCMTrack {
   async openTrack(options: VoiceTrackOptions = {}): Promise<VoiceTrack> {
     const participant = this.room.localParticipant;
     if (!this.connected || !participant) throw new Error('LiveKit room is disconnected');
-    const track = await VoiceTrack.publish(this.sdk, participant, this.#lifetime.signal, (track) => this.#tracks.delete(track), {
+    const track = await LiveKitVoiceTrack.publish(this.sdk, participant, this.#lifetime.signal, (track) => this.#tracks.delete(track), {
       ...this.options, ...options,
     });
     if (!this.connected) {

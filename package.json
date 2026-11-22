@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node --test \"test/*.test.js\" && npm run test --workspaces",
+    "test": "npm run build && node --test \"test/*.test.js\" && npm run test --workspaces && tsc -p test/tsconfig.json",
     "prepack": "npm run build"
   },
   "engines": {

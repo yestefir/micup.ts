@@ -1,16 +1,10 @@
 import type { AudioSource, LocalAudioTrack, LocalParticipant } from '@livekit/rtc-node';
 import { withAbort } from './abort.js';
-import { channels, sampleRate, samplesPerFrame, type PCMTrack } from './pcm.js';
+import { channels, sampleRate, samplesPerFrame, type VoiceTrack, type VoiceTrackOptions } from './pcm.js';
 
 export type RTC = typeof import('@livekit/rtc-node');
 
-export interface VoiceTrackOptions {
-  trackName?: string;
-  bitrate?: number;
-  signal?: AbortSignal;
-}
-
-export class VoiceTrack implements PCMTrack {
+export class LiveKitVoiceTrack implements VoiceTrack {
   readonly #lifetime = new AbortController();
   #closing?: Promise<void>;
   #capturing?: Promise<void>;
@@ -43,7 +37,7 @@ export class VoiceTrack implements PCMTrack {
       await source.close().catch(() => {});
       throw error;
     }
-    const published = new VoiceTrack(sdk, source, track, participant, roomSignal, onClose);
+    const published = new LiveKitVoiceTrack(sdk, source, track, participant, roomSignal, onClose);
     const attempt = participant.publishTrack(track, new sdk.TrackPublishOptions({
       source: sdk.TrackSource.SOURCE_MICROPHONE,
       audioEncoding: { maxBitrate: BigInt(bitrate) },

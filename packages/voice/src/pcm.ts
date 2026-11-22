@@ -18,3 +18,16 @@ export interface PCMTrack {
   drain?(options?: { signal?: AbortSignal }): Promise<void>;
   clear?(): void | Promise<void>;
 }
+
+export interface VoiceTrackOptions {
+  trackName?: string;
+  bitrate?: number;
+  signal?: AbortSignal;
+}
+
+export interface VoiceTrack extends PCMTrack {
+  readonly closed: boolean;
+  drain(options?: { signal?: AbortSignal }): Promise<void>;
+  clear(): Promise<void>;
+  close(): Promise<void>;
+}
