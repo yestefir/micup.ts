@@ -67,7 +67,7 @@ await client.newSession({ handler: events.handle }).run({ signal: stop.signal })
 
 | Alan | Ne sağlar | Başlangıç |
 | --- | --- | --- |
-| Kolay istemci | Olaylar, `message.reply()`, `interaction.reply()`, slash komutu oluşturucu, otomatik komut kaydı ve yönlendirme, butonlar, menüler, modallar, otomatik tamamlama ve güvenli hata yönetimi sunan `Client` | `micup.ts/easy` |
+| Kolay istemci | Olaylar, `message.reply()`, `interaction.reply()`, slash komutu oluşturucu, otomatik komut kaydı ve yönlendirme, butonlar, menüler, modallar, otomatik tamamlama, sayfalama ve güvenli hata yönetimi sunan `Client` | `micup.ts/easy` |
 | İstemci | Hız sınırı beklemeli, yeniden denemeli, denetim kaydı sebepli, `AbortSignal` destekli REST; bot kimliği (`self`, `application()`, `tokenId`) | `MicupClient` |
 | Gateway | Resume, kalp atışı denetimi, Zstandard sıkıştırma, durum (presence), tembel abonelikler, üye envanteri ve sayımlar içeren denetlenen oturumlar | `client.newSession()` |
 | Shard | IDENTIFY'ları aralıklayan, sunucuları shard'lara yönlendiren ve shard sayısı öneren yönetici | `client.newShardManager()` |

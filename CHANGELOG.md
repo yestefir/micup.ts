@@ -4,6 +4,7 @@
 
 ### Compatibility and packaging
 
+- `ws` and `@livekit/rtc-node` use caret ranges (`^8.23.0` and `^1.2.3`), so security patches reach applications without a new release of this SDK and a single copy is shared.
 - Node.js 20.3 or later is enough (it was 22). Zstandard Gateway compression still needs 22.15. The test suites pass on Node.js 20.20 and 24, and the native LiveKit module loads on Node.js 20.
 - `background()` uses its own timer for `timeoutMs`, so a task that only waits for its timeout is not dropped when nothing else keeps the process alive (Node.js 20 does not keep the event loop alive for `AbortSignal.timeout()`).
 - `CHANGELOG.md` is published with the package.
@@ -18,6 +19,7 @@
 - `SlashCommand` builder (options, subcommands, groups, choices, localizations), `userCommand()`, `messageCommand()` and `modal()`.
 - `client.command()`, `client.component()`, `client.modal()` and `client.autocomplete()` route interactions by command path, exact id, prefix (`vote:*`) or pattern. `registerCommands()` creates, edits and optionally prunes commands, and runs at login.
 - A routed handler that fails before answering sends a private error reply (`errorReply` option).
+- `paginate(target, pages, options)`: a button-driven page viewer for a command, a component or a message, with lazy pages, jump buttons, an invoker-only guard and idle timeout.
 - `awaitInteraction()`, `setStatus()`, `setCustomStatus()`, `setPresence()`, `permissionsFor()`, `sessionFor()` and `handleDispatch()`.
 - `micup.ts/easy` re-exports everything in `micup.ts`; `client.rest` is the full SDK client.
 

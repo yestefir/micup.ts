@@ -38,6 +38,7 @@ The concepts match; the names are closer to the wire format.
 | `interaction.reply()`, `deferReply()`, `editReply()`, `followUp()` | easy: the same; core: `client.interactions.respond()`, `defer()`, `editResponse()`, `followUp()` |
 | `interaction.options.getString('x')` | easy: the same; core: `optionString(interaction.data, 'x')` |
 | `SlashCommandBuilder` | easy: `SlashCommand` |
+| `Paginator` (micup.js) | easy: `paginate(interaction, pages)` |
 | `ActionRowBuilder`, `ButtonBuilder` | `actionRow(primaryButton(id, label))` |
 | `EmbedBuilder` | `EmbedBuilder` with `.title()`, `.description()`, `.field()`, `.build()` |
 | `PermissionsBitField` | `Permission` (bigint masks), `permissionNames()`, `hasPermissions()` |

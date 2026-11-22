@@ -140,6 +140,36 @@ const count = interaction.options.getInteger('count');         // number | null
 
 Build a modal with the `modal(customId, title, ...inputs)` helper and the `shortInput` and `paragraphInput` builders. Build buttons and menus with `actionRow`, `primaryButton`, `stringSelect` and the other [builders](commands-and-interactions.md#components).
 
+### Pagination
+
+`paginate()` shows a list of pages with Previous and Next buttons and handles the clicks:
+
+```js
+import { paginate } from 'micup.ts/easy';
+
+client.command(new SlashCommand('rules', 'Show the rules'), (interaction) =>
+  paginate(interaction, [
+    'Rule 1: be kind.',
+    { content: 'Rule 2', embeds: [{ title: 'Spam', description: 'No spam.' }] },
+    'Rule 3: have fun.',
+  ]));
+```
+
+The first argument is a command or component interaction, or a `Message` (the pages are then sent as a reply). Pages are strings or message options (`content`, `embeds`, ...); to build pages on demand pass `{ count, page: (index) => content }`. The buttons show `2/3` and disable at the ends. Only the person who started the list can use the buttons; anyone else gets a private notice. After 2 minutes without a click the buttons are disabled.
+
+| Option | Meaning |
+| --- | --- |
+| `timeoutMs` | idle time before the buttons are disabled (default 120000) |
+| `onlyInvoker` | `false` lets everyone turn pages (default `true`) |
+| `deniedReply` | the private notice for other people, or `false` for none |
+| `ephemeral` | show the list only to the invoker (interactions) |
+| `startPage` | the first page to show, counted from 0 |
+| `jumpButtons` | `true` shows First, Previous, Next and Last instead of Previous, Next and Stop |
+| `labels` | button texts: `first`, `previous`, `next`, `last`, `stop` |
+| `signal` | stops the list |
+
+It resolves with `{ reason: 'finished' | 'stopped' | 'timeout' | 'aborted', page }`. A single page is sent without buttons.
+
 ### Waiting for an answer
 
 ```js

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  Client, CommandInteraction, ComponentInteraction, InteractionRepliedError, MessageCatalog, ModalSubmitInteraction, Permission,
+  Client, CommandInteraction, ComponentInteraction, InteractionRepliedError, MessageCatalog, ModalSubmitInteraction, Permission, paginate,
   SlashCommand, messageCommand, modal, primaryButton, shortInput, userCommand,
 } from 'micup.ts/easy';
 
@@ -482,4 +482,157 @@ test('exposes the full SDK next to the easy client', async () => {
   assert.equal(easy.EmbedBuilder, main.EmbedBuilder);
   assert.equal(typeof easy.primaryButton, 'function');
   assert.deepEqual(primaryButton('a', 'A'), main.primaryButton('a', 'A'));
+});
+
+const pageMessage = { id: '950', channel_id: '20', content: 'x', author: { id: '77', username: 'robot' } };
+const callbacks = (calls) => calls.filter((call) => call.path.endsWith('/callback'));
+const buttons = (body) => body.components[0].components.map((button) => [button.label, button.disabled === true, button.custom_id.split(':')[1]]);
+const click = (client, prefix, action, extra = {}) => dispatch(client, 'INTERACTION_CREATE', {
+  ...base, id: String(2000 + ++sequence), type: 3, data: { custom_id: prefix + action, component_type: 2 }, message: pageMessage, ...extra,
+});
+const until = async (predicate) => { for (let i = 0; i < 400 && !predicate(); i++) await new Promise((resolve) => setTimeout(resolve, 5)); };
+
+test('paginates pages with buttons, jumps between them and stops', async (t) => {
+  const { client, calls } = await setup(t, () => Response.json(pageMessage));
+  let result;
+  client.command('list', async (interaction) => {
+    result = await paginate(interaction, ['one', 'two', { content: 'three', embeds: [{ title: 'T' }] }], { timeoutMs: 5000 });
+  });
+  await dispatch(client, 'INTERACTION_CREATE', { ...base, type: 2, data: commandData('list') });
+  await until(() => callbacks(calls).length >= 1);
+  const initial = callbacks(calls)[0].body;
+  assert.equal(initial.type, 4);
+  assert.equal(initial.data.content, 'one');
+  assert.deepEqual(buttons(initial.data), [['‹', true, 'previous'], ['1/3', true, 'page'], ['›', false, 'next'], ['✕', false, 'stop']]);
+  const prefix = initial.data.components[0].components[0].custom_id.replace('previous', '');
+  assert.match(prefix, /^pg-[a-z0-9]+:$/);
+
+  await click(client, prefix, 'next');
+  await until(() => callbacks(calls).length >= 2);
+  const second = callbacks(calls)[1].body;
+  assert.equal(second.type, 7);
+  assert.equal(second.data.content, 'two');
+  assert.deepEqual(buttons(second.data), [['‹', false, 'previous'], ['2/3', true, 'page'], ['›', false, 'next'], ['✕', false, 'stop']]);
+
+  await click(client, prefix, 'next');
+  await until(() => callbacks(calls).length >= 3);
+  const third = callbacks(calls)[2].body.data;
+  assert.equal(third.content, 'three');
+  assert.deepEqual(third.embeds, [{ title: 'T' }]);
+  assert.deepEqual(buttons(third), [['‹', false, 'previous'], ['3/3', true, 'page'], ['›', true, 'next'], ['✕', false, 'stop']]);
+
+  await click(client, prefix, 'previous');
+  await until(() => callbacks(calls).length >= 4);
+  assert.equal(callbacks(calls)[3].body.data.content, 'two');
+  assert.deepEqual(callbacks(calls)[3].body.data.embeds, []);
+
+  await click(client, prefix, 'stop');
+  await until(() => result);
+  assert.deepEqual(result, { reason: 'stopped', page: 1 });
+  assert.deepEqual(callbacks(calls)[4].body.data.components, []);
+});
+
+test('only the invoker can turn pages and others get a private notice', async (t) => {
+  const { client, calls } = await setup(t, () => Response.json(pageMessage));
+  let result;
+  client.command('list', async (interaction) => { result = await paginate(interaction, ['a', 'b'], { timeoutMs: 5000 }); });
+  await dispatch(client, 'INTERACTION_CREATE', { ...base, type: 2, data: commandData('list') });
+  await until(() => callbacks(calls).length >= 1);
+  const prefix = callbacks(calls)[0].body.data.components[0].components[0].custom_id.replace('previous', '');
+  const stranger = { member: { roles: [], user: { id: '6', username: 'eve' } } };
+
+  await click(client, prefix, 'next', stranger);
+  await until(() => callbacks(calls).length >= 2);
+  const denied = callbacks(calls)[1].body;
+  assert.equal(denied.type, 4);
+  assert.deepEqual(denied.data, { content: 'Only <@5> can use these buttons.', flags: 64 });
+  assert.equal(result, undefined);
+
+  await click(client, prefix, 'next');
+  await until(() => callbacks(calls).length >= 3);
+  assert.equal(callbacks(calls)[2].body.data.content, 'b');
+  await click(client, prefix, 'stop');
+  await until(() => result);
+  assert.equal(result.reason, 'stopped');
+});
+
+test('disables the buttons after the idle timeout and honors an abort signal', async (t) => {
+  const { client, calls } = await setup(t, () => Response.json(pageMessage));
+  let result;
+  client.command('list', async (interaction) => { result = await paginate(interaction, ['a', 'b', 'c'], { timeoutMs: 20 }); });
+  await dispatch(client, 'INTERACTION_CREATE', { ...base, type: 2, data: commandData('list') });
+  await until(() => result);
+  assert.deepEqual(result, { reason: 'timeout', page: 0 });
+  const edit = calls.find((call) => call.method === 'PATCH' && call.path === '/webhooks/77/tok/messages/@original');
+  assert.ok(edit.body.components[0].components.every((button) => button.disabled === true));
+
+  const controller = new AbortController();
+  let aborted;
+  client.command('stoppable', async (interaction) => { aborted = await paginate(interaction, ['a', 'b'], { timeoutMs: 5000, signal: controller.signal }); });
+  await dispatch(client, 'INTERACTION_CREATE', { ...base, id: '901', type: 2, data: commandData('stoppable') });
+  await settle();
+  controller.abort();
+  await until(() => aborted);
+  assert.deepEqual(aborted, { reason: 'aborted', page: 0 });
+});
+
+test('loads pages lazily, shows jump buttons and starts on a chosen page', async (t) => {
+  const { client, calls } = await setup(t, () => Response.json(pageMessage));
+  const loaded = [];
+  let result;
+  client.command('list', async (interaction) => {
+    result = await paginate(interaction, { count: 5, page: async (index) => { loaded.push(index); return 'page ' + index; } }, { jumpButtons: true, startPage: 2, timeoutMs: 5000, labels: { first: 'First' } });
+  });
+  await dispatch(client, 'INTERACTION_CREATE', { ...base, type: 2, data: commandData('list') });
+  await until(() => callbacks(calls).length >= 1);
+  const initial = callbacks(calls)[0].body.data;
+  assert.equal(initial.content, 'page 2');
+  assert.deepEqual(buttons(initial), [['First', false, 'first'], ['‹', false, 'previous'], ['3/5', true, 'page'], ['›', false, 'next'], ['»', false, 'last']]);
+  const prefix = initial.components[0].components[0].custom_id.replace('first', '');
+
+  await click(client, prefix, 'last');
+  await until(() => callbacks(calls).length >= 2);
+  assert.equal(callbacks(calls)[1].body.data.content, 'page 4');
+  assert.deepEqual(buttons(callbacks(calls)[1].body.data).map(([label, disabled]) => [label, disabled]), [['First', false], ['‹', false], ['5/5', true], ['›', true], ['»', true]]);
+  await click(client, prefix, 'first');
+  await until(() => callbacks(calls).length >= 3);
+  assert.equal(callbacks(calls)[2].body.data.content, 'page 0');
+  assert.deepEqual(loaded, [2, 4, 0]);
+  client.destroy();
+});
+
+test('sends a single page without buttons and paginates a message with replies', async (t) => {
+  const { client, calls } = await setup(t, (url) => Response.json(url.pathname.endsWith('/messages') ? { ...pageMessage, id: '951' } : pageMessage));
+  const results = [];
+  client.command('one', async (interaction) => { results.push(await paginate(interaction, ['only'])); });
+  await dispatch(client, 'INTERACTION_CREATE', { ...base, type: 2, data: commandData('one') });
+  await until(() => results.length);
+  assert.deepEqual(results[0], { reason: 'finished', page: 0 });
+  assert.deepEqual(callbacks(calls)[0].body.data.components, []);
+  assert.equal(callbacks(calls)[0].body.data.content, 'only');
+
+  client.on('messageCreate', async (message) => { results.push(await paginate(message, ['m1', 'm2'], { timeoutMs: 5000 })); });
+  await dispatch(client, 'MESSAGE_CREATE', { id: '800', channel_id: '20', guild_id: '10', content: '!list', author });
+  await until(() => calls.some((call) => call.method === 'POST' && call.path === '/channels/20/messages'));
+  const sent = calls.find((call) => call.method === 'POST' && call.path === '/channels/20/messages');
+  assert.equal(sent.body.content, 'm1');
+  assert.equal(sent.body.message_reference.message_id, '800');
+  const prefix = sent.body.components[0].components[0].custom_id.replace('previous', '');
+  await click(client, prefix, 'stop');
+  await until(() => results.length === 2);
+  assert.equal(results[1].reason, 'stopped');
+});
+
+test('rejects empty page sources and invalid start pages', async (t) => {
+  const { client } = await setup(t);
+  const seen = [];
+  client.command('bad', async (interaction) => {
+    await assert.rejects(paginate(interaction, []), RangeError);
+    await assert.rejects(paginate(interaction, { count: 0, page: () => 'x' }), RangeError);
+    await assert.rejects(paginate(interaction, ['a'], { startPage: 3 }), RangeError);
+    seen.push('checked');
+  });
+  await dispatch(client, 'INTERACTION_CREATE', { ...base, type: 2, data: commandData('bad') });
+  await until(() => seen.length);
+  assert.deepEqual(seen, ['checked']);
 });

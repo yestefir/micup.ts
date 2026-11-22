@@ -5,6 +5,8 @@ export type {
   RegisterCommandsOptions, RegisterCommandsResult,
 } from './client.js';
 export { MessageUpdate } from './client.js';
+export { paginate } from './paginate.js';
+export type { PageContent, PageSource, PaginateOptions, PaginateResult } from './paginate.js';
 export { Channel, Guild, Member, Message, ReactionEvent, User } from './structures.js';
 export type { MessageContent, ReasonOptions } from './structures.js';
 export {
