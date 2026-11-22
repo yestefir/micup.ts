@@ -1,0 +1,34 @@
+{
+  "name": "micup-js",
+  "version": "0.1.0",
+  "description": "JavaScript REST client for Micup bots",
+  "type": "module",
+  "exports": {
+    "types": "./dist/index.d.ts",
+    "default": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node --test",
+    "prepack": "npm run build"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "keywords": [
+    "micup",
+    "fluxer",
+    "bot"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yestefir/micup-js.git"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}
