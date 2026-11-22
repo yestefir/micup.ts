@@ -233,11 +233,17 @@ export class MicupVoiceRooms {
   }
 
   reorderTournament(channelId: string, version: number, userIds: readonly string[], options?: MicupRequestOptions): Promise<RoomTournament> {
-    if (!Number.isSafeInteger(version) || version < 0 || !Array.isArray(userIds) || userIds.length < 2 || userIds.length > 32 || new Set(userIds).size !== userIds.length) {
+    if (!Number.isSafeInteger(version) || version < 0) {
       throw new RangeError('A tournament order lists 2 to 32 distinct entrants for one version');
     }
+    if (!Array.isArray(userIds)) throw new TypeError('Tournament entrant IDs must be an array');
+    if (userIds.length < 2 || userIds.length > 32) {
+      throw new RangeError('A tournament order lists 2 to 32 distinct entrants for one version');
+    }
+    const ids = Array.from(userIds, (id) => snowflake(id, 'User ID'));
+    if (new Set(ids).size !== ids.length) throw new RangeError('A tournament order lists 2 to 32 distinct entrants for one version');
     return this.rest.request('PUT', roomPath(channelId) + '/tournament/order', {
-      ...options, body: { version, user_ids: userIds.map((id) => snowflake(id, 'User ID')) },
+      ...options, body: { version, user_ids: ids },
     });
   }
 

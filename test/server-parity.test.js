@@ -165,7 +165,8 @@ test('opens, orders, starts and cancels a room tournament', async (t) => {
   assert.throws(() => bot.rooms.openTournament('20', { game: 'arm_wrestle', size: 4, table: { x: 500, z: 0, yaw: 0 } }), RangeError);
   assert.throws(() => bot.rooms.reorderTournament('20', 2, ['1', '1']), RangeError);
   assert.throws(() => bot.rooms.reorderTournament('20', -1, ['1', '2']), RangeError);
-  assert.throws(() => bot.rooms.reorderTournament('20', 2, '12'), RangeError);
+  assert.throws(() => bot.rooms.reorderTournament('20', 2, ['1', , '2']), TypeError);
+  assert.throws(() => bot.rooms.reorderTournament('20', 2, '12'), TypeError);
   assert.throws(() => bot.rooms.startTournament('20', -1), TypeError);
 });
 
@@ -344,6 +345,8 @@ test('moves channels, clears commands and edits the bot profile', async (t) => {
   assert.deepEqual(calls[5].body, { locked: false });
 
   assert.throws(() => bot.guilds.moveChannels('10', []), RangeError);
+  assert.throws(() => bot.guilds.moveChannels('10', Array(1)), /Channel positions must be objects/);
+  assert.throws(() => bot.guilds.moveChannels('10', '1'), /Channel positions must be an array/);
   assert.throws(() => bot.users.editCurrentUser({ username: 'bad name' }), TypeError);
 });
 

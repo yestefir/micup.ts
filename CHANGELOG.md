@@ -10,6 +10,8 @@
 - REST preserves the caller's abort reason when cancellation interrupts a successful response body.
 - REST validates forum tag IDs, archived thread kinds, reaction-user cursors, discovery and sticker tags, message mention rules, sticker IDs and attachment references before sending requests.
 - Raw REST requests validate methods, query objects and retry/authentication flags, and reject GET or HEAD bodies before sending requests.
+- Guild channel moves reject sparse position arrays instead of serializing holes as null values.
+- Room tournament ordering rejects sparse entrant arrays before building the request body.
 - Bulk deletion, forum thread-data, OAuth invite and message-forward arrays reject malformed and sparse values before sending requests.
 - Command localization rejects sparse command, option and choice arrays instead of preserving holes in the localized output.
 - Component-disabling helpers reject sparse row and component arrays instead of preserving holes in the output.
@@ -31,6 +33,9 @@
 - `background()` contains failures from synchronous and asynchronous error reporters.
 - Easy Client falls back to its generic interaction reply when a custom error formatter throws.
 - Gateway voice grants, FFmpeg executables, readable audio inputs and player PCM sources are validated before use. Abort listener setup is consistent across REST, Gateway and interaction waits.
+- Voice source validation rejects sparse FFmpeg argument arrays before starting a process.
+- Gateway rejects sparse shard ID, ignored event and subscription member arrays before accepting configuration.
+- Gateway rejects configuration fields supplied with the wrong runtime shape, including strings and nested arrays.
 - Voice players close PCM sources when cancellation or iterator creation prevents playback from starting.
 - Voice players reject PCM sources that yield non-byte chunks instead of silently skipping them.
 - Voice `AudioInputStream` describes pipe destinations structurally without exposing `any` or requiring Node.js types in consumer declarations.
@@ -38,7 +43,7 @@
 
 ### Compatibility
 
-- CI exercises Node.js 20.20 alongside 22 and 24 on Linux, Windows and macOS.
+- CI exercises the Node.js 20.3 minimum on Linux and Node.js 20.20, 22 and 24 on Linux, Windows and macOS.
 
 ## 1.3.0 - 2026-11-22
 

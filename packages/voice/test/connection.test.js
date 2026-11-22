@@ -166,6 +166,7 @@ test('leaves the channel again when the LiveKit connection cannot be made', asyn
 test('opens FFmpeg sources from streams and validates the extra arguments', async () => {
   assert.throws(() => openSource(42), TypeError);
   assert.throws(() => openSource('file.mp3', { ffmpegArgs: ['-af', 3] }), TypeError);
+  assert.throws(() => openSource('file.mp3', { ffmpegArgs: Array(1) }), TypeError);
   assert.throws(() => openSource('file.mp3', { ffmpegArgs: 'bass' }), TypeError);
   const stream = Readable.from([Buffer.from('not audio')]);
   const source = openSource(stream, { ffmpeg: 'micupts-fixture-decoder-not-installed', ffmpegArgs: ['-af', 'volume=0.5'] });

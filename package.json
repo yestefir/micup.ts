@@ -64,8 +64,8 @@
     "node": ">=20.3.0"
   },
   "scripts": {
-    "build": "tsc",
-    "test": "npm run build && node --test \"test/*.test.js\" && npm run test --workspaces && tsc -p test/tsconfig.json",
+    "build": "node node_modules/typescript/lib/tsc.js",
+    "test": "npm run build && node scripts/run-tests.js test && npm run test --workspaces && node node_modules/typescript/lib/tsc.js -p test/tsconfig.json",
     "test:docs": "node scripts/check-doc-links.js",
     "test:live": "npm run build && node scripts/live-smoke.js",
     "prepack": "npm run build"

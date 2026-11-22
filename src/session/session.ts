@@ -97,9 +97,12 @@ export class GatewaySession {
     });
     this.#requests = new SessionRequests(this.send.bind(this));
     this.#presence = options.presence && normalizePresence(options.presence);
-    this.#ignoredEvents = [...(options.ignoredEvents ?? [])];
-    if (this.#ignoredEvents.length > 256 || this.#ignoredEvents.some((name) => !/^[A-Z][A-Z_0-9]*$/.test(name))) {
-      throw new TypeError('Invalid Micup ignored Gateway events');
+    const ignoredEvents = options.ignoredEvents ?? [];
+    if (!Array.isArray(ignoredEvents)) throw new TypeError('Invalid Micup ignored Gateway events');
+    this.#ignoredEvents = [...ignoredEvents];
+    if (this.#ignoredEvents.length > 256) throw new TypeError('Invalid Micup ignored Gateway events');
+    for (const name of this.#ignoredEvents) {
+      if (typeof name !== 'string' || !/^[A-Z][A-Z_0-9]*$/.test(name)) throw new TypeError('Invalid Micup ignored Gateway events');
     }
     this.#flags = options.flags ?? 0;
     if (!Number.isSafeInteger(this.#flags) || this.#flags < 0) throw new RangeError('Invalid Micup session flags');

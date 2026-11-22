@@ -266,13 +266,92 @@ test('rejects shard IDs outside the configured shard range', () => {
   assert.throws(() => create({ shardIds: [3] }), /within the shard count/);
   assert.throws(() => create({ shardIds: [1.5] }), /within the shard count/);
   assert.throws(() => create({ shardIds: [Number.MAX_SAFE_INTEGER + 1] }), /within the shard count/);
+  assert.throws(() => create({ shardIds: Array(1) }), /within the shard count/);
+  assert.throws(() => create({ shardIds: '0' }), /Shard IDs must be an array/);
   assert.throws(() => create({ shardIds: [] }), /At least one shard ID/);
   assert.throws(() => create({ shardIds: [1, 1] }), /must be unique/);
   assert.throws(() => create({ shardCount: 0 }), /Shard count must be positive/);
   assert.throws(() => create({ shardCount: 1.5 }), /Shard count must be positive/);
   assert.throws(() => create({ identifyIntervalMs: 0 }), /Invalid shard IDENTIFY interval/);
   assert.throws(() => create({ identifyIntervalMs: 2_147_483_648 }), /Invalid shard IDENTIFY interval/);
+  assert.throws(() => new GatewaySession({ endpoint: 'ws://localhost', token: 'fixture' }, {
+    handler: () => {}, ignoredEvents: Array(1),
+  }), /Invalid Micup ignored Gateway events/);
+  assert.throws(() => new GatewaySession({ endpoint: 'ws://localhost', token: 'fixture' }, {
+    handler: () => {}, ignoredEvents: 'READY',
+  }), /Invalid Micup ignored Gateway events/);
   assert.deepEqual(create({ shardIds: [2, 0] }).shards.map((shard) => shard.shardId), [0, 2]);
+});
+
+test('rejects sparse member IDs in Gateway subscriptions', async () => {
+  const { validateSubscriptions } = await import('../dist/gateway/subscription.js');
+  assert.throws(() => validateSubscriptions([]), /Guild subscriptions must be an object/);
+  assert.throws(() => validateSubscriptions({ '100': [] }), /Invalid guild subscription/);
+  assert.throws(() => validateSubscriptions({ '100': { member_list_channels: [] } }), /Invalid member list subscription/);
+  assert.throws(() => validateSubscriptions({ '100': { members: null } }), /subscription member or thread IDs/);
+  assert.throws(() => validateSubscriptions({ '100': { member_list_channels: null } }), /Invalid member list subscription/);
+  assert.throws(() => validateSubscriptions({ '100': { members: Array(1) } }), /subscription member or thread IDs/);
+  assert.throws(() => validateSubscriptions({ '100': { thread_member_lists: Array(1) } }), /subscription member or thread IDs/);
+  assert.doesNotThrow(() => validateSubscriptions({ '100': { members: ['200'], thread_member_lists: ['300'] } }));
+});
+
+test('routes guild count requests across shards and shuts them down on abort', { timeout: 5000 }, async (t) => {
+  const { server } = await createGateway(t);
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const identified = new Map();
+  const requests = new Map();
+  let resolveIdentified;
+  const allIdentified = new Promise((resolve) => { resolveIdentified = resolve; });
+
+  server.on('connection', (socket) => {
+    let shardId;
+    send(socket, op.Hello, { heartbeat_interval: 100 });
+    socket.on('message', (raw) => {
+      const packet = JSON.parse(raw);
+      if (packet.op === op.Heartbeat) {
+        send(socket, op.HeartbeatAck);
+        return;
+      }
+      if (packet.op === op.Identify) {
+        shardId = packet.d.shard[0];
+        identified.set(shardId, socket);
+        send(socket, op.Dispatch, { session_id: String(shardId) }, 'READY', 1);
+        if (identified.size === 2) resolveIdentified();
+        return;
+      }
+      if (packet.op === op.RequestGuildCounts) {
+        const guildIds = packet.d.guild_ids;
+        const byShard = requests.get(shardId) ?? [];
+        byShard.push(guildIds);
+        requests.set(shardId, byShard);
+        send(socket, op.Dispatch, {
+          nonce: packet.d.nonce,
+          counts: guildIds.map((guild_id) => ({ guild_id, member_count: 4, online_count: 2 })),
+        }, 'GUILD_COUNTS_UPDATE', 2);
+      }
+    });
+  });
+
+  const manager = new ShardManager({ endpoint: 'ws://127.0.0.1:' + server.address().port + '/gateway', token: 'fixture' }, {
+    shardCount: 2,
+    identifyIntervalMs: 1,
+    session: { handler: () => {} },
+  });
+  const running = manager.run({ signal: controller.signal });
+  await allIdentified;
+  const readyDeadline = Date.now() + 1000;
+  while (!manager.ready && Date.now() < readyDeadline) await new Promise((resolve) => setTimeout(resolve, 1));
+  assert.equal(manager.ready, true);
+  const counts = await manager.requestGuildCounts(['4194304', '0', '8388608', '4194304']);
+
+  assert.deepEqual(requests.get(1), [['4194304']]);
+  assert.deepEqual(requests.get(0), [['0', '8388608']]);
+  assert.deepEqual(counts.map((count) => count.guild_id).sort(), ['0', '4194304', '8388608']);
+  assert.ok(counts.every((count) => count.member_count === 4 && count.online_count === 2));
+
+  controller.abort();
+  await running;
 });
 
 test('validates guild snowflakes before calculating a shard', () => {
@@ -454,8 +533,12 @@ test('reports member inventory lookup failures without stopping its worker', { t
     controller.abort();
   });
   inventory.observe({ name: 'READY', data: { guilds: [{ id: '10' }] } });
-
-  await inventory.run(() => true, controller.signal);
+  const keepAlive = setInterval(() => {}, 1000);
+  try {
+    await inventory.run(() => true, controller.signal);
+  } finally {
+    clearInterval(keepAlive);
+  }
 
   assert.equal(reported.guildId, '10');
   assert.match(reported.error.message, /temporary lookup failure/);

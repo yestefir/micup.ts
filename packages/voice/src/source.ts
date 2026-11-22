@@ -44,8 +44,11 @@ export function openSource(input: string | AudioInputStream, options: AudioSourc
   if (typeof ffmpeg !== 'string' || !ffmpeg.trim() || ffmpeg.includes('\0')) {
     throw new TypeError('FFmpeg executable must be a nonempty path');
   }
-  if (!Array.isArray(ffmpegArgs) || ffmpegArgs.some((arg) => typeof arg !== 'string' || arg.includes('\0'))) {
+  if (!Array.isArray(ffmpegArgs)) {
     throw new TypeError('FFmpeg arguments must be strings');
+  }
+  for (const arg of ffmpegArgs) {
+    if (typeof arg !== 'string' || arg.includes('\0')) throw new TypeError('FFmpeg arguments must be strings');
   }
   const remote = !stream && /^https?:\/\//i.test(input as string);
   if (!stream && !remote && /^[a-z][a-z0-9+.-]*:/i.test(input as string) && !/^[a-z]:[/\\]/i.test(input as string)) {

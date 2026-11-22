@@ -38,8 +38,8 @@
     "node": ">=20.3.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test \"test/*.test.js\" && tsc -p test/tsconfig.json",
+    "build": "node ../../node_modules/typescript/lib/tsc.js -p tsconfig.json",
+    "test": "npm run build && node ../../scripts/run-tests.js test && node ../../node_modules/typescript/lib/tsc.js -p test/tsconfig.json",
     "prepack": "npm run build"
   },
   "publishConfig": {

@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import * as zlib from 'node:zlib';
 import type { RawData } from 'ws';
 

@@ -37,11 +37,14 @@ export class ShardManager {
     if (!Number.isSafeInteger(identifyIntervalMs) || identifyIntervalMs < 1 || identifyIntervalMs > 2_147_483_647) {
       throw new RangeError('Invalid shard IDENTIFY interval');
     }
+    if (options.shardIds !== undefined && !Array.isArray(options.shardIds)) throw new TypeError('Shard IDs must be an array');
     const ids = options.shardIds === undefined ? Array.from({ length: shardCount }, (_, id) => id) : [...options.shardIds];
     if (!ids.length) throw new RangeError('At least one shard ID is required');
     if (new Set(ids).size !== ids.length) throw new RangeError('Shard IDs must be unique');
-    if (ids.some((id) => !Number.isSafeInteger(id) || id < 0 || id >= shardCount)) {
-      throw new RangeError('Shard IDs must be integers within the shard count');
+    for (const id of ids) {
+      if (!Number.isSafeInteger(id) || id < 0 || id >= shardCount) {
+        throw new RangeError('Shard IDs must be integers within the shard count');
+      }
     }
     this.shardCount = shardCount;
     this.#lookup = config.lookupChannel;

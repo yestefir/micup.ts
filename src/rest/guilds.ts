@@ -282,15 +282,20 @@ export class MicupGuilds {
   }
 
   moveChannels(guildId: string, positions: readonly ChannelPosition[], options?: MicupRequestOptions): Promise<void> {
+    if (!Array.isArray(positions)) throw new TypeError('Channel positions must be an array');
     if (!positions.length) throw new RangeError('Moving channels needs at least one position');
-    const body = positions.map(({ id, parent_id, preceding_sibling_id, ...position }) => ({
-      ...position,
-      id: snowflake(id, 'Channel ID'),
-      ...(parent_id !== undefined && { parent_id: parent_id === null ? null : snowflake(parent_id, 'Parent ID') }),
-      ...(preceding_sibling_id !== undefined && {
-        preceding_sibling_id: preceding_sibling_id === null ? null : snowflake(preceding_sibling_id, 'Sibling ID'),
-      }),
-    }));
+    const body = Array.from(positions, (entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new TypeError('Channel positions must be objects');
+      const { id, parent_id, preceding_sibling_id, ...position } = entry;
+      return {
+        ...position,
+        id: snowflake(id, 'Channel ID'),
+        ...(parent_id !== undefined && { parent_id: parent_id === null ? null : snowflake(parent_id, 'Parent ID') }),
+        ...(preceding_sibling_id !== undefined && {
+          preceding_sibling_id: preceding_sibling_id === null ? null : snowflake(preceding_sibling_id, 'Sibling ID'),
+        }),
+      };
+    });
     return this.rest.request('PATCH', guildPath(guildId) + '/channels', { ...options, body });
   }
 
