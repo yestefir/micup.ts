@@ -161,7 +161,7 @@ Dokümanlar İngilizcedir.
 
 ## Güvenilirlik
 
-Test paketi SDK'yı sahte sunucular ve yerel bir LiveKit odasına karşı çalıştırır. `MICUP_TEST_BOT_TOKEN` ayarlıyken `npm run test:live`, bot kimliğini, uygulama erişimini, sunucu listesini, shard önerisini ve Gateway el sıkışmasını salt okunur biçimde denetler; sunucu verisi oluşturmaz veya değiştirmez ve kullanıcı token'ı kabul etmez. `MICUP_TEST_BOT_TOKEN` GitHub deposuna gizli değişken olarak eklendikten sonra `Live smoke` iş akışı bu denetimleri haftalık çalıştırabilir. Üretim dışı sandbox için `MICUP_TEST_ORIGIN` depo değişkenini ayarlayın.
+Test paketi SDK'yı sahte sunucular ve yerel bir LiveKit odasına karşı çalıştırır. `npm run test:live`, `MICUP_TEST_BOT_TOKEN` ve açıkça belirtilmiş `MICUP_TEST_ORIGIN` ile bot kimliğini, uygulama erişimini, sunucu listesini, shard önerisini, botun üye olduğu ilk sunucudaki sunucu/kanal/rol/üye okumalarını ve Gateway el sıkışmasını salt okunur biçimde denetler. Sunucu verisi oluşturmaz veya değiştirmez ve kullanıcı token'ı kabul etmez. Üretim dışı sandbox için `MICUP_TEST_ORIGIN` değerini ayarlayın; adres belirtilmezse test üretime yönelmez.
 
 İki çalışma alanını yerelde doğrulamak için bir kez `npm ci`, ardından `npm test` çalıştırın.
 

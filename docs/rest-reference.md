@@ -25,6 +25,11 @@
 | Members | `member`, `currentMember`, `members`, `iterateMembers`, `editMember`, `editCurrentMember`, `setNickname`, `addMemberRole`, `removeMemberRole`, `kick`, `timeout`, `clearTimeout`, `findMembers`, `searchMembers` |
 | Bans | `bans`, `getBan`, `ban`, `unban` |
 
+`guilds.createRole` requires a nonempty name. Role colors and permission masks are checked locally, and permission masks are sent as decimal strings.
+Member updates validate role lists, nicknames, voice fields, timeout dates and profile values before sending requests.
+Guild updates accept only documented editable settings and validate field ranges, identifiers, feature lists and timestamps before sending requests.
+Sticker updates require the current description and tags because the API clears either field when omitted.
+
 ## `client.channels`
 
 | Group | Methods |
@@ -51,6 +56,9 @@
 | `client.rooms` | `stage`, `setStage`, `clearStage`, `stageEffect`, `tournament`, `openTournament`, `reorderTournament`, `startTournament`, `cancelTournament` |
 | `client.discovery` | `status`, `apply`, `edit`, `withdraw` |
 | `client.media` | builds CDN URLs for avatars, banners, icons, emoji and stickers |
+
+`users.editCurrentUser` validates the bot username and accepts image data as a nonempty string or `null` to clear it.
+Command edits validate the supplied partial definition and reject response-only command fields before sending requests.
 
 ## Patterns
 

@@ -159,7 +159,7 @@ Your code still decides whom the bot messages and what it says; the SDK never wo
 
 ## Reliability
 
-The test suite runs the SDK against mocked servers. The voice workspace also includes an optional local LiveKit integration test; start a development server on loopback and set `MICUP_TEST_LIVEKIT_ENDPOINT` to include it. Run `npm run test:live` with `MICUP_TEST_BOT_TOKEN` and `MICUP_TEST_ORIGIN` set for read-only checks of bot identity, application access, guild listing, shard recommendation and the Gateway handshake. It does not create or edit server data and does not accept a user token. An explicit origin is required so the smoke test cannot silently use production. The `Live smoke` workflow runs these checks weekly when both the bot token repository secret and sandbox origin repository variable are configured.
+The test suite runs the SDK against mocked servers. The voice workspace also includes an optional local LiveKit integration test; start a development server on loopback and set `MICUP_TEST_LIVEKIT_ENDPOINT` to include it. Run `npm run test:live` with `MICUP_TEST_BOT_TOKEN` and `MICUP_TEST_ORIGIN` set for read-only checks of bot identity, application access, guild listing, shard recommendation, and, when the bot belongs to a guild, guild/channel/role/member reads and the Gateway handshake. It does not create or edit server data and does not accept a user token. An explicit origin is required so the smoke test cannot silently use production. The `Live smoke` workflow runs these checks weekly when both the bot token repository secret and sandbox origin repository variable are configured.
 
 Run `npm ci` once, then `npm test` to verify both workspaces locally.
 

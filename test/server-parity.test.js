@@ -347,7 +347,12 @@ test('moves channels, clears commands and edits the bot profile', async (t) => {
   assert.throws(() => bot.guilds.moveChannels('10', []), RangeError);
   assert.throws(() => bot.guilds.moveChannels('10', Array(1)), /Channel positions must be objects/);
   assert.throws(() => bot.guilds.moveChannels('10', '1'), /Channel positions must be an array/);
+  assert.throws(() => bot.users.editCurrentUser(null), /must be an object/);
   assert.throws(() => bot.users.editCurrentUser({ username: 'bad name' }), TypeError);
+  assert.throws(() => bot.users.editCurrentUser({ username: 123 }), TypeError);
+  assert.throws(() => bot.users.editCurrentUser({ avatar: 123 }), /nonempty strings/);
+  assert.throws(() => bot.users.editCurrentUser({ banner: '' }), /nonempty strings/);
+  assert.equal(calls.length, 6);
 });
 
 test('reads emoji, sticker and public application records', async (t) => {
@@ -386,7 +391,7 @@ test('validates and manages guild expressions across single and bulk routes', as
   await bot.expressions.cloneEmoji('10', '21');
   await bot.expressions.cloneSticker('10', '22');
   await bot.expressions.renameEmoji('10', '21', 'wave_new');
-  await bot.expressions.editSticker('10', '22', { name: 'Wave sticker' });
+  await bot.expressions.editSticker('10', '22', { name: 'Wave sticker', description: 'A wave', tags: ['wave'] });
   await bot.expressions.delete('10', 'emojis', '21', { purge: true });
   await bot.expressions.delete('10', 'stickers', '22');
   await bot.expressions.metadata('emojis', '21');
@@ -409,7 +414,7 @@ test('validates and manages guild expressions across single and bulk routes', as
     'GET /stickers/22/metadata',
   ]);
   assert.equal(calls[10].query, '?purge=true');
-  assert.deepEqual(calls[9].body, { tags: [], name: 'Wave sticker' });
+  assert.deepEqual(calls[9].body, { name: 'Wave sticker', description: 'A wave', tags: ['wave'] });
 
   assert.throws(() => bot.expressions.createEmoji('10', { name: 42, image: 'x' }), TypeError);
   assert.throws(() => bot.expressions.createEmoji('10', { name: 'ok', image: 42 }), TypeError);
@@ -418,6 +423,8 @@ test('validates and manages guild expressions across single and bulk routes', as
   assert.throws(() => bot.expressions.createStickers('10', Array(1)), TypeError);
   assert.throws(() => bot.expressions.createEmojis('10', 'wave'), TypeError);
   assert.throws(() => bot.expressions.editSticker('10', '22', { name: 'Ok', tags: 'wave' }), TypeError);
+  assert.throws(() => bot.expressions.editSticker('10', '22', { name: 'Ok' }), /must include description and tags/);
+  assert.throws(() => bot.expressions.editSticker('10', '22', { name: 'Ok', description: null, tags: [], image: 'x' }), /do not support the image field/);
   assert.throws(() => bot.expressions.source('users', '21'), TypeError);
   assert.throws(() => bot.expressions.delete('10', 'users', '21'), TypeError);
   assert.equal(calls.length, 14);

@@ -25,6 +25,30 @@ const shardCount = await client.recommendedShards();
 assert.ok(Number.isSafeInteger(shardCount) && shardCount >= 1, 'the API must recommend at least one shard');
 process.stdout.write('Guild listing and shard recommendation check passed\n');
 
+const guilds = await client.users.guilds({ limit: 1 });
+assert.ok(Array.isArray(guilds), 'the guild listing must be an array');
+if (guilds.length > 0) {
+  const guildId = guilds[0].id;
+  assert.equal(typeof guildId, 'string');
+  const [guild, channels, roles, member] = await Promise.all([
+    client.guilds.get(guildId),
+    client.guilds.channels(guildId),
+    client.guilds.roles(guildId),
+    client.guilds.currentMember(guildId),
+  ]);
+  assert.equal(guild.id, guildId, 'the guild detail must match the listed guild');
+  assert.ok(Array.isArray(channels), 'guild channels must be an array');
+  assert.ok(Array.isArray(roles), 'guild roles must be an array');
+  assert.ok(Array.isArray(member.roles), 'the current guild member must have a role list');
+  if (channels.length > 0) {
+    const channel = await client.channels.get(channels[0].id);
+    assert.equal(channel.id, channels[0].id, 'the channel detail must match the listed channel');
+  }
+  process.stdout.write('Guild, role, member and channel read scenario passed\n');
+} else {
+  process.stdout.write('Guild detail scenario skipped because the bot has no guilds\n');
+}
+
 const stop = new AbortController();
 const deadline = AbortSignal.timeout(20_000);
 let gatewayReady = false;

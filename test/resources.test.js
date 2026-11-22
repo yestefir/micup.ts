@@ -2,6 +2,42 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MicupClient, Permission } from 'micup.ts';
 
+test('validates guild updates against editable API fields', async (t) => {
+  const origin = 'https://micup.example';
+  const sent = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const { pathname } = new URL(url);
+    if (pathname === '/.well-known/fluxer') return Response.json({ endpoints: { api_public: origin + '/api' } });
+    if (pathname === '/api/v1/users/@me') return Response.json({ id: '99', bot: true });
+    sent.push(JSON.parse(options.body));
+    return Response.json({ id: '10', name: 'Updated' });
+  });
+  const bot = await MicupClient.connect({ origin, token: 'fixture' });
+  assert.throws(() => bot.guilds.edit('10', null), /must be an object/);
+  assert.throws(() => bot.guilds.edit('10', { name: '' }), /1 to 100/);
+  assert.throws(() => bot.guilds.edit('10', { afk_timeout: 59 }), RangeError);
+  assert.throws(() => bot.guilds.edit('10', { verification_level: 4 }), RangeError);
+  assert.throws(() => bot.guilds.edit('10', { nsfw_level: 2 }), RangeError);
+  assert.throws(() => bot.guilds.edit('10', { features: Array(101).fill('VISITS_ENABLED') }), /up to 100/);
+  assert.throws(() => bot.guilds.edit('10', { system_channel_id: 'invalid' }), /numeric string/);
+  assert.throws(() => bot.guilds.edit('10', { message_history_cutoff: 'tomorrow' }), /ISO 8601/);
+  assert.throws(() => bot.guilds.edit('10', { owner_id: '20' }), /do not support the owner_id field/);
+  await bot.guilds.edit('10', {
+    name: 'Updated',
+    afk_timeout: 300,
+    system_channel_id: null,
+    features: ['VISITS_ENABLED'],
+    message_history_cutoff: null,
+  });
+  assert.deepEqual(sent, [{
+    name: 'Updated',
+    afk_timeout: 300,
+    system_channel_id: null,
+    features: ['VISITS_ENABLED'],
+    message_history_cutoff: null,
+  }]);
+});
+
 test('uses Micup role, member moderation, channel and reaction routes', async (t) => {
   const origin = 'https://micup.example';
   const requests = [
@@ -26,6 +62,15 @@ test('uses Micup role, member moderation, channel and reaction routes', async (t
 
   const bot = await MicupClient.connect({ origin, token: 'fixture' });
   assert.throws(() => bot.guilds.ban('10', '20', { ban_duration_seconds: 5 }), /Invalid/);
+  assert.throws(() => bot.guilds.createRole('10', null), /must be an object/);
+  assert.throws(() => bot.guilds.createRole('10', {}), /needs a nonempty name/);
+  assert.throws(() => bot.guilds.createRole('10', { name: 'x'.repeat(101) }), RangeError);
+  assert.throws(() => bot.guilds.createRole('10', { name: 'Moderator', color: 0x1000000 }), RangeError);
+  assert.throws(() => bot.guilds.createRole('10', { name: 'Moderator', permissions: '-1' }), /unsigned 64-bit/);
+  assert.throws(() => bot.guilds.editRole('10', '70', { permissions: (1n << 64n).toString() }), /unsigned 64-bit/);
+  assert.throws(() => bot.guilds.editRole('10', '70', { hoist: 'yes' }), /must be booleans/);
+  assert.throws(() => bot.guilds.editRole('10', '70', { mentionable: 1 }), /must be booleans/);
+  assert.throws(() => bot.guilds.editRole('10', '70', { icon: '' }), /nonempty strings/);
   assert.throws(() => bot.channels.startThread('30', { name: 'Thread', rate_limit_per_user: -1 }), RangeError);
   assert.throws(() => bot.channels.startThread('30', { name: 'Thread', rate_limit_per_user: 21_601 }), RangeError);
   assert.throws(() => bot.channels.startThread('30', { name: 'Thread', rate_limit_per_user: 1.5 }), RangeError);
@@ -124,4 +169,42 @@ test('validates guild channel inputs before sending requests', async (t) => {
     { method: 'PUT', path: '/api/v1/channels/30/permissions/20', body: { type: 1, allow: '1', deny: '0' } },
   ]);
   assert.equal(fetch.mock.callCount(), 5);
+});
+
+test('validates guild member updates before sending requests', async (t) => {
+  const origin = 'https://micup.example';
+  const sent = [];
+  const fetch = t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const { pathname } = new URL(url);
+    if (pathname === '/.well-known/fluxer') return Response.json({ endpoints: { api_public: origin + '/api' } });
+    if (pathname === '/api/v1/users/@me') return Response.json({ id: '99', bot: true });
+    sent.push({ path: pathname, body: JSON.parse(options.body) });
+    return Response.json({ user: { id: '20' } });
+  });
+
+  const bot = await MicupClient.connect({ origin, token: 'fixture' });
+  assert.throws(() => bot.guilds.editMember('10', '20', null), /must be an object/);
+  assert.throws(() => bot.guilds.editMember('10', '20', { nick: 7 }), /nick must be/);
+  assert.throws(() => bot.guilds.editMember('10', '20', { nick: 'x'.repeat(33) }), RangeError);
+  assert.throws(() => bot.guilds.editMember('10', '20', { roles: Array(251).fill('30') }), RangeError);
+  assert.throws(() => bot.guilds.editMember('10', '20', { roles: ['invalid'] }), /numeric string/);
+  assert.throws(() => bot.guilds.editMember('10', '20', { roles: ['10'] }), /everyone role/);
+  assert.throws(() => bot.guilds.editMember('10', '20', { mute: 'yes' }), /must be booleans/);
+  assert.throws(() => bot.guilds.editMember('10', '20', { channel_id: 'invalid' }), /numeric string/);
+  assert.throws(() => bot.guilds.editMember('10', '20', { connection_id: 'x'.repeat(33) }), /connection IDs/);
+  assert.throws(() => bot.guilds.editMember('10', '20', { communication_disabled_until: 'tomorrow' }), /ISO 8601/);
+  assert.throws(() => bot.guilds.editMember('10', '20', {
+    communication_disabled_until: new Date(Date.now() + 366 * 24 * 60 * 60 * 1000).toISOString(),
+  }), RangeError);
+  assert.throws(() => bot.guilds.editMember('10', '20', { timeout_reason: 'x'.repeat(513) }), RangeError);
+  assert.throws(() => bot.guilds.editCurrentMember('10', { accent_color: 0x1000000 }), RangeError);
+  assert.throws(() => bot.guilds.editCurrentMember('10', { pronouns: 'x'.repeat(41) }), /pronouns/);
+  assert.throws(() => bot.guilds.editCurrentMember('10', { avatar: 123 }), /profile images/);
+  await bot.guilds.editMember('10', '20', { nick: '', roles: ['30'], mute: false, channel_id: null });
+  await bot.guilds.editCurrentMember('10', { nick: null, accent_color: 0xFFFFFF, pronouns: 'they/them', avatar: null });
+  assert.deepEqual(sent, [
+    { path: '/api/v1/guilds/10/members/20', body: { nick: '', roles: ['30'], mute: false, channel_id: null } },
+    { path: '/api/v1/guilds/10/members/@me', body: { nick: null, accent_color: 0xFFFFFF, pronouns: 'they/them', avatar: null } },
+  ]);
+  assert.equal(fetch.mock.callCount(), 4);
 });

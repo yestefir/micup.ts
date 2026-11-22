@@ -20,8 +20,8 @@ export interface GuildMemberEdit {
   deaf?: boolean;
   communication_disabled_until?: string | null;
   channel_id?: string | null;
-  connection_id?: string;
-  timeout_reason?: string;
+  connection_id?: string | null;
+  timeout_reason?: string | null;
 }
 
 export interface ChannelPosition {
@@ -60,6 +60,33 @@ export interface GuildRoleEdit {
   mentionable?: boolean;
   icon?: string | null;
   unicode_emoji?: string | null;
+}
+
+export interface GuildRoleCreate extends GuildRoleEdit {
+  name: string;
+}
+
+export interface GuildEdit extends SudoProof {
+  name?: string;
+  icon?: string | null;
+  system_channel_id?: string | null;
+  system_channel_flags?: number;
+  afk_channel_id?: string | null;
+  afk_timeout?: number;
+  default_message_notifications?: number;
+  verification_level?: number;
+  mfa_level?: number;
+  nsfw_level?: number;
+  nsfw?: boolean;
+  content_warning_level?: number;
+  content_warning_text?: string | null;
+  explicit_content_filter?: number;
+  banner?: string | null;
+  splash?: string | null;
+  embed_splash?: string | null;
+  splash_card_alignment?: number;
+  features?: readonly string[];
+  message_history_cutoff?: string | null;
 }
 
 export interface GuildBanInput {
@@ -119,11 +146,179 @@ function memberPath(guildId: string, userId: string): string {
   return guildPath(guildId) + '/members/' + snowflake(userId, 'User ID');
 }
 
-function rolePayload({ permissions, ...body }: GuildRoleEdit): object {
-  if (permissions === undefined) return body;
-  const text = String(permissions);
-  if (!/^\d{1,20}$/.test(text) || BigInt(text) > (1n << 64n) - 1n) throw new TypeError('Role permissions must be an unsigned 64-bit decimal value');
-  return { ...body, permissions: text };
+function rolePayload(role: GuildRoleEdit, creating = false): object {
+  if (!role || typeof role !== 'object' || Array.isArray(role)) throw new TypeError('Micup role options must be an object');
+  const { permissions, ...body } = role;
+  const payload: Record<string, unknown> = { ...body };
+  if (creating && (typeof role.name !== 'string' || !role.name)) throw new TypeError('A Micup role needs a nonempty name');
+  if (role.name !== undefined && typeof role.name !== 'string') throw new TypeError('Micup role name must be a string');
+  if (typeof role.name === 'string' && (!role.name || [...role.name].length > 100)) {
+    throw new RangeError('Micup role names must contain 1 to 100 characters');
+  }
+  if (permissions !== undefined) {
+    if (typeof permissions !== 'string' && typeof permissions !== 'bigint' &&
+        !(typeof permissions === 'number' && Number.isSafeInteger(permissions))) {
+      throw new TypeError('Role permissions must be an unsigned 64-bit decimal value');
+    }
+    const text = String(permissions);
+    if (!/^\d{1,20}$/.test(text) || BigInt(text) > (1n << 64n) - 1n) {
+      throw new TypeError('Role permissions must be an unsigned 64-bit decimal value');
+    }
+    payload.permissions = text;
+  }
+  if (role.color !== undefined && (!Number.isSafeInteger(role.color) || role.color < 0 || role.color > 0xFFFFFF)) {
+    throw new RangeError('Micup role color must be an integer between 0 and 16,777,215');
+  }
+  if ((role.hoist !== undefined && typeof role.hoist !== 'boolean') ||
+      (role.mentionable !== undefined && typeof role.mentionable !== 'boolean')) {
+    throw new TypeError('Micup role hoist and mentionable options must be booleans');
+  }
+  if ((role.icon !== undefined && role.icon !== null && (typeof role.icon !== 'string' || !role.icon)) ||
+      (role.unicode_emoji !== undefined && role.unicode_emoji !== null &&
+      (typeof role.unicode_emoji !== 'string' || !role.unicode_emoji))) {
+    throw new TypeError('Micup role icons must be nonempty strings or null');
+  }
+  return payload;
+}
+
+function guildPayload(body: GuildEdit): object {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('Micup guild options must be an object');
+  const fields = new Set([
+    'name', 'icon', 'system_channel_id', 'system_channel_flags', 'afk_channel_id', 'afk_timeout',
+    'default_message_notifications', 'verification_level', 'mfa_level', 'nsfw_level', 'nsfw',
+    'content_warning_level', 'content_warning_text', 'explicit_content_filter', 'banner', 'splash',
+    'embed_splash', 'splash_card_alignment', 'features', 'message_history_cutoff', 'password',
+    'mfa_method', 'mfa_code', 'webauthn_response', 'webauthn_challenge', 'email_code_ticket', 'email_code',
+  ]);
+  for (const field of Object.keys(body)) {
+    if (!fields.has(field)) throw new TypeError(`Micup guild updates do not support the ${field} field`);
+  }
+  const boundedInteger = (value: number | undefined, label: string, minimum: number, maximum: number) => {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < minimum || value > maximum)) {
+      throw new RangeError(`Micup guild ${label} must be an integer between ${minimum} and ${maximum}`);
+    }
+  };
+  if (body.name !== undefined && (typeof body.name !== 'string' || !body.name || [...body.name].length > 100)) {
+    throw new RangeError('Micup guild names must contain 1 to 100 characters');
+  }
+  for (const [field, value] of Object.entries({
+    icon: body.icon,
+    banner: body.banner,
+    splash: body.splash,
+    embed_splash: body.embed_splash,
+  })) {
+    if (value !== undefined && value !== null && (typeof value !== 'string' || !value)) {
+      throw new TypeError(`Micup guild ${field} must be a nonempty string or null`);
+    }
+  }
+  for (const [field, value] of Object.entries({
+    system_channel_id: body.system_channel_id,
+    afk_channel_id: body.afk_channel_id,
+  })) {
+    if (value !== undefined && value !== null) snowflake(value, field === 'afk_channel_id' ? 'AFK channel ID' : 'System channel ID');
+  }
+  if (body.system_channel_flags !== undefined && (!Number.isSafeInteger(body.system_channel_flags) || body.system_channel_flags < 0)) {
+    throw new RangeError('Micup guild system channel flags must be a nonnegative integer');
+  }
+  boundedInteger(body.afk_timeout, 'AFK timeout', 60, 3600);
+  boundedInteger(body.default_message_notifications, 'default message notifications', 0, 1);
+  boundedInteger(body.verification_level, 'verification level', 0, 3);
+  boundedInteger(body.mfa_level, 'MFA level', 0, 1);
+  if (body.nsfw_level !== undefined && body.nsfw_level !== 0 && body.nsfw_level !== 3) {
+    throw new RangeError('Micup guild NSFW level must be 0 or 3');
+  }
+  if (body.nsfw !== undefined && typeof body.nsfw !== 'boolean') throw new TypeError('Micup guild NSFW flag must be a boolean');
+  boundedInteger(body.content_warning_level, 'content warning level', 0, 1);
+  if (body.content_warning_text !== undefined && body.content_warning_text !== null &&
+      (typeof body.content_warning_text !== 'string' || [...body.content_warning_text].length > 200)) {
+    throw new RangeError('Micup guild content warning text must contain up to 200 characters or be null');
+  }
+  boundedInteger(body.explicit_content_filter, 'explicit content filter', 0, 2);
+  boundedInteger(body.splash_card_alignment, 'splash card alignment', 0, 2);
+  if (body.features !== undefined && (!Array.isArray(body.features) || body.features.length > 100 || body.features.some((feature) => typeof feature !== 'string'))) {
+    throw new TypeError('Micup guild features must be an array of up to 100 strings');
+  }
+  if (body.message_history_cutoff !== undefined && body.message_history_cutoff !== null) {
+    const value = body.message_history_cutoff;
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) {
+      throw new TypeError('Micup guild message history cutoff must be an ISO 8601 timestamp or null');
+    }
+  }
+  if (body.password !== undefined && (typeof body.password !== 'string' || !body.password)) throw new TypeError('Micup sudo password must be a nonempty string');
+  if (body.mfa_method !== undefined && !['totp', 'webauthn', 'email_code'].includes(body.mfa_method)) throw new TypeError('Micup sudo MFA method is invalid');
+  for (const [field, value, maximum] of [
+    ['mfa_code', body.mfa_code, 32],
+    ['webauthn_challenge', body.webauthn_challenge, Number.MAX_SAFE_INTEGER],
+    ['email_code_ticket', body.email_code_ticket, 128],
+    ['email_code', body.email_code, 6],
+  ] as const) {
+    if (value !== undefined && (typeof value !== 'string' || !value || [...value].length > maximum)) {
+      throw new RangeError(`Micup sudo ${field} must be a nonempty string of at most ${maximum} characters`);
+    }
+  }
+  if (body.email_code !== undefined && !/^\d{6}$/.test(body.email_code)) throw new TypeError('Micup sudo email code must contain six digits');
+  return body;
+}
+
+function memberPayload(guildId: string, body: GuildMemberEdit | CurrentMemberEdit): object {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('Micup member options must be an object');
+  const member = body as GuildMemberEdit & CurrentMemberEdit;
+  if (member.nick !== undefined && member.nick !== null && typeof member.nick !== 'string') {
+    throw new TypeError('Micup member nick must be a string or null');
+  }
+  if (typeof member.nick === 'string' && [...member.nick].length > 32) throw new RangeError('Micup member nicks can contain up to 32 characters');
+  if (member.roles !== undefined) {
+    if (!Array.isArray(member.roles)) throw new TypeError('Micup member roles must be an array');
+    if (member.roles.length > 250) throw new RangeError('Micup members can have up to 250 roles');
+    for (const roleId of member.roles) {
+      const id = snowflake(roleId, 'Role ID');
+      if (id === guildId) throw new TypeError('The everyone role must not be included in a member role list');
+    }
+  }
+  if ((member.mute !== undefined && typeof member.mute !== 'boolean') ||
+      (member.deaf !== undefined && typeof member.deaf !== 'boolean')) {
+    throw new TypeError('Micup member mute and deaf options must be booleans');
+  }
+  if (member.communication_disabled_until !== undefined && member.communication_disabled_until !== null) {
+    const timestamp = member.communication_disabled_until;
+    if (typeof timestamp !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(timestamp) ||
+        !Number.isFinite(Date.parse(timestamp))) {
+      throw new TypeError('Micup member timeout must be an ISO 8601 timestamp or null');
+    }
+    if (Date.parse(timestamp) > Date.now() + 365.25 * 24 * 60 * 60 * 1000) {
+      throw new RangeError('A Micup member timeout cannot exceed 365.25 days');
+    }
+  }
+  if (member.timeout_reason !== undefined && member.timeout_reason !== null) {
+    if (typeof member.timeout_reason !== 'string' || !member.timeout_reason) throw new TypeError('Micup timeout reasons must be nonempty strings or null');
+    if ([...member.timeout_reason].length > 512) throw new RangeError('Micup timeout reasons can contain up to 512 characters');
+  }
+  if (member.channel_id !== undefined && member.channel_id !== null) snowflake(member.channel_id, 'Voice channel ID');
+  if (member.connection_id !== undefined && member.connection_id !== null &&
+      (typeof member.connection_id !== 'string' || !member.connection_id || [...member.connection_id].length > 32)) {
+    throw new TypeError('Micup voice connection IDs must contain 1 to 32 characters');
+  }
+  if ((member.avatar !== undefined && member.avatar !== null && (typeof member.avatar !== 'string' || !member.avatar)) ||
+      (member.banner !== undefined && member.banner !== null && (typeof member.banner !== 'string' || !member.banner))) {
+    throw new TypeError('Micup guild profile images must be nonempty strings or null');
+  }
+  if (member.bio !== undefined && member.bio !== null && (typeof member.bio !== 'string' || !member.bio)) {
+    throw new TypeError('Micup guild profile bio must be a nonempty string or null');
+  }
+  if (member.pronouns !== undefined && member.pronouns !== null &&
+      (typeof member.pronouns !== 'string' || !member.pronouns || [...member.pronouns].length > 40)) {
+    throw new TypeError('Micup guild profile pronouns must contain 1 to 40 characters or be null');
+  }
+  if (member.accent_color !== undefined && member.accent_color !== null &&
+      (!Number.isSafeInteger(member.accent_color) || member.accent_color < 0 || member.accent_color > 0xFFFFFF)) {
+    throw new RangeError('Micup guild profile accent color must be between 0 and 16,777,215');
+  }
+  if ((member.profile_flags !== undefined && (!Number.isSafeInteger(member.profile_flags) || member.profile_flags < 0)) ||
+      (member.mention_flags !== undefined && (!Number.isSafeInteger(member.mention_flags) || member.mention_flags < 0))) {
+    throw new RangeError('Micup guild profile flags must be nonnegative integers');
+  }
+  return body;
 }
 
 export class MicupGuilds {
@@ -133,8 +328,8 @@ export class MicupGuilds {
     return this.rest.request('GET', guildPath(guildId), options);
   }
 
-  edit(guildId: string, body: Omit<Partial<MicupGuild>, 'id' | 'roles'>, options?: AuditOptions): Promise<MicupGuild> {
-    return this.rest.request('PATCH', guildPath(guildId), { ...options, body });
+  edit(guildId: string, body: GuildEdit, options?: AuditOptions): Promise<MicupGuild> {
+    return this.rest.request('PATCH', guildPath(guildId), { ...options, body: guildPayload(body) });
   }
 
   channels(guildId: string, options?: MicupRequestOptions): Promise<MicupChannel[]> {
@@ -145,8 +340,8 @@ export class MicupGuilds {
     return this.rest.request('GET', guildPath(guildId) + '/roles', options);
   }
 
-  createRole(guildId: string, role: GuildRoleEdit, options?: AuditOptions): Promise<MicupRole> {
-    return this.rest.request('POST', guildPath(guildId) + '/roles', { ...options, body: rolePayload(role) });
+  createRole(guildId: string, role: GuildRoleCreate, options?: AuditOptions): Promise<MicupRole> {
+    return this.rest.request('POST', guildPath(guildId) + '/roles', { ...options, body: rolePayload(role, true) });
   }
 
   editRole(guildId: string, roleId: string, role: GuildRoleEdit, options?: AuditOptions): Promise<MicupRole> {
@@ -198,7 +393,7 @@ export class MicupGuilds {
   }
 
   editMember(guildId: string, userId: string, body: GuildMemberEdit, options?: AuditOptions): Promise<MicupMember> {
-    return this.rest.request('PATCH', memberPath(guildId, userId), { ...options, body });
+    return this.rest.request('PATCH', memberPath(guildId, userId), { ...options, body: memberPayload(guildId, body) });
   }
 
   addMemberRole(guildId: string, userId: string, roleId: string, options?: AuditOptions): Promise<void> {
@@ -319,7 +514,7 @@ export class MicupGuilds {
   }
 
   editCurrentMember(guildId: string, edit: CurrentMemberEdit, options?: AuditOptions): Promise<MicupMember> {
-    return this.rest.request('PATCH', guildPath(guildId) + '/members/@me', { ...options, body: edit });
+    return this.rest.request('PATCH', guildPath(guildId) + '/members/@me', { ...options, body: memberPayload(guildId, edit) });
   }
 
   setNickname(guildId: string, nick: string | null, options?: AuditOptions): Promise<MicupMember> {

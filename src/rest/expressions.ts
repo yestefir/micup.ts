@@ -12,8 +12,14 @@ export interface EmojiInput {
 export interface StickerInput {
   name: string;
   image: string;
-  description?: string;
+  description?: string | null;
   tags?: readonly string[];
+}
+
+export interface StickerEdit {
+  name: string;
+  description: string | null;
+  tags: readonly string[];
 }
 
 export interface MicupSticker {
@@ -48,9 +54,11 @@ function emojiName(name: string): void {
   if (typeof name !== 'string' || !/^[A-Za-z0-9_]{2,32}$/.test(name)) throw new TypeError('Emoji names need 2 to 32 ASCII letters, digits or underscores');
 }
 
-function stickerText({ name, description, tags }: Omit<StickerInput, 'image'>): void {
+function stickerText(body: Omit<StickerInput, 'image'>): void {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('A sticker input is required');
+  const { name, description, tags } = body;
   if (typeof name !== 'string' || [...name].length < 2 || [...name].length > 30 ||
-      (description !== undefined && (typeof description !== 'string' || [...description].length > 500))) {
+      (description !== undefined && description !== null && (typeof description !== 'string' || [...description].length < 1 || [...description].length > 500))) {
     throw new TypeError('Invalid Micup sticker name, description or tags');
   }
   if (tags !== undefined) {
@@ -133,9 +141,17 @@ export class MicupExpressions {
     return this.rest.request('PATCH', this.#path(guildId, 'emojis', id), { ...options, body: { name } });
   }
 
-  editSticker(guildId: string, id: string, body: Omit<StickerInput, 'image'>, options?: AuditOptions): Promise<MicupSticker> {
+  editSticker(guildId: string, id: string, body: StickerEdit, options?: AuditOptions): Promise<MicupSticker> {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('A sticker edit is required');
+    const fields = new Set(['name', 'description', 'tags']);
+    for (const field of Object.keys(body)) {
+      if (!fields.has(field)) throw new TypeError(`Sticker updates do not support the ${field} field`);
+    }
+    if (!Object.hasOwn(body, 'description') || !Object.hasOwn(body, 'tags')) {
+      throw new TypeError('Sticker updates must include description and tags to prevent clearing omitted values');
+    }
     stickerText(body);
-    return this.rest.request('PATCH', this.#path(guildId, 'stickers', id), { ...options, body: { tags: [], ...body } });
+    return this.rest.request('PATCH', this.#path(guildId, 'stickers', id), { ...options, body });
   }
 
   delete(guildId: string, kind: Resource, id: string, { purge, ...options }: AuditOptions & { purge?: boolean } = {}): Promise<void> {

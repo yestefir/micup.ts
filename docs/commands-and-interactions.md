@@ -31,7 +31,7 @@ await client.commands.create({
 }, { guildId });
 ```
 
-Definitions are validated before they are sent (name and option limits, choices, localizations). Context menu commands use `CommandType.User` and `CommandType.Message`. Commands, options and choices can carry translated names and descriptions that Micup shows to each user in their language; build them from a `MessageCatalog` with `localizeCommand()` and translate replies with the same catalog. See [Localization](localization.md).
+Definitions are validated before they are sent (name and option limits, choices, localizations, permission masks and option constraints). Response-only fields are removed from nested option payloads. Context menu commands use `CommandType.User` and `CommandType.Message`. Commands, options and choices can carry translated names and descriptions that Micup shows to each user in their language; build them from a `MessageCatalog` with `localizeCommand()` and translate replies with the same catalog. See [Localization](localization.md).
 
 ## Route interactions
 

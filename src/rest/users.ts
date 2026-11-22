@@ -68,8 +68,13 @@ export class MicupUsers {
   }
 
   editCurrentUser(edit: BotProfileEdit, options?: MicupRequestOptions): Promise<MicupUser> {
-    if (edit.username !== undefined && !/^[A-Za-z0-9_]{1,32}$/.test(edit.username)) {
+    if (!edit || typeof edit !== 'object' || Array.isArray(edit)) throw new TypeError('Micup profile options must be an object');
+    if (edit.username !== undefined && (typeof edit.username !== 'string' || !/^[A-Za-z0-9_]{1,32}$/.test(edit.username))) {
       throw new TypeError('A bot username takes 1 to 32 ASCII letters, digits or underscores');
+    }
+    if ((edit.avatar !== undefined && edit.avatar !== null && (typeof edit.avatar !== 'string' || !edit.avatar)) ||
+        (edit.banner !== undefined && edit.banner !== null && (typeof edit.banner !== 'string' || !edit.banner))) {
+      throw new TypeError('Micup profile images must be nonempty strings or null');
     }
     return this.rest.request('PATCH', '/users/@me', { ...options, body: edit });
   }

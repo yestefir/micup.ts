@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Command option validation checks booleans, numeric and string constraints, channel filters and nested response-only fields.
+- Live smoke checks read the bot's first guild, its channels, roles and current member when available.
+- Command edits validate partial command definitions and reject response-only fields.
+- Guild updates expose a dedicated `GuildEdit` request type and validate editable fields before sending requests.
+- Sticker updates require description and tags so omitted values cannot be cleared accidentally.
+
 ### Reliability and security
 
 - REST and Gateway connection errors retain their original causes; attachment upload and LiveKit connection failures do the same. FFmpeg startup and input stream errors retain their underlying causes, and stream listeners are removed when the process closes.
@@ -32,6 +38,9 @@
 - Invite creation validates expiry, use-count and boolean options before sending requests.
 - Channel creation requires a supported guild channel type and validates shared field ranges before sending requests.
 - Single channel permission overwrites use the same target, type and permission-bit validation as channel creation.
+- Role creation and edits validate names, colors, booleans and unsigned 64-bit permission masks before sending requests.
+- Bot profile updates reject non-string usernames and malformed avatar or banner values before sending requests.
+- Guild member updates validate roles, nicknames, voice fields, timeout dates and profile values before sending requests.
 - Raw REST requests validate methods, query objects and retry/authentication flags, and reject GET or HEAD bodies before sending requests.
 - Guild channel moves reject sparse position arrays instead of serializing holes as null values.
 - Room tournament ordering rejects sparse entrant arrays before building the request body.
