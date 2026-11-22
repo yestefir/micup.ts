@@ -2,7 +2,7 @@
 
 Outgoing audio for [micup.ts](https://github.com/yestefir/micup.ts) bots. The package publishes stereo audio to a LiveKit room using a short-lived Micup voice grant.
 
-Requires Node.js 22 or later. Install FFmpeg to decode an audio file or stream with `openSource`. You can also give `Player` an async iterable of raw signed 16-bit little-endian PCM bytes at 48 kHz stereo.
+Install with `npm install @micupts/voice`. Requires Node.js 22 or later. Install FFmpeg to decode an audio file or stream with `openSource`. You can also give `Player` an async iterable of raw signed 16-bit little-endian PCM bytes at 48 kHz stereo.
 
 ```js
 import { openSource, Player, VoiceRoom } from '@micupts/voice';

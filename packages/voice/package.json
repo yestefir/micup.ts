@@ -1,6 +1,6 @@
 {
   "name": "@micupts/voice",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "LiveKit audio publisher and PCM player for Micup bots",
   "type": "module",
   "exports": {

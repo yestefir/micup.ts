@@ -2,7 +2,7 @@
 
 TypeScript SDK for Micup bots (Fluxer API), based on [micup.go](https://github.com/yestefir/micup.go). The SDK includes API discovery, REST requests and supervised Gateway sessions.
 
-Requires Node.js 22 or later and a Micup bot token. The build produces JavaScript and TypeScript declarations. After the first npm release, install it with:
+Requires Node.js 22 or later and a Micup bot token. The build produces JavaScript and TypeScript declarations. Install it with:
 
 ```sh
 npm install micup.ts
@@ -67,9 +67,13 @@ await client.newSession({ handler: events.handle }).run();
 
 The router also handles autocomplete, buttons, select menus and modal submissions. Use `client.interactions.defer` and `editResponse` when work needs more time.
 
+## Server administration
+
+Use the `client.guilds` and `client.channels` APIs for members, roles, channel permissions, threads, pins, reactions and invitations. Each Gateway session exposes `session.state` for cached guilds, channels, members, voice states and permission checks.
+
 ## Voice
 
-The optional [`@micupts/voice`](packages/voice) workspace publishes audio to LiveKit. The main SDK can be installed independently.
+The optional [`@micupts/voice`](packages/voice) workspace publishes audio to LiveKit. Install it with `npm install @micupts/voice` when your bot needs audio playback.
 
 Run `npm ci` once, then `npm test` to verify the REST client locally.
 
