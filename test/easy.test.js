@@ -36,9 +36,16 @@ test('login needs a token and exposes the bot user without a Gateway', async (t)
   assert.equal(client.ready, true);
   assert.equal(client.user.id, '77');
   assert.equal(client.user.displayName, 'robot');
+  assert.ok(client.readyAt instanceof Date);
+  assert.ok(client.uptime >= 0);
   assert.throws(() => new Client().rest, /login/);
   assert.throws(() => client.setStatus('idle'), /Gateway/);
   await assert.rejects(client.login(), /already/);
+  await client.destroy();
+  assert.equal(client.ready, false);
+  assert.equal(client.readyAt, undefined);
+  assert.equal(client.uptime, undefined);
+  assert.equal(client.user.id, '77');
 });
 
 test('destroy aborts REST discovery while login is still starting', async (t) => {
@@ -91,6 +98,43 @@ test('destroy aborts command registration before the ready event', async (t) => 
   await assert.rejects(login, (error) => error === signal.reason);
   assert.equal(signal.aborted, true);
   assert.equal(ready, false);
+});
+
+test('restarts readiness tracking after a partial shard startup fails', async () => {
+  const sessions = [];
+  let runCount = 0;
+  const rest = {
+    self: { id: '77', username: 'robot', bot: true },
+    newShardManager({ session }) {
+      sessions.push(session);
+      const run = ++runCount;
+      return {
+        run({ signal }) {
+          if (run === 1) {
+            return Promise.resolve().then(async () => {
+              await session.handler({ name: 'READY', data: { guilds: [], user: rest.self }, sequence: 1, shardId: 0 }, signal);
+              throw new Error('first shard startup failed');
+            });
+          }
+          return new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }));
+        },
+      };
+    },
+  };
+  const client = new Client({ rest, shards: 2 });
+
+  await assert.rejects(client.login(), /first shard startup failed/);
+
+  const login = client.login();
+  await new Promise((resolve) => setImmediate(resolve));
+  await sessions[1].handler({ name: 'READY', data: { guilds: [], user: rest.self }, sequence: 2, shardId: 1 }, new AbortController().signal);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(client.ready, false);
+
+  await sessions[1].handler({ name: 'READY', data: { guilds: [], user: rest.self }, sequence: 3, shardId: 0 }, new AbortController().signal);
+  await login;
+  assert.equal(client.ready, true);
+  await client.destroy();
 });
 
 test('ignores malformed readiness fields without replacing the bot identity', async (t) => {
@@ -187,6 +231,24 @@ test('supports once and off', async (t) => {
   await dispatch(client, 'MESSAGE_CREATE', { id: '3', channel_id: '20', content: 'x', author });
   await settle();
   assert.deepEqual(seen, ['on', 'once', 'on']);
+});
+
+test('keeps repeated listener registrations independent', async (t) => {
+  const { client } = await setup(t);
+  let calls = 0;
+  const listener = () => { calls++; };
+  client.on('messageCreate', listener);
+  client.once('messageCreate', listener);
+
+  await dispatch(client, 'MESSAGE_CREATE', { id: '1', channel_id: '20', content: 'x', author });
+  await dispatch(client, 'MESSAGE_CREATE', { id: '2', channel_id: '20', content: 'x', author });
+  await settle();
+  assert.equal(calls, 3);
+
+  client.off('messageCreate', listener);
+  await dispatch(client, 'MESSAGE_CREATE', { id: '3', channel_id: '20', content: 'x', author });
+  await settle();
+  assert.equal(calls, 3);
 });
 
 test('routes slash commands by path, reads options and tracks replies', async (t) => {
@@ -426,6 +488,39 @@ test('awaits the next matching interaction with a timeout and an abort signal', 
   const aborted = client.awaitInteraction({ signal: controller.signal });
   controller.abort(new Error('stop'));
   await assert.rejects(aborted, /stop/);
+});
+
+test('validates interaction wait filters and timeout durations', () => {
+  const client = new Client();
+  for (const timeoutMs of [0, -1, 1.5, NaN, Infinity, 2_147_483_648]) {
+    assert.throws(() => client.awaitInteraction({ timeoutMs }), /positive timer duration/);
+  }
+  assert.throws(() => client.awaitInteraction({ filter: null }), /filter must be a function/);
+});
+
+test('destroy rejects pending interaction waits', async (t) => {
+  const { client } = await setup(t);
+  const waiting = client.awaitInteraction({ timeoutMs: 10_000 });
+
+  await client.destroy();
+
+  await assert.rejects(waiting, /Client was destroyed while waiting/);
+});
+
+test('a throwing interaction wait filter does not block regular routing', async (t) => {
+  const { client, calls } = await setup(t);
+  const failure = new Error('filter failed');
+  const seen = [];
+  const waiting = client.awaitInteraction({ filter: () => { throw failure; } });
+  client.on('interactionCreate', () => seen.push('event'));
+  client.command('ping', (interaction) => interaction.reply('pong'));
+
+  await dispatch(client, 'INTERACTION_CREATE', { ...base, type: 2, data: commandData('ping') });
+
+  await assert.rejects(waiting, (error) => error === failure);
+  await settle();
+  assert.deepEqual(seen, ['event']);
+  assert.equal(calls.find((call) => call.path.endsWith('/callback')).body.data.content, 'pong');
 });
 
 test('builds slash commands with options first, subcommands and localizations', () => {

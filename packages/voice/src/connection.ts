@@ -63,6 +63,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
   #status: VoiceConnectionStatus = 'connecting';
   #current?: Promise<void>;
   #closing?: Promise<void>;
+  #regranting: Promise<void> = Promise.resolve();
 
   private constructor(session: VoiceSessionLike, grant: VoiceConnectionGrant, options: VoiceConnectionOptions) {
     super();
@@ -162,7 +163,13 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     }
   }
 
-  async regrant(grant: VoiceConnectionGrant): Promise<void> {
+  regrant(grant: VoiceConnectionGrant): Promise<void> {
+    const regranting = this.#regranting.then(() => this.#applyRegrant(grant));
+    this.#regranting = regranting.catch(() => {});
+    return regranting;
+  }
+
+  async #applyRegrant(grant: VoiceConnectionGrant): Promise<void> {
     if (this.destroyed) throw new Error('The voice connection is closed');
     this.#player.skip();
     await this.#current?.catch(() => {});

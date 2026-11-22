@@ -46,7 +46,7 @@ const client = new Client({
 | `localizeCommands`, `strictLocalization` | `false` skips translating commands; `true` checks that default texts match the catalog |
 | `readyTimeoutMs` | how long to wait for the initial servers before `ready` (default 15 s) |
 
-`await client.destroy()` stops the Gateway and clears the session. `client.ready`, `client.user`, `client.readyAt`, `client.uptime`, `client.latency` and `client.guildCount` report state.
+`await client.destroy()` stops the Gateway, clears the session and rejects pending `awaitInteraction()` waits. `client.ready`, `client.user`, `client.readyAt`, `client.uptime`, `client.latency` and `client.guildCount` report state.
 
 ## Events
 

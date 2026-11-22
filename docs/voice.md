@@ -55,7 +55,7 @@ URLs reconnect automatically after a dropped connection. A new `play()` replaces
 | `finish` | a track ends; `{ stopped: true }` when it was stopped or replaced |
 | `status` | `connecting`, `ready`, `reconnecting` or `disconnected` |
 | `memberJoin`, `memberLeave` | another participant joins or leaves the room |
-| `disconnect` | the connection closed; the second argument is the reason |
+| `disconnect` | the connection closed; the argument is the reason, if any |
 | `error` | a source failed; the promise of `play()` rejects as well |
 
 If the LiveKit room drops, the connection leaves the channel and emits `disconnect`. Use it to reconnect or to leave empty channels.

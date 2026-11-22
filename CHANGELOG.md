@@ -11,7 +11,14 @@
 - Compressed Gateway sends stop promptly when aborted during a flush; an interrupted caller send also closes the connection so later packets cannot reuse a desynchronized compression stream.
 - Gateway guild snapshots replace cached members so stale members cannot affect lookups or permission checks after a sync.
 - Voice playback waits for asynchronous PCM source cleanup when playback is cancelled, keeps the player busy during cleanup, and closes connection-owned sources only once.
+- Voice connection regrants run sequentially so overlapping Gateway updates cannot leave an older LiveKit room active.
 - Easy Client destruction aborts an in-progress REST connection attempt during login.
+- Easy Client clears partial shard readiness before each login attempt so a retry waits for every shard again.
+- Easy Client clears readiness timestamps on destroy while retaining its authenticated bot identity.
+- Easy Client destruction rejects pending interaction waiters instead of leaving them unresolved.
+- Errors from `awaitInteraction()` filters reject only their waiter and do not suppress normal interaction routing.
+- `awaitInteraction()` validates filters and timer durations before registering a waiter.
+- Easy Client preserves duplicate listener registrations independently so `once()` remains one-shot alongside `on()`.
 - REST validates forum tag IDs, archived thread kinds, reaction-user cursors, discovery and sticker tags, message mention rules, sticker IDs and attachment references before sending requests.
 - Raw REST requests validate methods, query objects and retry/authentication flags, and reject GET or HEAD bodies before sending requests.
 - Guild channel moves reject sparse position arrays instead of serializing holes as null values.

@@ -134,6 +134,32 @@ test('regrant moves to a new room, stops playback and keeps the connection usabl
   assert.deepEqual(calls.at(-1), ['leave', '10', 'moved']);
 });
 
+test('serializes concurrent regrants so the newest room remains active', async () => {
+  const { session, rooms } = fixture();
+  let releaseFirst;
+  const firstConnecting = new Promise((resolve) => { releaseFirst = resolve; });
+  const connectRoom = async (grant) => {
+    if (grant.token === 'next-1') await firstConnecting;
+    const room = new FakeRoom();
+    room.grant = grant;
+    rooms.push(room);
+    return room;
+  };
+  const connection = await VoiceConnection.connect(session, '10', '20', { connectRoom });
+  const first = connection.regrant({ guild_id: '10', channel_id: '30', connection_id: 'moved-1', endpoint: 'voice.example', token: 'next-1' });
+  await new Promise((resolve) => setImmediate(resolve));
+  const second = connection.regrant({ guild_id: '10', channel_id: '40', connection_id: 'moved-2', endpoint: 'voice.example', token: 'next-2' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(rooms.length, 1);
+  releaseFirst();
+  await Promise.all([first, second]);
+  assert.equal(connection.channelId, '40');
+  assert.equal(connection.connectionId, 'moved-2');
+  assert.deepEqual(rooms.map((room) => room.grant.token), ['token-1', 'next-1', 'next-2']);
+  assert.ok(rooms[0].closed && rooms[1].closed);
+  await connection.disconnect();
+});
+
 test('an unexpected room disconnect closes the connection and leaves the channel', async () => {
   const { session, rooms, calls, connectRoom } = fixture();
   const connection = await VoiceConnection.connect(session, '10', '20', { connectRoom });

@@ -157,6 +157,8 @@ interface Route<I> {
 interface Waiter {
   filter: (interaction: Interaction) => boolean;
   resolve: (interaction: Interaction) => void;
+  cancel: () => void;
+  fail: (error: unknown) => void;
 }
 
 const defaultErrorReply = 'Something went wrong while running this command.';
@@ -301,11 +303,12 @@ export class Client {
   once<K extends keyof MicupEvents>(event: K, listener: (data: MicupEvents[K], event: GatewayDispatch) => unknown): this;
   once(event: string, listener: (data: unknown, event: GatewayDispatch) => unknown): this;
   once(event: string, listener: (...args: any[]) => unknown): this {
+    let remove: () => void;
     const wrapper = (...args: unknown[]) => {
-      this.#emitter.remove(event, listener);
+      remove();
       return listener(...args);
     };
-    this.#emitter.add(event, listener, wrapper);
+    remove = this.#emitter.add(event, listener, wrapper);
     return this;
   }
 
@@ -371,6 +374,11 @@ export class Client {
     if (this.#loggingIn || this.#running || this.#isReady) throw new Error('The client is already logged in');
     this.#loggingIn = true;
     this.#stop = new AbortController();
+    this.#readyShards.clear();
+    this.#pendingGuilds.clear();
+    this.#gate = undefined;
+    this.#expectedShards = 0;
+    this.readyAt = undefined;
     try {
       if (!this.#rest) {
         const resolved = token ?? this.options.token ?? process.env.MICUP_BOT_TOKEN;
@@ -406,9 +414,10 @@ export class Client {
     this.#session = undefined;
     this.#manager = undefined;
     this.#isReady = false;
+    this.readyAt = undefined;
     this.#readyShards.clear();
     this.#pendingGuilds.clear();
-    for (const waiter of this.#waiters) waiter.resolve = () => {};
+    for (const waiter of this.#waiters) waiter.cancel();
     this.#waiters.clear();
     await running?.catch(() => {});
   }
@@ -472,6 +481,10 @@ export class Client {
 
   awaitInteraction<T extends Interaction = Interaction>(options: AwaitInteractionOptions<T> = {}): Promise<T> {
     const { filter = () => true, timeoutMs, signal } = options;
+    if (typeof filter !== 'function') throw new TypeError('Interaction filter must be a function');
+    if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647)) {
+      throw new RangeError('Interaction timeout must be a positive timer duration');
+    }
     signal?.throwIfAborted();
     return new Promise<T>((resolve, reject) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -489,6 +502,14 @@ export class Client {
         resolve: (interaction) => {
           finish();
           resolve(interaction as T);
+        },
+        cancel: () => {
+          finish();
+          reject(new Error('Client was destroyed while waiting for an interaction'));
+        },
+        fail: (error) => {
+          finish();
+          reject(error);
         },
       };
       this.#waiters.add(waiter);
@@ -698,9 +719,13 @@ export class Client {
       return;
     }
     for (const waiter of [...this.#waiters]) {
-      if (waiter.filter(interaction)) {
-        waiter.resolve(interaction);
-        break;
+      try {
+        if (waiter.filter(interaction)) {
+          waiter.resolve(interaction);
+          break;
+        }
+      } catch (error) {
+        waiter.fail(error);
       }
     }
     const tasks: Promise<void>[] = [this.#emit('interactionCreate', [interaction], { event: 'INTERACTION_CREATE', interaction })];
