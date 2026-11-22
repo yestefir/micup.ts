@@ -104,7 +104,7 @@ export interface ClientEvents {
   voiceStateUpdate: [state: MicupVoiceState];
 }
 
-export interface RegisterCommandsOptions {
+export interface RegisterCommandsOptions extends MicupRequestOptions {
   guildId?: string;
   prune?: boolean;
 }
@@ -370,19 +370,25 @@ export class Client {
   async login(token?: string): Promise<this> {
     if (this.#loggingIn || this.#running || this.#isReady) throw new Error('The client is already logged in');
     this.#loggingIn = true;
+    this.#stop = new AbortController();
     try {
       if (!this.#rest) {
         const resolved = token ?? this.options.token ?? process.env.MICUP_BOT_TOKEN;
         if (!resolved) throw new TypeError('A bot token is required: pass it to login(), the client options or MICUP_BOT_TOKEN');
-        this.#rest = await MicupClient.connect({ token: resolved, origin: this.options.origin, maxRestAttempts: this.options.maxRestAttempts, logger: this.options.logger });
+        this.#rest = await MicupClient.connect(
+          { token: resolved, origin: this.options.origin, maxRestAttempts: this.options.maxRestAttempts, logger: this.options.logger },
+          { signal: this.#stop.signal },
+        );
       }
+      this.#stop.signal.throwIfAborted();
       this.user = new User(this, this.#rest.self);
-      this.#stop = new AbortController();
       if (this.options.gateway === false) {
-        await this.#finishReady();
+        await this.#finishReady(this.#stop.signal);
+        this.#stop.signal.throwIfAborted();
         return this;
       }
       await this.#startGateway(this.#stop.signal);
+      this.#stop.signal.throwIfAborted();
       return this;
     } catch (error) {
       this.#stop?.abort();
@@ -435,7 +441,7 @@ export class Client {
   }
 
   async registerCommands(options: RegisterCommandsOptions = {}): Promise<RegisterCommandsResult> {
-    const scope = { guildId: options.guildId };
+    const scope = { guildId: options.guildId, signal: options.signal };
     const result: RegisterCommandsResult = { created: [], updated: [], unchanged: [], deleted: [] };
     const existing = await this.rest.commands.list(scope);
     const key = (command: { name: string; type?: number }) => (command.type ?? 1) + ':' + command.name;
@@ -555,21 +561,24 @@ export class Client {
       );
     });
     await ready;
-    await this.#finishReady();
+    await this.#finishReady(signal);
   }
 
-  async #finishReady(): Promise<void> {
+  async #finishReady(signal?: AbortSignal): Promise<void> {
     if (this.#isReady) return;
+    signal?.throwIfAborted();
     this.#isReady = true;
     this.readyAt = new Date();
     if (this.#definitions.length && this.options.registerCommands !== false) {
       const scope = typeof this.options.registerCommands === 'object' ? this.options.registerCommands : {};
       try {
-        await this.registerCommands(scope);
+        await this.registerCommands({ ...scope, signal });
       } catch (error) {
+        signal?.throwIfAborted();
         this.#report(error, { event: 'registerCommands' });
       }
     }
+    signal?.throwIfAborted();
     await this.#emit('ready', [this]);
   }
 

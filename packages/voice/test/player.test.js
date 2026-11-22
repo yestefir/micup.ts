@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bytesPerFrame, PlaybackSkippedError, Player, scaleVolume } from '@micup.ts/voice';
+import { bytesPerFrame, PlaybackBusyError, PlaybackSkippedError, Player, scaleVolume } from '@micup.ts/voice';
 
 function pcm(samples) {
   const bytes = Buffer.alloc(samples.length * 2);
@@ -93,7 +93,9 @@ test('closes the PCM source when iterator creation fails', async () => {
 
 test('skipping a stalled input closes the source and clears queued audio before playback ends', async () => {
   let resolveClosed;
+  let markCloseStarted;
   const closed = new Promise((resolve) => { resolveClosed = resolve; });
+  const closeStarted = new Promise((resolve) => { markCloseStarted = resolve; });
   let resolveRead;
   let cleared = false;
   const source = {
@@ -102,7 +104,8 @@ test('skipping a stalled input closes the source and clears queued audio before 
     },
     async close() {
       resolveRead?.({ done: true });
-      resolveClosed();
+      markCloseStarted();
+      await closed;
     },
   };
   const player = new Player({
@@ -113,8 +116,15 @@ test('skipping a stalled input closes the source and clears queued audio before 
   assert.equal(player.playing, true);
   await Promise.resolve();
   assert.equal(player.skip(), true);
+  await closeStarted;
+  let settled = false;
+  void playback.then(() => { settled = true; }, () => { settled = true; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(settled, false);
+  assert.equal(player.playing, true);
+  await assert.rejects(player.play((async function* () {})()), PlaybackBusyError);
+  resolveClosed();
   await assert.rejects(playback, PlaybackSkippedError);
-  await closed;
   assert.equal(player.playing, false);
   assert.equal(cleared, true);
 });

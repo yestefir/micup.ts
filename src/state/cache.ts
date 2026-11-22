@@ -250,6 +250,7 @@ export class GatewayState {
     }
     state.info = { ...structuredClone(properties), ...structuredClone(info), id, unavailable: false };
     state.roles.clear();
+    state.members.clear();
     state.voices.clear();
     this.#removeGuildChannels(id);
     for (const role of array(roles)) this.#storeRole(state, role);

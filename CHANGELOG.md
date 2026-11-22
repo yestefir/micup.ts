@@ -8,6 +8,10 @@
 - Live smoke checks require an explicit sandbox origin and never default to production.
 - REST accepts HTTP-date `Retry-After` values, rejects dot-segment paths, discards malformed API field errors, bounds learned route and bucket tables, and masks webhook and interaction tokens in permission logs.
 - REST preserves the caller's abort reason when cancellation interrupts a successful response body.
+- Compressed Gateway sends stop promptly when aborted during a flush; an interrupted caller send also closes the connection so later packets cannot reuse a desynchronized compression stream.
+- Gateway guild snapshots replace cached members so stale members cannot affect lookups or permission checks after a sync.
+- Voice playback waits for asynchronous PCM source cleanup when playback is cancelled, keeps the player busy during cleanup, and closes connection-owned sources only once.
+- Easy Client destruction aborts an in-progress REST connection attempt during login.
 - REST validates forum tag IDs, archived thread kinds, reaction-user cursors, discovery and sticker tags, message mention rules, sticker IDs and attachment references before sending requests.
 - Raw REST requests validate methods, query objects and retry/authentication flags, and reject GET or HEAD bodies before sending requests.
 - Guild channel moves reject sparse position arrays instead of serializing holes as null values.

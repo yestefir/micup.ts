@@ -85,7 +85,10 @@ export class Player {
     let used = 0;
     let nextFrameAt = performance.now();
     const frame = Buffer.allocUnsafe(bytesPerFrame);
-    const closeSource = () => { void Promise.resolve().then(() => pcm.close?.()).catch(() => {}); };
+    let closing: Promise<void> | undefined;
+    const closeSource = () => {
+      closing ??= Promise.resolve().then(() => pcm.close?.()).then(() => {}, () => {});
+    };
     signal.addEventListener('abort', closeSource, { once: true });
 
     const waitWhilePaused = async () => {
@@ -143,8 +146,12 @@ export class Player {
       throw error;
     } finally {
       signal.removeEventListener('abort', closeSource);
-      this.#active = undefined;
       if (!exhausted) void Promise.resolve().then(() => iterator.return?.()).catch(() => {});
+      if (signal.aborted) {
+        closeSource();
+        await closing;
+      }
+      this.#active = undefined;
     }
   }
 }

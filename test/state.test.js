@@ -24,12 +24,14 @@ test('reconciles a guild snapshot, partial events, scoped thread sync and tempor
   apply(state, 'THREAD_LIST_SYNC', { guild_id: '100', channel_ids: ['200'], threads: [] });
   assert.equal(state.channel('220'), undefined);
   assert.equal(state.channel('221').id, '221');
+  apply(state, 'GUILD_MEMBER_ADD', { guild_id: '100', user: { id: '501', username: 'stale' }, roles: [] });
   apply(state, 'GUILD_DELETE', { id: '100', unavailable: true });
   assert.equal(state.guild('100'), undefined);
   assert.equal(state.guildForChannel('221'), '100');
   apply(state, 'GUILD_SYNC', { ...guild, channels: [{ id: '202', type: 2 }], threads: [] });
   assert.equal(state.channel('201'), undefined);
   assert.equal(state.channel('202').guild_id, '100');
+  assert.equal(state.member('100', '501'), undefined);
   assert.equal(state.member('100', user.id).user.username, 'fixture');
   apply(state, 'VOICE_STATE_UPDATE', { guild_id: '100', user_id: user.id, channel_id: '202' });
   assert.deepEqual(state.voiceMembers('100', '202'), [user.id]);

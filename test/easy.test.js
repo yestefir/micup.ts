@@ -41,6 +41,58 @@ test('login needs a token and exposes the bot user without a Gateway', async (t)
   await assert.rejects(client.login(), /already/);
 });
 
+test('destroy aborts REST discovery while login is still starting', async (t) => {
+  let signal;
+  let markStarted;
+  const started = new Promise((resolve) => { markStarted = resolve; });
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    signal = options.signal;
+    markStarted();
+    return new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+  });
+  const client = new Client({ token: 'fixture', origin, gateway: false });
+  let ready = false;
+  client.on('ready', () => { ready = true; });
+  const login = client.login();
+  await started;
+  await client.destroy();
+
+  await assert.rejects(login, (error) => error === signal.reason);
+  assert.equal(signal.aborted, true);
+  assert.equal(ready, false);
+});
+
+test('destroy aborts command registration before the ready event', async (t) => {
+  let signal;
+  let markStarted;
+  const started = new Promise((resolve) => { markStarted = resolve; });
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (String(url) === origin + '/.well-known/fluxer') return Response.json({ endpoints: { api_public: origin + '/api' } });
+    if (String(url) === origin + '/api/v1/users/@me') return Response.json({ id: '77', username: 'robot', bot: true });
+    if (new URL(url).pathname === '/api/v1/applications/77/commands') {
+      signal = options.signal;
+      markStarted();
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    }
+    assert.fail('Unexpected request ' + String(url));
+  });
+  const client = new Client({ token: 'fixture', origin, gateway: false });
+  client.command(new SlashCommand('fixture', 'Fixture'), () => {});
+  let ready = false;
+  client.on('ready', () => { ready = true; });
+  const login = client.login();
+  await started;
+  await client.destroy();
+
+  await assert.rejects(login, (error) => error === signal.reason);
+  assert.equal(signal.aborted, true);
+  assert.equal(ready, false);
+});
+
 test('ignores malformed readiness fields without replacing the bot identity', async (t) => {
   const { client } = await setup(t, undefined, { sequential: true });
   await dispatch(client, 'READY', { guilds: {}, user: 'invalid' });

@@ -194,9 +194,15 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
       });
       source = decoded;
     }
+    let closing: Promise<void> | undefined;
+    const closeSource = () => closing ??= Promise.resolve().then(() => source.close?.()).then(() => {}, () => {});
+    const playbackSource: PCMInput = {
+      [Symbol.asyncIterator]: () => source[Symbol.asyncIterator](),
+      close: closeSource,
+    };
     this.emit('start');
     try {
-      await this.#player.play(source, { signal: options.signal });
+      await this.#player.play(playbackSource, { signal: options.signal });
       this.emit('finish', { stopped: false });
     } catch (error) {
       if (error instanceof PlaybackSkippedError || options.signal?.aborted || this.#lifetime.signal.aborted) {
@@ -206,7 +212,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
       this.#report(error);
       throw error;
     } finally {
-      await Promise.resolve(source.close?.()).catch(() => {});
+      await closeSource();
     }
   }
 

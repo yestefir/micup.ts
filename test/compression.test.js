@@ -3,7 +3,60 @@ import { once } from 'node:events';
 import { test } from 'node:test';
 import * as zlib from 'node:zlib';
 import { WebSocketServer } from 'ws';
+import { GatewayCompression } from '../dist/gateway/compression.js';
 import { GatewayOpcode, GatewaySession } from 'micup.ts';
+
+test('keeps the connection usable when a compressed send is cancelled before encoding', {
+  skip: typeof zlib.createZstdCompress !== 'function' || typeof zlib.createZstdDecompress !== 'function',
+}, async () => {
+  const lifetime = new AbortController();
+  const caller = new AbortController();
+  const reason = new Error('send cancelled before encoding');
+  caller.abort(reason);
+  let writes = 0;
+  let reported;
+  const compression = new GatewayCompression(lifetime.signal, () => {}, (error) => { reported = error; }, () => {});
+
+  try {
+    await assert.rejects(compression.send('{}', () => { writes++; }, caller.signal), (error) => error === reason);
+    assert.equal(writes, 0);
+    assert.equal(reported, undefined);
+    assert.equal(lifetime.signal.aborted, false);
+  } finally {
+    compression.destroy();
+  }
+});
+
+test('cancels a compressed write when its caller aborts during flush', {
+  skip: typeof zlib.createZstdCompress !== 'function' || typeof zlib.createZstdDecompress !== 'function',
+}, async () => {
+  const lifetime = new AbortController();
+  const reason = new Error('send cancelled');
+  let writes = 0;
+  let aborted = false;
+  let reported;
+  const caller = {
+    get aborted() { return aborted; },
+    get reason() { return reason; },
+    throwIfAborted() { if (aborted) throw reason; },
+    addEventListener(_type, listener) {
+      queueMicrotask(() => {
+        aborted = true;
+        listener();
+      });
+    },
+    removeEventListener() {},
+  };
+  const compression = new GatewayCompression(lifetime.signal, () => {}, (error) => { reported = error; }, () => {});
+
+  try {
+    await assert.rejects(compression.send('{}', () => { writes++; }, caller), (error) => error === reason);
+    assert.equal(writes, 0);
+    assert.equal(reported?.cause, reason);
+  } finally {
+    compression.destroy();
+  }
+});
 
 test('uses one Zstandard stream in each direction across binary WebSocket messages', {
   skip: typeof zlib.createZstdCompress !== 'function',

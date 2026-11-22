@@ -69,6 +69,7 @@ export class GatewayCompression {
   readonly #packets = new JsonPackets();
   #chunks: Buffer[] = [];
   #signal: AbortSignal;
+  #error: (error: unknown) => void;
   #sending: Promise<void> = Promise.resolve();
 
   constructor(
@@ -78,6 +79,7 @@ export class GatewayCompression {
     resume: () => void,
   ) {
     this.#signal = signal;
+    this.#error = error;
     this.#encoder.on('data', (chunk: Buffer) => this.#chunks.push(chunk));
     this.#encoder.on('error', error);
     this.#decoder.on('error', error);
@@ -100,21 +102,51 @@ export class GatewayCompression {
     const task = this.#sending.then(async () => {
       this.#signal.throwIfAborted();
       caller?.throwIfAborted();
+      let encodingStarted = false;
+      let callerAbortReported = false;
+      const invalidateCallerAbort = () => {
+        if (!encodingStarted || !caller?.aborted || this.#signal.aborted || callerAbortReported) return;
+        callerAbortReported = true;
+        try {
+          this.#error(new Error('Micup Gateway compression was interrupted during a send', { cause: caller.reason }));
+        } catch {}
+      };
       await new Promise<void>((resolve, reject) => {
-        const abort = () => reject(this.#signal.reason);
-        this.#signal.addEventListener('abort', abort, { once: true });
-        if (this.#signal.aborted) {
+        let settled = false;
+        const cleanup = () => {
           this.#signal.removeEventListener('abort', abort);
-          reject(this.#signal.reason);
+          caller?.removeEventListener('abort', abort);
+        };
+        const abort = () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          invalidateCallerAbort();
+          reject(caller?.aborted ? caller.reason : this.#signal.reason);
+        };
+        const flushed = () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve();
+        };
+        this.#signal.addEventListener('abort', abort, { once: true });
+        caller?.addEventListener('abort', abort, { once: true });
+        if (this.#signal.aborted || caller?.aborted) {
+          abort();
           return;
         }
+        encodingStarted = true;
         this.#encoder.write(text);
-        this.#encoder.flush(zlib.constants.ZSTD_e_flush, () => {
-          this.#signal.removeEventListener('abort', abort);
-          resolve();
-        });
+        this.#encoder.flush(zlib.constants.ZSTD_e_flush, flushed);
       });
-      this.#signal.throwIfAborted();
+      try {
+        this.#signal.throwIfAborted();
+        caller?.throwIfAborted();
+      } catch (error) {
+        invalidateCallerAbort();
+        throw error;
+      }
       const frame = Buffer.concat(this.#chunks);
       this.#chunks = [];
       write(frame);

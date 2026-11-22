@@ -157,6 +157,29 @@ test('emits an error event and rejects when the audio source fails', async () =>
   await connection.disconnect();
 });
 
+test('closes an aborted raw source exactly once', async () => {
+  const { session, connectRoom } = fixture();
+  const connection = await VoiceConnection.connect(session, '10', '20', { connectRoom });
+  const controller = new AbortController();
+  let resolveRead;
+  let closes = 0;
+  const source = {
+    [Symbol.asyncIterator]() {
+      return { next: () => new Promise((resolve) => { resolveRead = resolve; }) };
+    },
+    close() {
+      closes++;
+      resolveRead?.({ done: true });
+    },
+  };
+  const playing = connection.play(source, { raw: true, signal: controller.signal });
+  await new Promise((resolve) => setImmediate(resolve));
+  controller.abort(new Error('cancel playback'));
+  await playing;
+  assert.equal(closes, 1);
+  await connection.disconnect();
+});
+
 test('leaves the channel again when the LiveKit connection cannot be made', async () => {
   const { session, calls } = fixture();
   await assert.rejects(VoiceConnection.connect(session, '10', '20', { connectRoom: async () => { throw new Error('no livekit'); } }), /no livekit/);
