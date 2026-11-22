@@ -7,6 +7,11 @@ import { SessionVoice, type VoiceJoinOptions, type VoiceServerUpdate, type Voice
 import { Permission, hasPermissions } from '../model/permissions.js';
 import { GatewayState } from '../state/cache.js';
 
+import { GatewayOpcode } from '../gateway/protocol.js';
+import type { MicupMember } from '../model/guild.js';
+import { activePresence, normalizePresence, type CustomStatus, type Presence, type PresenceStatus } from '../model/presence.js';
+import { SessionRequests, type ChannelMemberCount, type GuildCount, type GuildMembersRequest } from './requests.js';
+
 export interface GatewaySessionConfig {
   readonly endpoint: string;
   readonly token: string;
@@ -19,6 +24,7 @@ export interface GatewaySessionOptions extends VoiceSessionOptions {
   readonly handler: (event: GatewayDispatch, signal: AbortSignal) => void | Promise<void>;
   readonly ignoredEvents?: readonly string[];
   readonly flags?: number;
+  readonly presence?: Presence;
   readonly minBackoffMs?: number;
   readonly maxBackoffMs?: number;
   readonly onReady?: (resumed: boolean) => void;
@@ -38,6 +44,8 @@ export class GatewaySession {
   readonly #voice: SessionVoice;
   readonly state = new GatewayState();
   #botId?: string;
+  #presence?: Presence;
+  readonly #requests: SessionRequests;
   readonly #minBackoff: number;
   readonly #maxBackoff: number;
   #running = false;
@@ -58,6 +66,8 @@ export class GatewaySession {
     if (typeof options?.handler !== 'function') throw new TypeError('A Gateway event handler is required');
     this.#options = { ...options };
     this.#voice = new SessionVoice(config.botId, this.send.bind(this), this.#options);
+    this.#requests = new SessionRequests(this.send.bind(this));
+    this.#presence = options.presence && normalizePresence(options.presence);
     this.#ignoredEvents = [...(options.ignoredEvents ?? [])];
     if (this.#ignoredEvents.length > 256 || this.#ignoredEvents.some((name) => !/^[A-Z][A-Z_0-9]*$/.test(name))) {
       throw new TypeError('Invalid Micup ignored Gateway events');
@@ -93,6 +103,36 @@ export class GatewaySession {
     await this.#connection.send(opcode, data, signal);
   }
 
+  get presence(): Presence {
+    return structuredClone(activePresence(this.#presence ?? { status: 'online', custom_status: null }));
+  }
+
+  async updatePresence(presence: Presence, { signal }: { signal?: AbortSignal } = {}): Promise<void> {
+    signal?.throwIfAborted();
+    this.#presence = normalizePresence(presence);
+    if (this.ready) await this.send(GatewayOpcode.PresenceUpdate, this.#presence, { signal });
+  }
+
+  setStatus(status: PresenceStatus, options?: { signal?: AbortSignal }): Promise<void> {
+    return this.updatePresence({ ...this.presence, status }, options);
+  }
+
+  setCustomStatus(custom_status: CustomStatus | null, options?: { signal?: AbortSignal }): Promise<void> {
+    return this.updatePresence({ ...this.presence, custom_status }, options);
+  }
+
+  requestGuildCounts(ids: readonly string[], { signal }: { signal?: AbortSignal } = {}): Promise<GuildCount[]> {
+    return this.#requests.guildCounts(ids, signal);
+  }
+
+  requestChannelMemberCounts(guildId: string, ids: readonly string[], { signal }: { signal?: AbortSignal } = {}): Promise<ChannelMemberCount[]> {
+    return this.#requests.channelCounts(guildId, ids, signal);
+  }
+
+  requestGuildMembers(guildId: string, request?: GuildMembersRequest): Promise<MicupMember[]> {
+    return this.#requests.members(guildId, request);
+  }
+
   async joinVoice(guildId: string, channelId: string, options?: VoiceJoinOptions): Promise<VoiceServerUpdate> {
     const permission = this.#botId && this.state.permissions(guildId, this.#botId, channelId);
     if (typeof permission === 'bigint' && !hasPermissions(permission, Permission.ViewChannel | Permission.Connect)) {
@@ -125,6 +165,7 @@ export class GatewaySession {
             token: this.#token,
             shard: this.#shard,
             flags: this.#flags,
+            presence: () => this.#presence && activePresence(this.#presence),
             ignoredEvents: this.#ignoredEvents,
             resume: this.#resume,
             beforeIdentify: this.#options.beforeIdentify,
@@ -135,7 +176,10 @@ export class GatewaySession {
               this.state.apply(event);
               await this.#options.handler(event, lifetime);
             },
-            receive: (event) => this.#voice.receive(event),
+            receive: (event) => {
+              this.#voice.receive(event);
+              this.#requests.receive(event);
+            },
             onGatewayError: (data) => {
               this.#voice.refuse(data);
               this.#options.onGatewayError?.(data);
@@ -143,6 +187,7 @@ export class GatewaySession {
             onInvalidate: () => {
               this.#ready = false;
               this.#voice.invalidate();
+              this.#requests.invalidate();
               this.state.clear();
             },
             onReady: (resumed) => {
@@ -157,6 +202,7 @@ export class GatewaySession {
           if (signal.aborted) return;
           if (error instanceof GatewayCloseError && error.resetsSession) {
             this.#voice.invalidate();
+            this.#requests.invalidate();
             this.state.clear();
             this.#resume.sessionId = undefined;
             this.#resume.sequence = null;
@@ -173,6 +219,7 @@ export class GatewaySession {
       this.#ready = false;
       this.#connection = undefined;
       this.#running = false;
+      this.#requests.invalidate();
       this.#voice.invalidate();
     }
   }

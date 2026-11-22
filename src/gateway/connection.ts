@@ -7,12 +7,15 @@ export interface GatewayResume {
   sequence: number | null;
 }
 
+import type { Presence } from '../model/presence.js';
+
 interface ConnectionOptions {
   endpoint: URL;
   token: string;
   shard: readonly [number, number];
   ignoredEvents: readonly string[];
   flags: number;
+  presence: () => Presence | undefined;
   resume: GatewayResume;
   beforeIdentify?: (signal: AbortSignal) => Promise<void>;
   dispatch: (event: GatewayDispatch, signal: AbortSignal) => Promise<void>;
@@ -202,11 +205,13 @@ export class GatewayConnection {
       } else {
         if (waitForIdentify) await this.options.beforeIdentify?.(this.#lifetime.signal);
         this.#lifetime.signal.throwIfAborted();
+        const presence = this.options.presence();
         this.#write(this.#encode(GatewayOpcode.Identify, {
           token,
           properties: { os: process.platform, browser: 'micup.ts', device: 'micup.ts' },
           shard,
           ...(flags ? { flags } : {}),
+          ...(presence ? { presence } : {}),
           ...(ignoredEvents.length ? { ignored_events: ignoredEvents } : {}),
         }));
       }

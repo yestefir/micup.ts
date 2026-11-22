@@ -219,3 +219,56 @@ test('completes a voice join while a Gateway event handler waits for the grant',
   ]);
   assert.equal(session.voice('123'), undefined);
 });
+
+test('publishes presence and correlates count replies and out-of-order member chunks', { timeout: 5000 }, async (t) => {
+  const { server, endpoint } = await createGateway(t);
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const writes = [];
+  let members;
+  let counts;
+  server.on('connection', (socket) => {
+    send(socket, op.Hello, { heartbeat_interval: 100 });
+    socket.on('message', (raw) => {
+      const packet = JSON.parse(raw);
+      writes.push(packet);
+      if (packet.op === op.Identify) {
+        send(socket, op.Dispatch, { session_id: 'requests' }, 'READY', 1);
+        send(socket, op.Dispatch, {}, 'WORK', 2);
+      } else if (packet.op === op.RequestGuildCounts) {
+        send(socket, op.Dispatch, { nonce: 'unrelated', counts: [] }, 'GUILD_COUNTS_UPDATE', 3);
+        send(socket, op.Dispatch, {
+          nonce: packet.d.nonce, counts: [{ guild_id: '10', member_count: 5, online_count: 3 }],
+        }, 'GUILD_COUNTS_UPDATE', 4);
+      } else if (packet.op === op.RequestGuildMembers) {
+        for (const index of [1, 0]) {
+          send(socket, op.Dispatch, {
+            guild_id: '10', nonce: packet.d.nonce,
+            chunk_count: 2, chunk_index: index, members: [{ user: { id: String(index + 1) }, roles: [] }],
+          }, 'GUILD_MEMBERS_CHUNK', 6 - index);
+        }
+      } else if (packet.op === op.Heartbeat) {
+        send(socket, op.HeartbeatAck);
+      }
+    });
+  });
+
+  const session = new GatewaySession({ endpoint, token: 'fixture' }, {
+    presence: { status: 'offline', custom_status: { text: 'Working' } },
+    handler: async (event, signal) => {
+      if (event.name !== 'WORK') return;
+      await session.setCustomStatus(null, { signal });
+      counts = await session.requestGuildCounts(['10', '10'], { signal });
+      members = await session.requestGuildMembers('10', { query: 'a', limit: 2, signal });
+      controller.abort();
+    },
+  });
+
+  await session.run({ signal: controller.signal });
+  assert.deepEqual(writes[0].d.presence, { status: 'invisible', afk: false, mobile: false, custom_status: { text: 'Working' } });
+  assert.deepEqual(writes.find((entry) => entry.op === op.PresenceUpdate).d,
+    { status: 'invisible', afk: false, mobile: false, custom_status: null });
+  assert.deepEqual(writes.find((entry) => entry.op === op.RequestGuildCounts).d.guild_ids, ['10']);
+  assert.deepEqual(counts, [{ guild_id: '10', member_count: 5, online_count: 3 }]);
+  assert.deepEqual(members.map((member) => member.user.id), ['1', '2']);
+});
