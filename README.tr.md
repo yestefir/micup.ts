@@ -103,7 +103,7 @@ void background(async (signal) => { await slowSearch(signal); }, { timeoutMs: 30
 await manager.run({ signal: stop.signal });
 ```
 
-Botun izni olmadığı için başarısız olan istekleri, rota başına dakikada en fazla bir kez günlüğe yazma:
+Botun izni olmadığı için başarısız olan istekleri, rota başına dakikada en fazla bir kez günlüğe yazma (oturumlar bağlanma, resume ve kopmalar için aynı `logger` seçeneğini alır):
 
 ```js
 const client = await MicupClient.connect({

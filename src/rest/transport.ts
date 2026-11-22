@@ -5,6 +5,7 @@ export type RestMethod = 'GET' | 'HEAD' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 export interface MicupLogger {
   warn(message: string, fields?: Record<string, unknown>): void;
+  info?(message: string, fields?: Record<string, unknown>): void;
 }
 
 export interface MicupRequestOptions {

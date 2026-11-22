@@ -1,26 +1,7 @@
 {
   "name": "micup.ts",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "The TypeScript SDK for Micup bots: Gateway sessions and shards, REST, slash commands, buttons, modals, soundboard and voice",
-  "type": "module",
-  "exports": {
-    "types": "./dist/index.d.ts",
-    "default": "./dist/index.js"
-  },
-  "files": [
-    "dist",
-    "docs",
-    "README.tr.md"
-  ],
-  "scripts": {
-    "build": "tsc",
-    "test": "npm run build && node --test \"test/*.test.js\" && npm run test --workspaces && tsc -p test/tsconfig.json",
-    "prepack": "npm run build"
-  },
-  "engines": {
-    "node": ">=22"
-  },
-  "license": "MIT",
   "keywords": [
     "micup",
     "micup-bot",
@@ -41,19 +22,44 @@
     "livekit",
     "soundboard"
   ],
+  "homepage": "https://github.com/yestefir/micup.ts#readme",
+  "bugs": {
+    "url": "https://github.com/yestefir/micup.ts/issues"
+  },
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yestefir/micup.ts.git"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "types": "./dist/index.d.ts",
+    "default": "./dist/index.js"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "docs",
+    "README.tr.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node --test \"test/*.test.js\" && npm run test --workspaces && tsc -p test/tsconfig.json",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "ws": "8.23.0"
   },
   "devDependencies": {
     "@types/ws": "8.18.2",
     "typescript": "7.0.2"
   },
-  "dependencies": {
-    "ws": "8.23.0"
-  },
   "workspaces": [
     "packages/voice"
-  ],
-  "homepage": "https://github.com/yestefir/micup.ts#readme"
+  ]
 }

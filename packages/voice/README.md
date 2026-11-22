@@ -1,68 +1,110 @@
 # @micup.ts/voice
 
-Outgoing audio for [micup.ts](https://github.com/yestefir/micup.ts) bots. The package publishes stereo audio to a LiveKit room using a short-lived Micup voice grant.
+Voice for [micup.ts](https://github.com/yestefir/micup.ts) bots. It joins a voice channel through the Micup Gateway, connects to the channel's LiveKit room with a short-lived grant, and publishes stereo audio from files, URLs, streams or raw PCM.
 
-Install with `npm install @micup.ts/voice`. Requires Node.js 22 or later. Install FFmpeg to decode an audio file or stream with `openSource`. You can also give `Player` an async iterable of raw signed 16-bit little-endian PCM bytes at 48 kHz stereo.
+```sh
+npm install @micup.ts/voice
+```
+
+Requires Node.js 22 or later. Install [FFmpeg](https://ffmpeg.org) to decode files, URLs and streams; it is not needed for raw PCM. Rooms with end-to-end encryption or peer-to-peer voice are not supported, and such grants are refused.
+
+## Quick start
+
+```js
+import { MicupClient } from 'micup.ts';
+import { VoiceConnection } from '@micup.ts/voice';
+
+const client = await MicupClient.connect({ token: process.env.MICUP_BOT_TOKEN });
+const connections = new Map();
+const session = client.newSession({
+  handler: events.handle,
+  onVoiceGrant: (grant) => connections.get(grant.guild_id)?.regrant(grant),
+  onVoiceLost: (guildId) => connections.delete(guildId),
+});
+void session.run({ signal: stop.signal });
+
+const connection = await VoiceConnection.connect(session, guildId, channelId, { selfDeaf: true, volume: 0.8 });
+connections.set(guildId, connection);
+connection.on('finish', ({ stopped }) => console.log(stopped ? 'stopped' : 'ended'));
+await connection.play('./song.mp3');
+await connection.disconnect();
+```
+
+Wait until the session is ready before you connect. The bot needs `Connect` and `Speak` in the channel.
+
+## VoiceConnection
+
+`VoiceConnection.connect(session, guildId, channelId, options)` joins the channel, connects to LiveKit, owns a player and leaves the channel when it closes.
+
+| Option | Meaning |
+| --- | --- |
+| `selfMute`, `selfDeaf` | the bot's voice state |
+| `volume` | starting volume, 0 to 2 |
+| `bitrate` | Opus bitrate in bits per second (8000 to 512000, default 96000) |
+| `trackName` | name of the published LiveKit track |
+| `signal` | cancels joining and connecting |
+
+| Member | Meaning |
+| --- | --- |
+| `play(input, options)` | play a file path, an `http(s)` URL or a `Readable`; replaces the current track |
+| `stop()`, `pause()`, `resume()`, `setVolume(0..2)` | control the current track |
+| `regrant(grant)` | move to the channel of a new voice grant; stops the track and keeps the volume |
+| `disconnect()` | close the room and leave the channel; safe to call twice |
+| `status`, `playing`, `paused`, `volume`, `memberCount`, `guildId`, `channelId`, `connectionId`, `destroyed` | state |
+
+`play()` options: `volume`, `seek` (seconds), `ffmpegArgs` (extra arguments inserted before the output, for example `['-af', 'bass=g=5']`; treat as trusted input), `ffmpeg` (binary path), `raw` (the input is 48 kHz stereo signed 16-bit little-endian PCM from a stream or an async iterable) and `signal`.
+
+| Event | When |
+| --- | --- |
+| `start` | a track starts |
+| `finish` | a track ends; `{ stopped: true }` when it was stopped, replaced or aborted |
+| `status` | `connecting`, `ready`, `reconnecting` or `disconnected` |
+| `memberJoin`, `memberLeave` | another participant joins or leaves the room |
+| `disconnect` | the connection closed; the argument is the reason, if any |
+| `error` | a source failed; the promise of `play()` rejects as well |
+
+A dropped LiveKit room closes the connection, leaves the channel and emits `disconnect`. Events never throw: `error` is only emitted when you listen for it.
+
+When the bot is moved, the Gateway sends a new grant to `onVoiceGrant`. `regrant()` stops the current track, closes the old room and connects to the new one.
+
+## Lower level
 
 ```js
 import { openSource, Player, VoiceRoom } from '@micup.ts/voice';
 
-export async function playAudio(grant, input, signal) {
-  const room = await VoiceRoom.connect(grant, { signal, bitrate: 64000 });
-  try {
-    const source = openSource(input, { signal });
-    try {
-      const player = new Player(room);
-      await player.play(source, { signal });
-    } finally {
-      await source.close();
-    }
-  } finally {
-    await room.close();
-  }
-}
-```
-
-Use the Gateway session to obtain a grant before connecting the audio publisher:
-
-```js
-const grant = await session.joinVoice(guildId, channelId, { selfDeaf: true, signal });
+const room = await VoiceRoom.connect(grant, { signal, bitrate: 64000 });
 try {
-  await playAudio(grant, input, signal);
+  const source = openSource(input, { signal, startSeconds: 30 });
+  try {
+    await new Player(room).play(source, { signal });
+  } finally {
+    await source.close();
+  }
 } finally {
-  await session.leaveVoice(guildId, grant.connection_id);
+  await room.close();
 }
 ```
 
-The grant accepts the `endpoint` and `token` from a Micup Gateway voice-server update. Keep grants out of logs and persistent storage. The publisher supports unencrypted LiveKit rooms. The player supports pause, resume, skip and volume. Queue and playlist management belong to the application.
+| Export | Purpose |
+| --- | --- |
+| `VoiceRoom` | connects with a grant, publishes a default track, `openTrack()` for more tracks, emits `memberJoin`, `memberLeave` and `disconnected`, reports `memberCount` |
+| `VoiceTrack` (type) | one published audio track; can be closed independently of its room |
+| `Player` | plays PCM on a track with `pause()`, `resume()`, `skip()`, `setVolume()`, `playing`, `paused` |
+| `openSource()` | decodes a file, URL or stream with FFmpeg into PCM; options `ffmpeg`, `startSeconds`, `ffmpegArgs`, `signal` |
+| `PlaybackSkippedError`, `PlaybackBusyError` | thrown by `Player` |
+| `TypedEmitter` | the small event emitter `VoiceRoom` and `VoiceConnection` build on |
+| `sampleRate`, `channels`, `frameDurationMs`, `samplesPerFrame`, `bytesPerFrame`, `scaleVolume()` | PCM constants and helpers |
 
-## VoiceConnection
+`VoiceRoom.connect()` publishes a default track. Pass `publishOnConnect: false` to connect first and call `room.openTrack()` when you are ready. Skipping stops the current source and clears queued audio. Queues and playlists belong to your application.
 
-`VoiceConnection` joins the channel, connects to LiveKit, owns a player and leaves the channel again when it closes. It emits `start`, `finish` (`{ stopped }`), `status` (`connecting`, `ready`, `reconnecting`, `disconnected`), `memberJoin`, `memberLeave`, `disconnect` and `error`.
+The grant accepts the `endpoint` and `token` from a Micup Gateway voice-server update. Keep grants out of logs and persistent storage.
 
-```js
-import { VoiceConnection } from '@micup.ts/voice';
+## Soundboard and rooms
 
-const session = bot.newSession({
-  handler: events.handle,
-  onVoiceGrant: (grant) => voice.get(grant.guild_id)?.regrant(grant),
-});
-const connection = await VoiceConnection.connect(session, guildId, channelId, { selfDeaf: true, volume: 0.8 });
-connection.on('finish', ({ stopped }) => console.log(stopped ? 'stopped' : 'ended'));
-await connection.play('https://example.com/stream.mp3', { ffmpegArgs: ['-af', 'bass=g=5'] });
-await connection.disconnect();
-```
+Guild soundboard sounds and the 3D voice room stage are part of the main package: see `client.sounds` and `client.rooms` in the [micup.ts documentation](https://github.com/yestefir/micup.ts/blob/main/docs/voice.md).
 
-`play()` takes a file path, an HTTP(S) URL or a `Readable`. Pass `raw: true` to play 48 kHz stereo signed 16-bit PCM from a stream or an async iterable. A new `play()` replaces the current track, and `stop()`, `pause()`, `resume()` and `setVolume()` act on it. `regrant(grant)` moves the connection to the channel of a new voice grant, stops the current track and reconnects; the volume stays. A dropped LiveKit room closes the connection, leaves the channel and emits `disconnect`.
+## Tests
 
-`openSource()` also accepts `ffmpegArgs` (inserted before the output options), a `Readable` input and the `FFMPEG_PATH` environment variable. HTTP(S) inputs reconnect automatically after a dropped connection. Treat `ffmpegArgs` as trusted input.
+`npm test --workspace @micup.ts/voice` runs the unit tests. To run the integration test, start a LiveKit server in development mode on loopback and set `MICUP_TEST_LIVEKIT_ENDPOINT` to its WebSocket URL; the test publishes an audible PCM signal and verifies that a second participant receives it. Set `MICUP_TEST_FFMPEG` to an FFmpeg binary to run it with a decoded WAV source.
 
-## Track lifecycle
-
-`VoiceRoom.connect()` publishes a default track. Pass `publishOnConnect: false` to connect first and call `room.openTrack()` when you are ready to publish. A track can be closed independently of its room. Use `Player.playing` and `Player.paused` to inspect playback. Skipping stops the current source and clears queued PCM.
-
-## Local LiveKit test
-
-Start a LiveKit server in development mode on loopback. Set `MICUP_TEST_LIVEKIT_ENDPOINT` to its WebSocket URL and run `npm test --workspace @micup.ts/voice`. The integration test publishes an audible PCM signal and verifies that a second participant receives it.
-
-Set `MICUP_TEST_FFMPEG` to an FFmpeg binary to run that test with a decoded WAV source.
+MIT license.

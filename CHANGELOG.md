@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 - 2026-11-22
+
+- `client.newSession()` and the shard manager accept a `logger` option that reports Gateway readiness, resumes, invalidated sessions and disconnects (close code, whether it reconnects) with the shard number. This matches `SessionOptions.Logger` of micup.go.
+- `MicupLogger` has an optional `info` method next to `warn`.
+- Package metadata: `main` and `types` fallbacks, `sideEffects: false` and a bug tracker URL.
+- `@micup.ts/voice` 1.1.1: a rewritten README with the full API of `VoiceConnection` and the lower-level exports, and the same metadata.
+
 ## 1.1.1 - 2026-11-22
 
 - The voice package moved to the `@micup.ts` scope: install `@micup.ts/voice` instead of `@micupts/voice`. The code is the same as `@micupts/voice` 1.1.0, and the README and guides point to the new name.

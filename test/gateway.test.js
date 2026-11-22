@@ -359,3 +359,41 @@ test('sends Lazy Request subscriptions and exposes a one-connection runner', { t
   await assert.rejects(session.runOnce({ signal: control.signal }), (error) => error instanceof GatewayCloseError && error.code === 4000);
   assert.deepEqual(received, { subscriptions: body });
 });
+
+test('logs readiness, invalidation and disconnects with the shard', { timeout: 5000 }, async (t) => {
+  const { server, endpoint } = await createGateway(t);
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const lines = [];
+  let identifies = 0;
+  server.on('connection', (socket) => {
+    send(socket, op.Hello, { heartbeat_interval: 100 });
+    socket.on('message', (raw) => {
+      const packet = JSON.parse(raw);
+      if (packet.op === op.Identify) {
+        identifies++;
+        send(socket, op.Dispatch, { session_id: 's' + identifies }, 'READY', identifies);
+        if (identifies === 1) send(socket, op.InvalidSession, false);
+      } else if (packet.op === op.Heartbeat && identifies === 2) {
+        send(socket, op.HeartbeatAck);
+        socket.close(4004, 'fixture rejection');
+      }
+    });
+  });
+  const logger = {
+    info: (message, fields) => lines.push(['info', message, fields]),
+    warn: (message, fields) => lines.push(['warn', message, fields]),
+  };
+  const session = new GatewaySession({ endpoint, token: 'fixture' }, { handler: () => {}, logger });
+  await assert.rejects(session.run({ signal: controller.signal }), GatewayCloseError);
+  assert.deepEqual(lines.map(([level, message]) => level + ':' + message), [
+    'info:gateway session invalidated', 'info:gateway ready', 'warn:gateway disconnected',
+  ]);
+  assert.deepEqual(lines.at(-1)[2], { shard: 0, error: 'Micup Gateway closed with code 4004: fixture rejection', code: 4004, reconnecting: false });
+
+  const warned = [];
+  const quiet = new GatewaySession({ endpoint, token: 'fixture' }, { handler: () => {}, logger: { warn: (message) => { warned.push(message); throw new Error('logger failure'); } } });
+  identifies = 0;
+  await assert.rejects(quiet.run({ signal: controller.signal }), GatewayCloseError);
+  assert.ok(warned.includes('gateway ready'));
+});

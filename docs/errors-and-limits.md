@@ -58,7 +58,7 @@ const client = await MicupClient.connect({
 });
 ```
 
-The logger receives `bot lacks permission for this request` with the method, path, code and server ID, at most once a minute for each route. It is off unless you pass a logger.
+The same `logger` option exists on `client.newSession()` and the shard manager's `session` options; there it reports Gateway connections, resumes, invalidated sessions and disconnects. The REST logger receives `bot lacks permission for this request` with the method, path, code and server ID, at most once a minute for each route. It is off unless you pass a logger.
 
 ## Handler safety
 

@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { GatewayConnection, type GatewayResume } from '../gateway/connection.js';
 import { assertZstdAvailable } from '../gateway/compression.js';
+import type { MicupLogger } from '../rest/transport.js';
 import { GatewayCloseError, gatewayEndpoint, type GatewayDispatch } from '../gateway/protocol.js';
 
 import { SessionVoice, type VoiceJoinOptions, type VoiceServerUpdate, type VoiceSessionOptions } from './voice.js';
@@ -41,6 +42,7 @@ export interface GatewaySessionOptions extends VoiceSessionOptions {
   readonly onDisconnect?: (error: unknown) => void;
   readonly onGatewayError?: (data: unknown) => void;
   readonly beforeIdentify?: (signal: AbortSignal) => Promise<void>;
+  readonly logger?: MicupLogger;
 }
 
 export class GatewaySession {
@@ -212,6 +214,14 @@ export class GatewaySession {
     return this.#run(false, options);
   }
 
+  #log(level: 'info' | 'warn', message: string, fields: Record<string, unknown> = {}): void {
+    const logger = this.#options.logger;
+    if (!logger) return;
+    try {
+      (logger[level] ?? logger.warn).call(logger, message, { shard: this.#shard[0], ...fields });
+    } catch {}
+  }
+
   async #run(reconnect: boolean, { signal = new AbortController().signal }: { signal?: AbortSignal } = {}): Promise<void> {
     if (this.#running) throw new Error('Micup Gateway session is already running');
     this.#running = true;
@@ -246,6 +256,7 @@ export class GatewaySession {
               this.#options.onGatewayError?.(data);
             },
             onInvalidate: () => {
+              this.#log('info', 'gateway session invalidated');
               this.#ready = false;
               this.#voice.invalidate();
               this.#requests.invalidate();
@@ -255,6 +266,7 @@ export class GatewaySession {
             onReady: (resumed) => {
               this.#ready = true;
               backoff = this.#minBackoff;
+              this.#log('info', resumed ? 'gateway resumed' : 'gateway ready');
               this.#options.onReady?.(resumed);
             },
           }, signal, (connection) => { this.#connection = connection; });
@@ -270,6 +282,13 @@ export class GatewaySession {
             this.#resume.sessionId = undefined;
             this.#resume.sequence = null;
           }
+          const stopping = !reconnect || error instanceof GatewayCloseError && error.fatal;
+          this.#log('warn', 'gateway disconnected', {
+            error: error instanceof Error ? error.message : String(error),
+            ...(error instanceof GatewayCloseError && { code: error.code }),
+            reconnecting: !stopping,
+            ...(!stopping && { retryInMs: backoff }),
+          });
           this.#options.onDisconnect?.(error);
           if (!reconnect || error instanceof GatewayCloseError && error.fatal) throw error;
           await delay(backoff, undefined, { signal }).catch((cause) => {

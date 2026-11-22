@@ -103,7 +103,7 @@ void background(async (signal) => { await slowSearch(signal); }, { timeoutMs: 30
 await manager.run({ signal: stop.signal });
 ```
 
-Log requests that fail because the bot lacks a permission, at most once a minute per route:
+Log requests that fail because the bot lacks a permission, at most once a minute per route (sessions take the same `logger` option for connects, resumes and disconnects):
 
 ```js
 const client = await MicupClient.connect({
