@@ -15,6 +15,41 @@ async function mockBot(t, handler) {
   return { bot: await MicupClient.connect({ origin, token: 'fixture' }), fetch };
 }
 
+test('rejects unsupported message and attachment fields before sending', async (t) => {
+  const calls = [];
+  const { bot, fetch } = await mockBot(t, async (url, options) => {
+    calls.push(JSON.parse(options.body));
+    return Response.json({ id: '90' });
+  });
+
+  assert.throws(() => bot.sendMessage('20', { content: 'hello', guild_id: '10' }), /Unsupported Micup message field/);
+  assert.throws(() => bot.sendMessage('20', { content: 'hello', allowed_mentions: { everyone: true } }), /Unsupported allowed mentions field/);
+  assert.throws(() => bot.sendMessage('20', { content: 'hello', attachments: [{ id: '80', upload_url: 'https://example.com' }] }), /Unsupported message attachment field/);
+  assert.throws(() => bot.sendMessage('20', { content: 'hello', uploads: [{ filename: 'a.txt', upload_filename: 'a', file_size: 1, content_type: 'text/plain', owner_id: '10' }] }), /Unsupported uploaded message attachment field/);
+  await bot.sendMessage('20', { content: 'hello', allowed_mentions: { users: ['80'] }, attachments: [{ id: '81', filename: 'a.txt' }] });
+  await bot.sendMessage('20', { favorite_meme_id: '82' });
+  assert.throws(() => bot.sendMessage('20', { favorite_meme_id: 'invalid' }), /numeric string/);
+  assert.deepEqual(calls, [
+    { content: 'hello', allowed_mentions: { parse: [], users: ['80'] }, attachments: [{ id: '81', filename: 'a.txt' }] },
+    { favorite_meme_id: '82' },
+  ]);
+  assert.equal(fetch.mock.callCount(), 4);
+});
+
+test('accepts numeric message nonces and retries a zero nonce when enforcement is enabled', async (t) => {
+  const attempts = [];
+  const { bot } = await mockBot(t, async (url, options) => {
+    attempts.push(JSON.parse(options.body));
+    if (attempts.length === 1) throw new Error('temporary connection failure');
+    return Response.json({ id: '91' });
+  });
+  assert.equal((await bot.sendMessage('20', { content: 'safe retry', nonce: 0, enforce_nonce: true })).id, '91');
+  assert.deepEqual(attempts, [
+    { content: 'safe retry', nonce: 0, enforce_nonce: true },
+    { content: 'safe retry', nonce: 0, enforce_nonce: true },
+  ]);
+});
+
 test('uploads signed multipart slices anonymously and references completed attachments', async (t) => {
   const calls = [];
   const { bot } = await mockBot(t, async (url, options) => {
@@ -223,6 +258,8 @@ test('covers webhook management, thread options and token-authenticated message 
 
   assert.throws(() => bot.webhooks.get('60', { token: '..' }), /webhook token/);
   assert.throws(() => bot.webhooks.edit('60', {}, {}), /need a change/);
+  assert.throws(() => bot.webhooks.edit('60', { id: '61' }), /Unsupported webhook field/);
+  assert.throws(() => bot.webhooks.edit('60', { avatar: 12 }), /avatar must be/);
   assert.throws(() => bot.webhooks.edit('60', { channel_id: '21' }, { token: 'webhook/token' }), /must move/);
   assert.throws(() => bot.webhooks.execute('60', 'token', ''), /needs content/);
   assert.throws(() => bot.webhooks.execute('60', 'token', { content: 'x', components: [{}] }), /cannot carry components/);
@@ -232,6 +269,7 @@ test('covers webhook management, thread options and token-authenticated message 
   assert.throws(() => bot.webhooks.execute('60', 'token', 'x', { threadName: 'new', appliedTags: Array(1) }), TypeError);
   assert.throws(() => bot.webhooks.execute('60', 'token', 'x', { threadName: 'new', appliedTags: ['invalid'] }), TypeError);
   assert.throws(() => bot.webhooks.editMessage('60', 'token', '70', {}), /need a change/);
+  assert.equal(calls.length, 13);
 });
 
 test('keeps forum message attachments inside the starter message payload', async (t) => {

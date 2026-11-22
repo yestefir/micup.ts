@@ -67,6 +67,7 @@ test('uses Micup role, member moderation, channel and reaction routes', async (t
   assert.throws(() => bot.guilds.createRole('10', {}), /needs a nonempty name/);
   assert.throws(() => bot.guilds.createRole('10', { name: 'x'.repeat(101) }), RangeError);
   assert.throws(() => bot.guilds.createRole('10', { name: 'Moderator', color: 0x1000000 }), RangeError);
+  assert.throws(() => bot.guilds.createRole('10', { name: 'Moderator', id: '70' }), /Unsupported Micup role field/);
   assert.throws(() => bot.guilds.createRole('10', { name: 'Moderator', permissions: '-1' }), /unsigned 64-bit/);
   assert.throws(() => bot.guilds.editRole('10', '70', { permissions: (1n << 64n).toString() }), /unsigned 64-bit/);
   assert.throws(() => bot.guilds.editRole('10', '70', { hoist: 'yes' }), /must be booleans/);
@@ -104,6 +105,7 @@ test('validates forum tag fields before sending a request', async (t) => {
   assert.throws(() => bot.channels.createForumTag('30', { name: 'x', emoji_id: 'invalid' }), /numeric string/);
   assert.throws(() => bot.channels.createForumTag('30', { name: 'x', emoji_id: '10', emoji_name: '✨' }), /Invalid Micup forum tag/);
   assert.throws(() => bot.channels.createForumTag('30', { name: 'x', emoji_name: '✨'.repeat(65) }), /Invalid Micup forum tag emoji/);
+  assert.throws(() => bot.channels.createForumTag('30', { name: 'x', id: '50' }), /Unsupported Micup forum tag field/);
   await bot.channels.createForumTag('30', { name: 'sparkle', emoji_name: '✨', moderated: true });
   assert.deepEqual(sent, [{ path: '/api/v1/channels/30/tags', body: { name: 'sparkle', emoji_name: '✨', moderated: true } }]);
   assert.equal(fetch.mock.callCount(), 3);
@@ -159,7 +161,11 @@ test('validates guild channel inputs before sending requests', async (t) => {
   assert.throws(() => bot.channels.edit('30', { bitrate: 7_999 }), RangeError);
   assert.throws(() => bot.channels.edit('30', { user_limit: 100 }), RangeError);
   assert.throws(() => bot.channels.edit('30', { topic: '' }), RangeError);
+  assert.throws(() => bot.channels.edit('30', { id: '50' }), /Unsupported Micup channel field/);
+  assert.throws(() => bot.channels.startThread('30', { name: 'Thread', id: '50' }), /Unsupported thread field/);
   assert.throws(() => bot.channels.edit('30', { permission_overwrites: [{ id: '20', type: 2, allow: '1', deny: '0' }] }), /permission overwrite/);
+  assert.throws(() => bot.channels.edit('30', { permission_overwrites: [{ id: '20', type: 1, allow: '18446744073709551616', deny: '0' }] }), /permission overwrite/);
+  assert.throws(() => bot.channels.setPermission('30', { id: '20', type: 1, allow: '1', deny: '0', user: {} }), /permission overwrite field/);
   assert.throws(() => bot.channels.setPermission('30', { id: '20', type: 2, allow: '1', deny: '0' }), /permission overwrite/);
   assert.throws(() => bot.channels.setPermission('30', { id: '20', type: 1, allow: '-1', deny: '0' }), /permission overwrite/);
   await bot.channels.create('10', { name: 'general', type: 0, topic: 'Chat' });
@@ -194,6 +200,7 @@ test('validates guild member updates before sending requests', async (t) => {
   assert.throws(() => bot.guilds.editMember('10', '20', { mute: 'yes' }), /must be booleans/);
   assert.throws(() => bot.guilds.editMember('10', '20', { channel_id: 'invalid' }), /numeric string/);
   assert.throws(() => bot.guilds.editMember('10', '20', { connection_id: 'x'.repeat(33) }), /connection IDs/);
+  assert.throws(() => bot.guilds.editMember('10', '20', { user: { id: '20' } }), /Unsupported Micup member field/);
   assert.throws(() => bot.guilds.editMember('10', '20', { communication_disabled_until: 'tomorrow' }), /ISO 8601/);
   assert.throws(() => bot.guilds.editMember('10', '20', {
     communication_disabled_until: new Date(Date.now() + 366 * 24 * 60 * 60 * 1000).toISOString(),
@@ -202,6 +209,7 @@ test('validates guild member updates before sending requests', async (t) => {
   assert.throws(() => bot.guilds.editCurrentMember('10', { accent_color: 0x1000000 }), RangeError);
   assert.throws(() => bot.guilds.editCurrentMember('10', { pronouns: 'x'.repeat(41) }), /pronouns/);
   assert.throws(() => bot.guilds.editCurrentMember('10', { avatar: 123 }), /profile images/);
+  assert.throws(() => bot.guilds.editCurrentMember('10', { roles: ['30'] }), /Unsupported Micup member field/);
   await bot.guilds.editMember('10', '20', { nick: '', roles: ['30'], mute: false, channel_id: null });
   await bot.guilds.editCurrentMember('10', { nick: null, accent_color: 0xFFFFFF, pronouns: 'they/them', avatar: null });
   assert.deepEqual(sent, [

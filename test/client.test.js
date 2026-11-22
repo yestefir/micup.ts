@@ -50,7 +50,9 @@ test('discovers the API, authenticates the bot and sends replies', async (t) => 
   assert.throws(() => client.sendMessage('202', { content: 'test', components: Array(1) }), TypeError);
   assert.throws(() => client.sendMessage('202', { content: 'test', components: [null] }), TypeError);
   assert.throws(() => client.sendMessage('202', { content: 'test', flags: -1 }), TypeError);
-  assert.throws(() => client.sendMessage('202', { content: 'test', nonce: 1 }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', nonce: -1 }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', nonce: 1.5 }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', nonce: 'x'.repeat(33) }), RangeError);
   assert.throws(() => client.sendMessage('202', { content: 'test', enforce_nonce: 'yes' }), TypeError);
   assert.throws(() => client.sendMessage('202', { content: 'test', tts: 1 }), TypeError);
   assert.equal(fetch.mock.callCount(), 4);

@@ -148,6 +148,8 @@ function memberPath(guildId: string, userId: string): string {
 
 function rolePayload(role: GuildRoleEdit, creating = false): object {
   if (!role || typeof role !== 'object' || Array.isArray(role)) throw new TypeError('Micup role options must be an object');
+  const fields = new Set(['name', 'permissions', 'color', 'hoist', 'mentionable', 'icon', 'unicode_emoji']);
+  for (const field of Object.keys(role)) if (!fields.has(field)) throw new TypeError('Unsupported Micup role field: ' + field);
   const { permissions, ...body } = role;
   const payload: Record<string, unknown> = { ...body };
   if (creating && (typeof role.name !== 'string' || !role.name)) throw new TypeError('A Micup role needs a nonempty name');
@@ -260,8 +262,13 @@ function guildPayload(body: GuildEdit): object {
   return body;
 }
 
-function memberPayload(guildId: string, body: GuildMemberEdit | CurrentMemberEdit): object {
+function memberPayload(guildId: string, body: GuildMemberEdit | CurrentMemberEdit, current = false): object {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('Micup member options must be an object');
+  const fields = new Set([
+    'nick', ...(!current ? ['roles'] : []), 'mute', 'deaf', 'communication_disabled_until', 'channel_id', 'connection_id', 'timeout_reason',
+    ...(current ? ['avatar', 'banner', 'bio', 'pronouns', 'accent_color', 'profile_flags', 'mention_flags'] : []),
+  ]);
+  for (const field of Object.keys(body)) if (!fields.has(field)) throw new TypeError('Unsupported Micup member field: ' + field);
   const member = body as GuildMemberEdit & CurrentMemberEdit;
   if (member.nick !== undefined && member.nick !== null && typeof member.nick !== 'string') {
     throw new TypeError('Micup member nick must be a string or null');
@@ -318,7 +325,7 @@ function memberPayload(guildId: string, body: GuildMemberEdit | CurrentMemberEdi
       (member.mention_flags !== undefined && (!Number.isSafeInteger(member.mention_flags) || member.mention_flags < 0))) {
     throw new RangeError('Micup guild profile flags must be nonnegative integers');
   }
-  return body;
+  return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
 }
 
 export class MicupGuilds {
@@ -354,24 +361,35 @@ export class MicupGuilds {
   }
 
   moveRoles(guildId: string, positions: readonly { id: string; position: number }[], options?: AuditOptions): Promise<void> {
-    this.#checkPositions(guildId, positions.map((entry) => ({ id: entry.id, position: entry.position })));
-    return this.rest.request('PATCH', guildPath(guildId) + '/roles', { ...options, body: positions });
+    const body = this.#checkPositions(guildId, positions, 'position');
+    return this.rest.request('PATCH', guildPath(guildId) + '/roles', { ...options, body });
   }
 
   moveHoistedRoles(guildId: string, positions: readonly { id: string; hoist_position: number }[], options?: AuditOptions): Promise<void> {
-    this.#checkPositions(guildId, positions.map((entry) => ({ id: entry.id, position: entry.hoist_position })));
-    return this.rest.request('PATCH', guildPath(guildId) + '/roles/hoist-positions', { ...options, body: positions });
+    const body = this.#checkPositions(guildId, positions, 'hoist_position');
+    return this.rest.request('PATCH', guildPath(guildId) + '/roles/hoist-positions', { ...options, body });
   }
 
   resetHoistedRoles(guildId: string, options?: AuditOptions): Promise<void> {
     return this.rest.request('DELETE', guildPath(guildId) + '/roles/hoist-positions', options);
   }
 
-  #checkPositions(guildId: string, positions: readonly { id: string; position: number }[]): void {
-    if (!positions.length || positions.some(({ id, position }) => id === guildId || !Number.isSafeInteger(position) || position < 0)) {
-      throw new RangeError('Role positions require nonnegative positions and exclude the everyone role');
-    }
-    for (const { id } of positions) snowflake(id, 'Role ID');
+  #checkPositions<T extends { id: string }>(guildId: string, positions: readonly T[], field: 'position' | 'hoist_position'): T[] {
+    if (!Array.isArray(positions)) throw new TypeError('Role positions must be an array');
+    if (!positions.length) throw new RangeError('Role positions require at least one role');
+    const ids = new Set<string>();
+    return Array.from(positions, (entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new TypeError('Role positions must be objects');
+      for (const key of Object.keys(entry)) if (key !== 'id' && key !== field) throw new TypeError('Unsupported role position field: ' + key);
+      const id = snowflake(entry.id, 'Role ID');
+      const position = (entry as Record<string, unknown>)[field];
+      if (id === guildId || typeof position !== 'number' || !Number.isSafeInteger(position) || position < 0) {
+        throw new RangeError('Role positions require nonnegative positions and exclude the everyone role');
+      }
+      if (ids.has(id)) throw new RangeError('A role can only appear once in a position update');
+      ids.add(id);
+      return { id, [field]: position } as T;
+    });
   }
 
   member(guildId: string, userId: string, options?: MicupRequestOptions): Promise<MicupMember> {
@@ -502,12 +520,21 @@ export class MicupGuilds {
   moveChannels(guildId: string, positions: readonly ChannelPosition[], options?: MicupRequestOptions): Promise<void> {
     if (!Array.isArray(positions)) throw new TypeError('Channel positions must be an array');
     if (!positions.length) throw new RangeError('Moving channels needs at least one position');
+    const ids = new Set<string>();
     const body = Array.from(positions, (entry) => {
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new TypeError('Channel positions must be objects');
-      const { id, parent_id, preceding_sibling_id, ...position } = entry;
+      const fields = new Set(['id', 'position', 'parent_id', 'preceding_sibling_id', 'lock_permissions']);
+      for (const field of Object.keys(entry)) if (!fields.has(field)) throw new TypeError('Unsupported channel position field: ' + field);
+      const { id, position, parent_id, preceding_sibling_id, lock_permissions } = entry;
+      const channelId = snowflake(id, 'Channel ID');
+      if (ids.has(channelId)) throw new RangeError('A channel can only appear once in a position update');
+      ids.add(channelId);
+      if (position !== undefined && (!Number.isSafeInteger(position) || position < 0)) throw new RangeError('Channel positions must be nonnegative integers');
+      if (lock_permissions !== undefined && typeof lock_permissions !== 'boolean') throw new TypeError('Channel position lock_permissions must be a boolean');
       return {
-        ...position,
-        id: snowflake(id, 'Channel ID'),
+        id: channelId,
+        ...(position !== undefined && { position }),
+        ...(lock_permissions !== undefined && { lock_permissions }),
         ...(parent_id !== undefined && { parent_id: parent_id === null ? null : snowflake(parent_id, 'Parent ID') }),
         ...(preceding_sibling_id !== undefined && {
           preceding_sibling_id: preceding_sibling_id === null ? null : snowflake(preceding_sibling_id, 'Sibling ID'),
@@ -537,7 +564,7 @@ export class MicupGuilds {
   }
 
   editCurrentMember(guildId: string, edit: CurrentMemberEdit, options?: AuditOptions): Promise<MicupMember> {
-    return this.rest.request('PATCH', guildPath(guildId) + '/members/@me', { ...options, body: memberPayload(guildId, edit) });
+    return this.rest.request('PATCH', guildPath(guildId) + '/members/@me', { ...options, body: memberPayload(guildId, edit, true) });
   }
 
   setNickname(guildId: string, nick: string | null, options?: AuditOptions): Promise<MicupMember> {

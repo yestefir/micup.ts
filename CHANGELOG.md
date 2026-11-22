@@ -6,6 +6,14 @@
 - Discovery create and edit requests reject response-only fields and empty edits before sending.
 - Invite, ban and expression creation requests reject unsupported fields before sending.
 - Voice-room stage, effect and tournament requests validate and serialize supported nested fields only.
+- Webhook edits reject unsupported fields and invalid avatar values before sending.
+- Channel and role ordering requests reject duplicate IDs, invalid positions and unsupported fields.
+- Channel, thread, forum tag and permission overwrite requests reject unsupported fields and out-of-range permission bits.
+- Guild role and member updates reject fields that belong to API responses or another route.
+- Message requests and attachment references reject unsupported fields and serialize metadata explicitly.
+- Embed request and response types are distinct; embed inputs validate nested fields and URL protocols.
+- Message creation supports sending a saved meme by its favorite meme ID.
+- Message nonces support documented numeric and string forms and retry correctly when the nonce is zero.
 - Easy client Gateway events no longer use unbounded event payload types; guild updates require both API identifiers.
 - TypeScript compilation enables unchecked indexed access across the main and voice packages.
 - Guild member search validates documented sort fields, source types and timestamp ranges before sending requests.

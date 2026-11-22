@@ -47,12 +47,22 @@ function threadQuery(threadId?: string): URLSearchParams {
 }
 
 function webhookEdit(edit: WebhookEdit): WebhookEdit {
+  if (!edit || typeof edit !== 'object' || Array.isArray(edit)) throw new TypeError('Webhook edits must be an object');
+  const fields = new Set(['name', 'avatar', 'channel_id']);
+  for (const field of Object.keys(edit)) if (!fields.has(field)) throw new TypeError('Unsupported webhook field: ' + field);
   if (edit.name !== undefined && (typeof edit.name !== 'string' || [...edit.name].length < 1 || [...edit.name].length > 80)) {
     throw new TypeError('A webhook name must contain 1 to 80 characters');
   }
+  if (edit.avatar !== undefined && edit.avatar !== null && (typeof edit.avatar !== 'string' || !edit.avatar)) {
+    throw new TypeError('A webhook avatar must be a nonempty string or null');
+  }
   if (edit.channel_id !== undefined) snowflake(edit.channel_id, 'Channel ID');
   if (edit.name === undefined && edit.avatar === undefined && edit.channel_id === undefined) throw new TypeError('Webhook edits need a change');
-  return edit;
+  return {
+    ...(edit.name !== undefined && { name: edit.name }),
+    ...(edit.avatar !== undefined && { avatar: edit.avatar }),
+    ...(edit.channel_id !== undefined && { channel_id: edit.channel_id }),
+  };
 }
 
 export class MicupWebhooks {
@@ -106,7 +116,7 @@ export class MicupWebhooks {
     if (wait) query.set('wait', 'true');
     return this.rest.request('POST', webhookPath(webhookId, token), {
       body: messageBody(message, undefined, { username, avatar_url: avatarURL, thread_name: threadName, applied_tags: appliedTags }),
-      query, signal, anonymous: true, idempotent: Boolean(message.nonce),
+      query, signal, anonymous: true, idempotent: message.nonce !== undefined,
     });
   }
 

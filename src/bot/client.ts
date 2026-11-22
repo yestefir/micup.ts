@@ -8,7 +8,7 @@ import { tokenId } from '../rest/identity.js';
 import { MessageFlag } from '../model/entities.js';
 import type { MicupApplication } from '../rest/users.js';
 
-import { messageBody, messageQuery, messagesPath, snowflake, type ListMessageOptions, type MessageForward, type MessageInput, type MessageSearch, type MessageSearchResult } from '../rest/messages.js';
+import { messageBody, messageQuery, messagesPath, snowflake, validateNonce, type ListMessageOptions, type MessageForward, type MessageInput, type MessageSearch, type MessageSearchResult } from '../rest/messages.js';
 
 import { MicupCommands } from '../rest/commands.js';
 import { MicupInteractions } from '../rest/interactions.js';
@@ -255,11 +255,13 @@ export class MicupClient {
     const path = messagesPath(channelId);
     const input = typeof content === 'string' ? { content } : content;
     if (!input?.content?.trim() && !input?.embeds?.length && !input?.components?.length &&
-        !input?.files?.length && !input?.attachments?.length && !input?.uploads?.length && !input?.sticker_ids?.length) {
+        !input?.files?.length && !input?.attachments?.length && !input?.uploads?.length && !input?.sticker_ids?.length && !input?.favorite_meme_id) {
       throw new TypeError('Message content, embeds, components or attachments are required');
     }
     const reply = replyTo === undefined ? undefined : { message_id: snowflake(replyTo, 'Reply message ID'), channel_id: channelId };
-    return this.request('POST', path, { body: messageBody(input, reply), signal, idempotent: Boolean(input.nonce && input.enforce_nonce) });
+    return this.request('POST', path, {
+      body: messageBody(input, reply), signal, idempotent: input.nonce !== undefined && input.enforce_nonce === true,
+    });
   }
 
   getMessage(channelId: string, messageId: string, options?: MicupRequestOptions): Promise<MicupMessage> {
@@ -328,6 +330,7 @@ export class MicupClient {
     channelId: string, forward: MessageForward,
     { signal, nonce, flags }: MicupRequestOptions & Pick<MessageInput, 'nonce' | 'flags'> = {},
   ): Promise<MicupMessage> {
+    validateNonce(nonce);
     if (forward.attachment_ids !== undefined && !Array.isArray(forward.attachment_ids) ||
         forward.embed_indices !== undefined && !Array.isArray(forward.embed_indices)) {
       throw new TypeError('Forward attachment IDs and embed indices must be arrays');
@@ -349,7 +352,7 @@ export class MicupClient {
       embed_indices: forward.embed_indices === undefined ? undefined : embedIndices,
     };
     return this.request('POST', messagesPath(channelId), {
-      body: { message_reference: reference, nonce, flags }, signal, idempotent: Boolean(nonce),
+      body: { message_reference: reference, nonce, flags }, signal, idempotent: nonce !== undefined,
     });
   }
 

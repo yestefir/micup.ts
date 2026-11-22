@@ -15,7 +15,7 @@ export type { VoiceJoinOptions, VoiceServerUpdate, VoiceSessionOptions } from '.
 export { MicupAPIError, MicupErrorCode } from './rest/errors.js';
 export type { MicupFieldError } from './rest/errors.js';
 export type { MicupRequestOptions, RestMethod, RestRequestOptions } from './rest/transport.js';
-export type { AllowedMentions, ListMessageOptions, MessageInput, MicupEmbed, MicupFile } from './rest/messages.js';
+export type { AllowedMentions, ListMessageOptions, MessageInput, MicupEmbed, MicupEmbedInput, MicupFile } from './rest/messages.js';
 export { GatewayState } from './state/cache.js';
 export { ElevatedPermissions, Permission, computePermissions, hasPermissions, missingPermissions, parsePermission, permissionNames } from './model/permissions.js';
 export * from './model/constants.js';

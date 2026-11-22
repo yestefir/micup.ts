@@ -357,7 +357,25 @@ test('moves channels and clears commands', async (t) => {
   assert.throws(() => bot.guilds.moveChannels('10', []), RangeError);
   assert.throws(() => bot.guilds.moveChannels('10', Array(1)), /Channel positions must be objects/);
   assert.throws(() => bot.guilds.moveChannels('10', '1'), /Channel positions must be an array/);
+  assert.throws(() => bot.guilds.moveChannels('10', [{ id: '1', position: 1.5 }]), /nonnegative integers/);
+  assert.throws(() => bot.guilds.moveChannels('10', [{ id: '1', lock_permissions: 'yes' }]), /must be a boolean/);
+  assert.throws(() => bot.guilds.moveChannels('10', [{ id: '1', name: 'response field' }]), /Unsupported channel position field/);
+  assert.throws(() => bot.guilds.moveChannels('10', [{ id: '1' }, { id: '1' }]), /once in a position update/);
   assert.equal(calls.length, 5);
+});
+
+test('validates role position arrays before sending them', async (t) => {
+  const { bot, calls } = await mockBot(t, () => none());
+  await bot.guilds.moveRoles('10', [{ id: '1', position: 2 }, { id: '2', position: 1 }]);
+  await bot.guilds.moveHoistedRoles('10', [{ id: '1', hoist_position: 2 }]);
+  assert.deepEqual(calls[0].body, [{ id: '1', position: 2 }, { id: '2', position: 1 }]);
+  assert.deepEqual(calls[1].body, [{ id: '1', hoist_position: 2 }]);
+  assert.throws(() => bot.guilds.moveRoles('10', null), /must be an array/);
+  assert.throws(() => bot.guilds.moveRoles('10', []), /at least one role/);
+  assert.throws(() => bot.guilds.moveRoles('10', [{ id: '1', position: 1 }, { id: '1', position: 2 }]), /once in a position update/);
+  assert.throws(() => bot.guilds.moveHoistedRoles('10', [{ id: '1', hoist_position: 1, name: 'response field' }]), /Unsupported role position field/);
+  assert.throws(() => bot.guilds.moveHoistedRoles('10', [{ id: '1', hoist_position: -1 }]), /nonnegative positions/);
+  assert.equal(calls.length, 2);
 });
 
 test('reads emoji, sticker and public application records', async (t) => {

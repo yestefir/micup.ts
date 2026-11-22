@@ -100,6 +100,12 @@ await client.sendMessage(channelId, {
 
 Signed attachment uploads require HTTPS. Loopback HTTP URLs are accepted for local testing; public HTTP URLs are rejected before file data is sent.
 
+Use `MicupEmbedInput` for message requests and `MicupEmbed` for embeds received in messages. The input type contains only supported rich embed fields; response-only metadata such as `type`, provider and proxy URLs is rejected before sending.
+
+Send a saved meme by setting `favorite_meme_id`; it is validated as a snowflake and can be the message's only content.
+
+Message nonces accept a string of 1 to 32 characters or a nonnegative safe integer. Set `enforce_nonce: true` when a create request should be retried safely with that nonce.
+
 Clear a nullable field by passing `null` (for example `setNickname(guildId, null)` or `edit(channelId, { topic: null })`); leave a field out to keep it.
 
 Call a route the SDK has no method for with `client.request(method, path, { body, query, reason, signal })`. Paths are relative to the versioned API.

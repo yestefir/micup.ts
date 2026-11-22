@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  ButtonStyle, ComponentType, EmbedBuilder, inviteURL, MessageCatalog, MicupMedia,
+  ButtonStyle, ComponentType, EmbedBuilder, inviteURL, MessageCatalog, MicupMedia, validateEmbed,
   TimestampStyle, actionRow, disableComponents, formatTimestamp, knownGatewayEvents, mentionChannel,
   modalRows, selectRow, snowflakeAt, snowflakeTime,
 } from 'micup.ts';
@@ -35,7 +35,16 @@ test('builds and validates components, embeds, and media URLs without mutating i
   assert.deepEqual(new EmbedBuilder().title('Fixture').field('Example', 'Value').build(), {
     title: 'Fixture', fields: [{ name: 'Example', value: 'Value', inline: undefined }],
   });
-  assert.throws(() => new EmbedBuilder().title('x'.repeat(257)).build(), /size/);
+  assert.throws(() => new EmbedBuilder().title('x'.repeat(257)).build(), /title/);
+  assert.throws(() => validateEmbed({ title: 'fixture', type: 'article' }), /Unsupported embed object field/);
+  assert.throws(() => validateEmbed({ author: { name: 'fixture', proxy_icon_url: 'https://media.example/icon.png' } }), /Unsupported embed author field/);
+  assert.throws(() => validateEmbed({ image: { url: 'https://media.example/image.png', proxy_url: 'https://proxy.example/image.png' } }), /Unsupported embed image field/);
+  assert.throws(() => validateEmbed({ fields: [{ name: 'fixture', value: 'x', inline: 'yes' }] }), /inline flag/);
+  assert.throws(() => validateEmbed({ url: 'javascript:alert(1)' }), /Invalid Micup embed link URL/);
+  assert.doesNotThrow(() => validateEmbed({
+    title: 'fixture', url: 'https://example.com', author: { name: 'author', icon_url: 'https://example.com/icon.png' },
+    image: { url: 'attachment://image.png', description: 'image' }, fields: [{ name: 'field', value: '' }],
+  }));
   const media = new MicupMedia('https://media.example/');
   assert.equal(media.userAvatar({ id: '20', username: 'fixture', avatar: 'a_hash' }, { format: 'png', size: 64 }),
     'https://media.example/avatars/20/a_hash.png?animated=false&size=64');
