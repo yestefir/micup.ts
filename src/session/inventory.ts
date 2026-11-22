@@ -77,9 +77,10 @@ export class MemberInventory {
       }
       case 'GUILD_MEMBER_ADD':
       case 'GUILD_MEMBER_UPDATE':
-      case 'GUILD_MEMBER_REMOVE': {
+      case 'GUILD_MEMBER_REMOVE':
+      case 'GUILD_BAN_ADD': {
         const { guild_id, user } = data as { guild_id: string; user?: MicupUser };
-        if (user?.id) this.#write(guild_id, user, name === 'GUILD_MEMBER_REMOVE');
+        if (user?.id) this.#write(guild_id, user, name === 'GUILD_MEMBER_REMOVE' || name === 'GUILD_BAN_ADD');
         break;
       }
       case 'VOICE_STATE_UPDATE': {

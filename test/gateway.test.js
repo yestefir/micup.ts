@@ -547,7 +547,9 @@ test('merges Gateway member changes into a paginated inventory without sharing i
       if (packet.op === op.Heartbeat) send(socket, op.HeartbeatAck);
       if (packet.op === op.Identify) {
         send(socket, op.Dispatch, {
-          session_id: 'membership', guilds: [{ id: '10', members: [{ user: { id: '20' }, roles: [] }] }],
+          session_id: 'membership', guilds: [{ id: '10', members: [
+            { user: { id: '20' }, roles: [] }, { user: { id: '22' }, roles: [] },
+          ] }],
         }, 'READY', sequence++);
       }
     });
@@ -561,11 +563,12 @@ test('merges Gateway member changes into a paginated inventory without sharing i
       lookups.push(after);
       if (!after) {
         send(socket, op.Dispatch, { guild_id: '10', user: { id: '20' } }, 'GUILD_MEMBER_REMOVE', sequence++);
+        send(socket, op.Dispatch, { guild_id: '10', user: { id: '22' } }, 'GUILD_BAN_ADD', sequence++);
         send(socket, op.Dispatch, { guild_id: '10', user: { id: '21', bot: true }, roles: [] }, 'GUILD_MEMBER_ADD', sequence++);
         await changes;
         return Array.from({ length: 1000 }, (_, index) => ({ user: { id: String(100 + index) }, roles: [] }));
       }
-      return [{ user: { id: '20' }, roles: [] }];
+      return [{ user: { id: '20' }, roles: [] }, { user: { id: '22' }, roles: [] }];
     },
   }, {
     trackMembers: true,
@@ -579,6 +582,7 @@ test('merges Gateway member changes into a paginated inventory without sharing i
     const [snapshot] = session.memberInventories();
     assert.deepEqual(lookups, [undefined, '1099']);
     assert.equal(snapshot.members.has('20'), false);
+    assert.equal(snapshot.members.has('22'), false);
     assert.equal(snapshot.members.get('21'), true);
     snapshot.members.clear();
     assert.equal(session.memberInventories()[0].members.size, 1001);

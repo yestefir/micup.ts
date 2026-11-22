@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Remove banned users from the member inventory during and after synchronization.
+
 ## 2.0.0 - 2026-11-22
 
 - Require Node.js 24 or later in both packages and run CI against supported Node.js 24 and 26 releases. Node.js 20 and 22 are end-of-life.
