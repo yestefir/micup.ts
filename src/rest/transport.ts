@@ -11,6 +11,8 @@ export interface RestRequestOptions extends MicupRequestOptions {
   body?: unknown;
   query?: URLSearchParams;
   reason?: string;
+  anonymous?: boolean;
+  idempotent?: boolean;
 }
 
 const majorParameters = new Set(['channels', 'guilds', 'webhooks']);
@@ -96,7 +98,7 @@ export class RestTransport {
     }
   }
 
-  async request<T>(method: RestMethod, path: string, { body, signal, query, reason }: RestRequestOptions = {}): Promise<T> {
+  async request<T>(method: RestMethod, path: string, { body, signal, query, reason, anonymous, idempotent }: RestRequestOptions = {}): Promise<T> {
     if (!path.startsWith('/') || path.startsWith('//') || /[\\?#\u0000-\u0020]/.test(path)) {
       throw new TypeError('Micup REST path must be relative to the versioned API');
     }
@@ -106,7 +108,9 @@ export class RestTransport {
     }
     if (query?.size) target.search = query.toString();
 
-    const headers = new Headers({ Authorization: 'Bot ' + this.token, 'User-Agent': 'micup.ts' });
+    const headers = new Headers({ 'User-Agent': 'micup.ts' });
+    if (!anonymous) headers.set('Authorization', 'Bot ' + this.token);
+    const canRetry = idempotent || repeatable.has(method);
     if (reason !== undefined) {
       if (typeof reason !== 'string' || !reason.trim() || reason.length > 512 || /[\r\n]/.test(reason)) {
         throw new TypeError('Invalid Micup audit log reason');
@@ -129,7 +133,7 @@ export class RestTransport {
       } catch {
         signal?.throwIfAborted();
         last = new Error('Micup API connection failed');
-        if (!remaining || !repeatable.has(method)) throw last;
+        if (!remaining || !canRetry) throw last;
         await delay(backoff, undefined, { signal });
         continue;
       }
@@ -149,7 +153,7 @@ export class RestTransport {
         this.#limits.block(route, wait, error.global);
       } else if (response.status === 423) {
         wait = Math.max(error.retryAfterMs, 1000);
-      } else if (response.status >= 500 && repeatable.has(method)) {
+      } else if (response.status >= 500 && canRetry) {
         wait = Math.max(error.retryAfterMs, backoff);
       }
       if (!remaining || wait === 0 || wait > maxRetryDelay) throw error;

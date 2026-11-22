@@ -272,3 +272,90 @@ test('publishes presence and correlates count replies and out-of-order member ch
   assert.deepEqual(counts, [{ guild_id: '10', member_count: 5, online_count: 3 }]);
   assert.deepEqual(members.map((member) => member.user.id), ['1', '2']);
 });
+
+test('merges Gateway member changes into a paginated inventory without sharing its storage', { timeout: 6000 }, async (t) => {
+  const { server, endpoint } = await createGateway(t);
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  let socket;
+  let sequence = 1;
+  let releasePage;
+  const changes = new Promise((resolve) => { releasePage = resolve; });
+  const lookups = [];
+
+  server.on('connection', (connected) => {
+    socket = connected;
+    send(socket, op.Hello, { heartbeat_interval: 100 });
+    socket.on('message', (data) => {
+      const packet = JSON.parse(data);
+      if (packet.op === op.Heartbeat) send(socket, op.HeartbeatAck);
+      if (packet.op === op.Identify) {
+        send(socket, op.Dispatch, {
+          session_id: 'membership', guilds: [{ id: '10', members: [{ user: { id: '20' }, roles: [] }] }],
+        }, 'READY', sequence++);
+      }
+    });
+  });
+
+  const session = new GatewaySession({
+    endpoint, token: 'fixture',
+    lookupMembers: async (guildId, { after, limit }) => {
+      assert.equal(guildId, '10');
+      assert.equal(limit, 1000);
+      lookups.push(after);
+      if (!after) {
+        send(socket, op.Dispatch, { guild_id: '10', user: { id: '20' } }, 'GUILD_MEMBER_REMOVE', sequence++);
+        send(socket, op.Dispatch, { guild_id: '10', user: { id: '21', bot: true }, roles: [] }, 'GUILD_MEMBER_ADD', sequence++);
+        await changes;
+        return Array.from({ length: 1000 }, (_, index) => ({ user: { id: String(100 + index) }, roles: [] }));
+      }
+      return [{ user: { id: '20' }, roles: [] }];
+    },
+  }, {
+    trackMembers: true,
+    handler: ({ name }) => { if (name === 'GUILD_MEMBER_ADD') releasePage(); },
+  });
+  const running = session.run({ signal: controller.signal });
+  try {
+    while (!session.memberInventories()[0]?.complete) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    const [snapshot] = session.memberInventories();
+    assert.deepEqual(lookups, [undefined, '1099']);
+    assert.equal(snapshot.members.has('20'), false);
+    assert.equal(snapshot.members.get('21'), true);
+    snapshot.members.clear();
+    assert.equal(session.memberInventories()[0].members.size, 1001);
+  } finally {
+    controller.abort();
+    await running;
+  }
+});
+
+test('sends Lazy Request subscriptions and exposes a one-connection runner', { timeout: 5000 }, async (t) => {
+  const { server, endpoint } = await createGateway(t);
+  const control = new AbortController();
+  t.after(() => control.abort());
+  let received;
+  server.once('connection', (socket) => {
+    send(socket, op.Hello, { heartbeat_interval: 1000 });
+    socket.on('message', (raw) => {
+      const packet = JSON.parse(raw);
+      if (packet.op === op.Identify) send(socket, op.Dispatch, { session_id: 'lazy' }, 'READY', 1);
+      if (packet.op === op.LazyRequest) {
+        received = packet.d;
+        socket.close(4000, 'fixture ended');
+      }
+    });
+  });
+  const body = { '101': { active: true, member_list_channels: { '102': [[0, 99]] }, thread_member_lists: [] } };
+  const session = new GatewaySession({ endpoint, token: 'fixture' }, {
+    handler: () => {},
+    onReady: () => {
+      void session.subscribe(body, { signal: control.signal }).catch(() => control.abort());
+    },
+  });
+  assert.throws(() => session.subscribe({ '101': { member_list_channels: { '102': [[0, 100]] } } }), /ranges/);
+  await assert.rejects(session.runOnce({ signal: control.signal }), (error) => error instanceof GatewayCloseError && error.code === 4000);
+  assert.deepEqual(received, { subscriptions: body });
+});

@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { GatewayConnection, type GatewayResume } from '../gateway/connection.js';
+import { assertZstdAvailable } from '../gateway/compression.js';
 import { GatewayCloseError, gatewayEndpoint, type GatewayDispatch } from '../gateway/protocol.js';
 
 import { SessionVoice, type VoiceJoinOptions, type VoiceServerUpdate, type VoiceSessionOptions } from './voice.js';
@@ -8,14 +9,21 @@ import { Permission, hasPermissions } from '../model/permissions.js';
 import { GatewayState } from '../state/cache.js';
 
 import { GatewayOpcode } from '../gateway/protocol.js';
-import type { MicupMember } from '../model/guild.js';
+import type { MicupChannel, MicupMember, MicupVoiceState } from '../model/guild.js';
+import { validateSubscriptions, type GatewaySubscription } from '../gateway/subscription.js';
 import { activePresence, normalizePresence, type CustomStatus, type Presence, type PresenceStatus } from '../model/presence.js';
 import { SessionRequests, type ChannelMemberCount, type GuildCount, type GuildMembersRequest } from './requests.js';
+
+import { MemberInventory, type GuildMemberInventory, type MemberPageLookup } from './inventory.js';
+
+export type ChannelLookup = (channelId: string, options?: { signal?: AbortSignal }) => Promise<MicupChannel>;
 
 export interface GatewaySessionConfig {
   readonly endpoint: string;
   readonly token: string;
   readonly botId?: string;
+  readonly lookupChannel?: ChannelLookup;
+  readonly lookupMembers?: MemberPageLookup;
   readonly shardId?: number;
   readonly shardCount?: number;
 }
@@ -24,6 +32,8 @@ export interface GatewaySessionOptions extends VoiceSessionOptions {
   readonly handler: (event: GatewayDispatch, signal: AbortSignal) => void | Promise<void>;
   readonly ignoredEvents?: readonly string[];
   readonly flags?: number;
+  readonly compress?: boolean;
+  readonly trackMembers?: boolean;
   readonly presence?: Presence;
   readonly minBackoffMs?: number;
   readonly maxBackoffMs?: number;
@@ -44,6 +54,8 @@ export class GatewaySession {
   readonly #voice: SessionVoice;
   readonly state = new GatewayState();
   #botId?: string;
+  readonly #lookup?: ChannelLookup;
+  readonly #inventory?: MemberInventory;
   #presence?: Presence;
   readonly #requests: SessionRequests;
   readonly #minBackoff: number;
@@ -53,10 +65,16 @@ export class GatewaySession {
   #connection?: GatewayConnection;
 
   constructor(config: GatewaySessionConfig, options: GatewaySessionOptions) {
-    this.#endpoint = gatewayEndpoint(config.endpoint);
+    if (options?.compress) assertZstdAvailable();
+    this.#endpoint = gatewayEndpoint(config.endpoint, options?.compress);
     if (!/^[\x21-\x7E]+$/.test(config.token ?? '')) throw new TypeError('Gateway token is required');
     this.#token = config.token;
     this.#botId = config.botId;
+    this.#lookup = config.lookupChannel;
+    if (options?.trackMembers) {
+      if (!config.lookupMembers) throw new TypeError('Member tracking requires a member page lookup');
+      this.#inventory = new MemberInventory(config.lookupMembers);
+    }
     const id = config.shardId ?? 0;
     const count = config.shardCount ?? 1;
     if (!Number.isSafeInteger(id) || !Number.isSafeInteger(count) || id < 0 || id >= count) {
@@ -153,9 +171,52 @@ export class GatewaySession {
     return this.#voice.update(guildId, options);
   }
 
-  async run({ signal = new AbortController().signal }: { signal?: AbortSignal } = {}): Promise<void> {
+  async resolveGuild(channelId: string, { signal }: { signal?: AbortSignal } = {}): Promise<string | undefined> {
+    const cached = this.state.guildForChannel(channelId);
+    if (cached) return cached;
+    if (!this.#lookup) throw new Error('No channel lookup is configured');
+    const channel = await this.#lookup(channelId, { signal });
+    if (channel.id !== channelId) throw new Error('Micup returned a different channel');
+    this.state.rememberChannel(channel);
+    return channel.guild_id;
+  }
+
+  subscribe(subscriptions: Readonly<Record<string, GatewaySubscription>>, options?: { signal?: AbortSignal }): Promise<void> {
+    validateSubscriptions(subscriptions);
+    return this.send(GatewayOpcode.LazyRequest, { subscriptions }, options);
+  }
+
+  memberInventories(): GuildMemberInventory[] {
+    return this.#inventory?.snapshots() ?? [];
+  }
+
+  #applyState(event: GatewayDispatch): void {
+    const voice = event.name === 'VOICE_STATE_UPDATE' ? event.data as MicupVoiceState | null : null;
+    const guild = voice?.guild_id;
+    const user = voice?.user_id;
+    const previous = guild && user ? this.state.voiceChannel(guild, user) : undefined;
+    this.state.apply(event);
+    this.#inventory?.observe(event);
+    if (guild && user && previous && user !== this.#botId && previous !== voice?.channel_id &&
+        this.#botId && this.state.voiceChannel(guild, this.#botId) === previous &&
+        this.state.voiceMembers(guild, previous).every((id) => id === this.#botId)) {
+      this.#options.onVoiceEmpty?.(guild, previous);
+    }
+  }
+
+  run(options?: { signal?: AbortSignal }): Promise<void> {
+    return this.#run(true, options);
+  }
+
+  runOnce(options?: { signal?: AbortSignal }): Promise<void> {
+    return this.#run(false, options);
+  }
+
+  async #run(reconnect: boolean, { signal = new AbortController().signal }: { signal?: AbortSignal } = {}): Promise<void> {
     if (this.#running) throw new Error('Micup Gateway session is already running');
     this.#running = true;
+    const stopInventory = new AbortController();
+    const inventory = this.#inventory?.run(() => this.ready, AbortSignal.any([stopInventory.signal, signal]));
     let backoff = this.#minBackoff;
     try {
       while (!signal.aborted) {
@@ -173,7 +234,7 @@ export class GatewaySession {
               if (event.name === 'READY') {
                 this.#botId = (event.data as { user?: { id?: string } } | null)?.user?.id ?? this.#botId;
               }
-              this.state.apply(event);
+              this.#applyState(event);
               await this.#options.handler(event, lifetime);
             },
             receive: (event) => {
@@ -189,6 +250,7 @@ export class GatewaySession {
               this.#voice.invalidate();
               this.#requests.invalidate();
               this.state.clear();
+              this.#inventory?.clear();
             },
             onReady: (resumed) => {
               this.#ready = true;
@@ -204,11 +266,12 @@ export class GatewaySession {
             this.#voice.invalidate();
             this.#requests.invalidate();
             this.state.clear();
+            this.#inventory?.clear();
             this.#resume.sessionId = undefined;
             this.#resume.sequence = null;
           }
           this.#options.onDisconnect?.(error);
-          if (error instanceof GatewayCloseError && error.fatal) throw error;
+          if (!reconnect || error instanceof GatewayCloseError && error.fatal) throw error;
           await delay(backoff, undefined, { signal }).catch((cause) => {
             if (!signal.aborted) throw cause;
           });
@@ -216,6 +279,8 @@ export class GatewaySession {
         }
       }
     } finally {
+      stopInventory.abort();
+      await inventory;
       this.#ready = false;
       this.#connection = undefined;
       this.#running = false;

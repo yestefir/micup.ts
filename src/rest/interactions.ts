@@ -1,5 +1,5 @@
 import { InteractionType, type CommandChoice, type MicupInteraction } from '../model/interaction.js';
-import type { MicupMessage } from './client.js';
+import type { MicupMessage } from '../model/entities.js';
 import { messageBody, snowflake, type MessageInput } from './messages.js';
 import type { MicupRequestOptions, RestTransport } from './transport.js';
 

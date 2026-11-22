@@ -1,20 +1,14 @@
+import { validateEmbed, type MicupEmbed } from '../model/embed.js';
+export type { MicupEmbed } from '../model/embed.js';
+import type { MessageReference } from '../model/entities.js';
+import type { UploadedAttachment } from './attachments.js';
+
 export interface MicupFile {
   name: string;
   data: Blob;
   description?: string;
-}
-
-export interface MicupEmbed {
   title?: string;
-  description?: string;
-  url?: string;
-  color?: number;
-  timestamp?: string;
-  fields?: readonly { name: string; value: string; inline?: boolean }[];
-  image?: { url: string };
-  thumbnail?: { url: string };
-  footer?: { text: string; icon_url?: string };
-  author?: { name: string; url?: string; icon_url?: string };
+  spoiler?: boolean;
 }
 
 export interface AllowedMentions {
@@ -31,6 +25,11 @@ export interface MessageInput {
   allowed_mentions?: AllowedMentions;
   flags?: number;
   files?: readonly MicupFile[];
+  uploads?: readonly UploadedAttachment[];
+  nonce?: string;
+  enforce_nonce?: boolean;
+  tts?: boolean;
+  sticker_ids?: readonly string[];
   attachments?: readonly { id: string; filename?: string; description?: string }[];
 }
 
@@ -52,18 +51,38 @@ export function messagesPath(channelId: string, messageId?: string): string {
   return messageId === undefined ? base : base + '/' + snowflake(messageId, 'Message ID');
 }
 
-export function messageBody({ files = [], ...message }: MessageInput, reply?: { message_id: string; channel_id: string }): object {
-  const body = { ...message, ...(reply && { message_reference: reply }) };
-  if (files.length === 0) return body;
+export function assertFileName(name: string): void {
+  if (typeof name !== 'string' || !name || /[/\\\r\n\u0000]/.test(name)) {
+    throw new TypeError('Micup attachments require a valid filename');
+  }
+}
+
+export function messageBody(
+  { files = [], uploads = [], ...message }: MessageInput,
+  reference?: MessageReference,
+  extra: object = {},
+): object {
+  if ((message.embeds?.length ?? 0) > 10) throw new RangeError('A Micup message accepts up to 10 embeds');
+  for (const embed of message.embeds ?? []) validateEmbed(embed);
+  if ((message.sticker_ids?.length ?? 0) > 3) throw new RangeError('A Micup message accepts up to three stickers');
+  const mentions = message.allowed_mentions;
+  const body = {
+    ...message, ...extra,
+    ...(mentions && { allowed_mentions: { ...mentions, parse: mentions.parse ?? [] } }),
+    ...(reference && { message_reference: reference }),
+  };
+  const attachments = [...(message.attachments ?? [])];
+  if (attachments.length + files.length + uploads.length > 10) throw new RangeError('Micup messages support up to 10 attachments');
+  const newFiles = files.map(({ name, data, description, title, spoiler }, index) => {
+    assertFileName(name);
+    if (!(data instanceof Blob)) throw new TypeError('Micup attachments require a Blob');
+    return { id: index, filename: name, description, title, flags: spoiler ? 8 : undefined };
+  });
+  const uploadedFiles = uploads.map((upload, index) => ({ ...upload, id: files.length + index }));
+  const payload = files.length || uploads.length ? { ...body, attachments: [...attachments, ...newFiles, ...uploadedFiles] } : body;
+  if (files.length === 0) return payload;
   const form = new FormData();
-  const attachments = [...(body.attachments ?? []), ...files.map(({ name, data, description }, index) => {
-    if (!name || /[/\\\r\n\u0000]/.test(name) || !(data instanceof Blob)) {
-      throw new TypeError('Micup attachments require a filename and a Blob');
-    }
-    return { id: index, filename: name, description };
-  })];
-  if (attachments.length > 10) throw new RangeError('Micup messages support up to 10 attachments');
-  form.append('payload_json', JSON.stringify({ ...body, attachments }));
+  form.append('payload_json', JSON.stringify(payload));
   files.forEach(({ name, data }, index) => form.append('files[' + index + ']', data, name));
   return form;
 }
@@ -77,4 +96,49 @@ export function messageQuery({ before, after, around, limit }: ListMessageOption
     query.set('limit', String(limit));
   }
   return query;
+}
+
+export interface MessageForward {
+  channel_id: string;
+  message_id: string;
+  guild_id?: string;
+  attachment_ids?: readonly string[];
+  embed_indices?: readonly number[];
+}
+
+export interface MessageSearch {
+  context_guild_id?: string;
+  context_channel_id?: string;
+  content?: string;
+  min_id?: string;
+  max_id?: string;
+  channel_ids?: readonly string[];
+  exclude_channel_id?: readonly string[];
+  exact_phrases?: readonly string[];
+  author_id?: readonly string[];
+  exclude_author_id?: readonly string[];
+  author_type?: readonly ('user' | 'bot' | 'webhook')[];
+  mentions?: readonly string[];
+  has?: readonly string[];
+  exclude_has?: readonly string[];
+  link_hostname?: readonly string[];
+  attachment_filename?: readonly string[];
+  attachment_extension?: readonly string[];
+  mention_everyone?: boolean;
+  pinned?: boolean;
+  include_nsfw?: boolean;
+  hits_per_page?: number;
+  page?: number;
+  sort_by?: 'timestamp' | 'relevance';
+  sort_order?: 'asc' | 'desc';
+}
+
+export interface MessageSearchResult {
+  messages: import('../model/entities.js').MicupMessage[];
+  channels?: import('../model/guild.js').MicupChannel[];
+  threads?: import('../model/guild.js').MicupChannel[];
+  total: number;
+  hits_per_page: number;
+  page: number;
+  indexing?: boolean;
 }

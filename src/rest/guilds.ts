@@ -1,5 +1,5 @@
 import type { MicupChannel, MicupGuild, MicupMember, MicupRole } from '../model/guild.js';
-import type { MicupUser } from './client.js';
+import type { MicupUser } from '../model/entities.js';
 import { snowflake } from './messages.js';
 import type { MicupRequestOptions, RestTransport } from './transport.js';
 
@@ -19,6 +19,8 @@ export interface GuildMemberEdit {
   deaf?: boolean;
   communication_disabled_until?: string | null;
   channel_id?: string | null;
+  connection_id?: string;
+  timeout_reason?: string;
 }
 
 export interface GuildRoleEdit {
@@ -96,6 +98,27 @@ export class MicupGuilds {
 
   deleteRole(guildId: string, roleId: string, options?: AuditOptions): Promise<void> {
     return this.rest.request('DELETE', guildPath(guildId) + '/roles/' + snowflake(roleId, 'Role ID'), options);
+  }
+
+  moveRoles(guildId: string, positions: readonly { id: string; position: number }[], options?: AuditOptions): Promise<void> {
+    this.#checkPositions(guildId, positions.map((entry) => ({ id: entry.id, position: entry.position })));
+    return this.rest.request('PATCH', guildPath(guildId) + '/roles', { ...options, body: positions });
+  }
+
+  moveHoistedRoles(guildId: string, positions: readonly { id: string; hoist_position: number }[], options?: AuditOptions): Promise<void> {
+    this.#checkPositions(guildId, positions.map((entry) => ({ id: entry.id, position: entry.hoist_position })));
+    return this.rest.request('PATCH', guildPath(guildId) + '/roles/hoist-positions', { ...options, body: positions });
+  }
+
+  resetHoistedRoles(guildId: string, options?: AuditOptions): Promise<void> {
+    return this.rest.request('DELETE', guildPath(guildId) + '/roles/hoist-positions', options);
+  }
+
+  #checkPositions(guildId: string, positions: readonly { id: string; position: number }[]): void {
+    if (!positions.length || positions.some(({ id, position }) => id === guildId || !Number.isSafeInteger(position) || position < 0)) {
+      throw new RangeError('Role positions require nonnegative positions and exclude the everyone role');
+    }
+    for (const { id } of positions) snowflake(id, 'Role ID');
   }
 
   member(guildId: string, userId: string, options?: MicupRequestOptions): Promise<MicupMember> {

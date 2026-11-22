@@ -35,6 +35,10 @@ export class GatewayState {
     return structuredClone(this.#channels.get(id));
   }
 
+  rememberChannel(channel: MicupChannel): void {
+    this.#storeChannel(channel);
+  }
+
   guildForChannel(channelId: string): string | undefined {
     return this.#channels.get(channelId)?.guild_id;
   }
@@ -50,6 +54,36 @@ export class GatewayState {
   voiceMembers(guildId: string, channelId: string): string[] {
     const voices = this.#guilds.get(guildId)?.voices.values() ?? [];
     return [...voices].filter((voice) => voice.channel_id === channelId).map((voice) => voice.user_id).sort();
+  }
+
+  channels(guildId: string): MicupChannel[] {
+    return [...this.#channels.values()].filter((channel) => channel.guild_id === guildId).map((channel) => structuredClone(channel));
+  }
+
+  threads(guildId: string): MicupChannel[] {
+    return this.channels(guildId).filter((channel) => isThread(channel.type));
+  }
+
+  highestRole(guildId: string, userId: string): MicupRole | undefined {
+    const guild = this.#guilds.get(guildId);
+    if (!guild || guild.info.unavailable) return undefined;
+    let highest = guild.roles.get(guildId);
+    for (const id of guild.members.get(userId)?.roles ?? []) {
+      const role = guild.roles.get(id);
+      if (role && (!highest || role.position > highest.position)) highest = role;
+    }
+    return structuredClone(highest);
+  }
+
+  canManage(guildId: string, actorId: string, targetId: string): boolean {
+    const guild = this.#guilds.get(guildId);
+    if (!guild || guild.info.unavailable) return false;
+    const owner = guild.info.owner_id;
+    if (owner && owner === actorId) return true;
+    if (targetId === owner) return false;
+    const actor = this.highestRole(guildId, actorId);
+    const target = this.highestRole(guildId, targetId);
+    return Boolean(actor && target && actor.position > target.position);
   }
 
   permissions(guildId: string, userId: string, channelId?: string): bigint | undefined {
@@ -148,7 +182,15 @@ export class GatewayState {
       case 'THREAD_UPDATE':
         this.#storeChannel(data as MicupChannel);
         break;
-      case 'CHANNEL_DELETE':
+      case 'CHANNEL_DELETE': {
+        const id = (data as MicupChannel).id;
+        if (!id) return;
+        this.#channels.delete(id);
+        for (const [child, channel] of this.#channels) {
+          if (channel.parent_id === id && isThread(channel.type)) this.#channels.delete(child);
+        }
+        break;
+      }
       case 'THREAD_DELETE':
         this.#channels.delete((data as MicupChannel).id);
         break;

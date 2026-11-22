@@ -18,6 +18,7 @@ export interface VoiceJoinOptions {
 
 export interface VoiceSessionOptions {
   onVoiceLost?: (guildId: string, connectionId: string) => void;
+  onVoiceEmpty?: (guildId: string, channelId: string) => void;
   onVoiceGrant?: (grant: VoiceServerUpdate) => void;
 }
 
@@ -30,8 +31,9 @@ export class VoiceRefusedError extends Error {
 
 interface PendingJoin {
   channelId: string;
-  resolve: (grant: VoiceServerUpdate) => void;
-  reject: (error: unknown) => void;
+  wake: () => void;
+  grant?: VoiceServerUpdate;
+  error?: unknown;
 }
 
 interface VoiceState {
@@ -67,15 +69,13 @@ export class SessionVoice {
     signal.throwIfAborted();
 
     let join!: PendingJoin;
-    const pending = new Promise<VoiceServerUpdate>((resolve, reject) => {
-      join = { channelId, resolve, reject };
-    });
-    const abort = () => join.reject(signal.reason);
+    const pending = new Promise<void>((wake) => { join = { channelId, wake }; });
+    const abort = () => this.#fail(join, signal.reason);
     this.#joins.set(guildId, join);
     signal.addEventListener('abort', abort, { once: true });
 
     try {
-      const [, grant] = await Promise.all([
+      await Promise.all([
         this.send(GatewayOpcode.VoiceStateUpdate, {
           guild_id: guildId, channel_id: channelId,
           self_mute: options.selfMute ?? false, self_deaf: options.selfDeaf ?? false,
@@ -84,9 +84,10 @@ export class SessionVoice {
         pending,
       ]);
       signal.throwIfAborted();
-      if (this.#joins.get(guildId) !== join) throw new Error('Micup voice join was invalidated');
-      this.#grants.set(guildId, grant);
-      return { ...grant };
+      if (join.error) throw join.error;
+      if (this.#joins.get(guildId) !== join || !join.grant) throw new Error('Micup voice join was invalidated');
+      this.#grants.set(guildId, join.grant);
+      return { ...join.grant };
     } finally {
       signal.removeEventListener('abort', abort);
       if (this.#joins.get(guildId) === join) this.#joins.delete(guildId);
@@ -124,10 +125,11 @@ export class SessionVoice {
   refuse(data: unknown): void {
     const code = (data as { code?: string } | null)?.code;
     if (!code || !refusalCodes.has(code)) return;
-    const oldest = this.#joins.entries().next();
-    if (oldest.done) return;
-    const [guildId, pending] = oldest.value;
-    pending.reject(new VoiceRefusedError(guildId, code));
+    for (const [guildId, pending] of this.#joins) {
+      if (pending.error || pending.grant) continue;
+      this.#fail(pending, new VoiceRefusedError(guildId, code));
+      return;
+    }
   }
 
   invalidate(): void {
@@ -135,7 +137,7 @@ export class SessionVoice {
     const grants = [...this.#grants.values()];
     this.#joins.clear();
     this.#grants.clear();
-    for (const join of joins) join.reject(new Error('Micup Gateway voice session ended'));
+    for (const join of joins) this.#fail(join, new Error('Micup Gateway voice session ended'));
     for (const grant of grants) this.options.onVoiceLost?.(grant.guild_id, grant.connection_id);
   }
 
@@ -152,7 +154,7 @@ export class SessionVoice {
     const previous = this.#grants.get(guildId);
     const channel = packet.channel_id || join?.channelId || previous?.channel_id;
     if (!packet.endpoint || !packet.token || !packet.connection_id || !channel) {
-      join?.reject(new Error('Micup returned an incomplete voice grant'));
+      if (join) this.#fail(join, new Error('Micup returned an incomplete voice grant'));
       if (previous) this.#lose(previous);
       return;
     }
@@ -166,8 +168,11 @@ export class SessionVoice {
       e2ee_key: packet.e2ee_key,
     };
     if (join) {
-      if (join.channelId !== channel) join.reject(new Error('Micup granted a different voice channel'));
-      else join.resolve(grant);
+      if (join.channelId !== channel) this.#fail(join, new Error('Micup granted a different voice channel'));
+      else if (!join.error) {
+        join.grant = grant;
+        join.wake();
+      }
       return;
     }
     if (!previous) return;
@@ -179,6 +184,11 @@ export class SessionVoice {
     } else {
       this.#lose(previous);
     }
+  }
+
+  #fail(join: PendingJoin, error: unknown): void {
+    join.error ??= error;
+    join.wake();
   }
 
   #lose(grant: VoiceServerUpdate): void {

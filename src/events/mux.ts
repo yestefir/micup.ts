@@ -1,5 +1,5 @@
 import type { GatewayDispatch } from '../gateway/protocol.js';
-import type { MicupMessage, MicupUser } from '../rest/client.js';
+import type { MicupMessage, MicupUser } from '../model/entities.js';
 
 import type { VoiceServerUpdate } from '../session/voice.js';
 
@@ -7,18 +7,20 @@ import type { MicupChannel, MicupGuildCreate, MicupMember, MicupMembersChunk, Mi
 
 import type { MicupInteraction } from '../model/interaction.js';
 
-export interface MicupEvents {
+import type { AdditionalGatewayEvents, ThreadMember } from './catalog.js';
+
+export interface MicupEvents extends AdditionalGatewayEvents {
   READY: { session_id: string; user: MicupUser; guilds?: MicupGuildCreate[]; private_channels?: MicupChannel[] };
   RESUMED: Record<string, never>;
-  MESSAGE_CREATE: MicupMessage;
-  MESSAGE_UPDATE: Partial<MicupMessage> & Pick<MicupMessage, 'id' | 'channel_id'>;
-  MESSAGE_DELETE: Pick<MicupMessage, 'id' | 'channel_id'> & { guild_id?: string };
+  MESSAGE_CREATE: MicupMessage & { channel_type?: number; mention_here?: boolean; member?: MicupMember; nicks?: Record<string, string> };
+  MESSAGE_UPDATE: Partial<MicupEvents['MESSAGE_CREATE']> & Pick<MicupMessage, 'id' | 'channel_id'>;
+  MESSAGE_DELETE: Pick<MicupMessage, 'id' | 'channel_id'> & { guild_id?: string; content?: string | null; author_id?: string; member?: MicupMember };
   USER_UPDATE: MicupUser;
   INTERACTION_CREATE: MicupInteraction;
   VOICE_STATE_UPDATE: MicupVoiceState;
   GUILD_CREATE: MicupGuildCreate;
   GUILD_SYNC: MicupGuildCreate;
-  GUILD_UPDATE: Partial<MicupGuildCreate> & { guild_id?: string };
+  GUILD_UPDATE: Partial<MicupGuildCreate> & { guild_id?: string; content?: string | null; author_id?: string; member?: MicupMember };
   GUILD_DELETE: { id: string; unavailable?: boolean };
   GUILD_ROLE_CREATE: { guild_id: string; role: MicupRole };
   GUILD_ROLE_UPDATE: { guild_id: string; role: MicupRole };
@@ -32,10 +34,10 @@ export interface MicupEvents {
   CHANNEL_UPDATE: MicupChannel;
   CHANNEL_DELETE: MicupChannel;
   CHANNEL_UPDATE_BULK: { guild_id?: string; channels: MicupChannel[] };
-  THREAD_CREATE: MicupChannel;
+  THREAD_CREATE: MicupChannel & { newly_created?: boolean };
   THREAD_UPDATE: MicupChannel;
   THREAD_DELETE: MicupChannel;
-  THREAD_LIST_SYNC: { guild_id: string; channel_ids?: string[]; threads: MicupChannel[] };
+  THREAD_LIST_SYNC: { guild_id: string; channel_ids?: string[]; threads: MicupChannel[]; members?: ThreadMember[] };
   VOICE_SERVER_UPDATE: VoiceServerUpdate;
 }
 

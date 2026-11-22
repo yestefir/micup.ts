@@ -71,10 +71,20 @@ The router also handles autocomplete, buttons, select menus and modal submission
 
 Use the `client.guilds` and `client.channels` APIs for members, roles, channel permissions, threads, pins, reactions and invitations. Each Gateway session exposes `session.state` for cached guilds, channels, members, voice states and permission checks.
 
+## Gateway and REST options
+
+Pass `compress: true` to use Micup's continuous Zstandard Gateway stream. On Node.js 22 this requires 22.15 or later. Use `session.runOnce()` when your application manages reconnects. Set `trackMembers: true` to maintain paginated member inventories and read their availability and completeness through `session.memberInventories()`.
+
+Use `session.subscribe()` or `manager.subscribe()` for Lazy Request subscriptions. The shard manager groups subscriptions and counts by their owning shard. The typed event catalog is available as `knownGatewayEvents`.
+
+`client.users` handles DM channels and profiles. `client.webhooks` and `client.expressions` manage webhooks and guild emoji or stickers. Use `client.attachments.upload()` for direct uploads, then pass the result in the message's `uploads` field. Forum posts, archived threads and reaction users are available through `client.channels`.
+
+The SDK exports message catalogs, mention and snowflake helpers, media URLs, and builders for embeds, buttons, selects and modals. Pass `client.media` an entity to build its discovered CDN URL.
+
 ## Voice
 
 The optional [`@micupts/voice`](packages/voice) workspace publishes audio to LiveKit. Install it with `npm install @micupts/voice` when your bot needs audio playback.
 
-Run `npm ci` once, then `npm test` to verify the REST client locally.
+Run `npm ci` once, then `npm test` to verify both workspaces locally.
 
 MIT license. See [LICENSE](LICENSE).

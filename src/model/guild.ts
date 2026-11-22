@@ -1,4 +1,4 @@
-import type { MicupUser } from '../rest/client.js';
+import type { MicupUser } from './entities.js';
 
 export interface PermissionOverwrite {
   id: string;
@@ -13,6 +13,7 @@ export interface MicupRole {
   position: number;
   permissions: string | number;
   managed?: boolean;
+  icon?: string | null;
 }
 
 export interface MicupChannel {
@@ -30,6 +31,8 @@ export interface MicupMember {
   user?: MicupUser;
   roles: readonly string[];
   nick?: string | null;
+  avatar?: string | null;
+  communication_disabled_until?: string | null;
 }
 
 export interface MicupVoiceState {
@@ -48,6 +51,9 @@ export interface MicupGuild {
   owner_id?: string;
   unavailable?: boolean;
   features?: string[];
+  icon?: string | null;
+  banner?: string | null;
+  splash?: string | null;
   roles?: MicupRole[];
   emojis?: { id: string; name?: string }[];
   stickers?: { id: string; name?: string }[];

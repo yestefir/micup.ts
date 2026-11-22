@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import WebSocket, { type RawData } from 'ws';
+import WebSocket from 'ws';
+import { GatewayCompression } from './compression.js';
 import { decodePacket, GatewayCloseError, GatewayOpcode, type GatewayDispatch, type GatewayPacket } from './protocol.js';
 
 export interface GatewayResume {
@@ -50,6 +51,7 @@ export class GatewayConnection {
   readonly #socket: WebSocket;
   readonly #lifetime = new AbortController();
   readonly #commands = new CommandWindow(540, 60_000);
+  #compression?: GatewayCompression;
   readonly #presence = new CommandWindow(5, 20_000);
   readonly #dispatches: GatewayPacket[] = [];
   #helloTimer?: ReturnType<typeof setTimeout>;
@@ -99,7 +101,7 @@ export class GatewayConnection {
     }
     await this.#commands.acquire(combined);
     combined.throwIfAborted();
-    this.#write(payload);
+    await this.#write(payload, combined);
   }
 
   #read(signal: AbortSignal): Promise<void> {
@@ -112,6 +114,7 @@ export class GatewayConnection {
         this.#dispatches.length = 0;
         clearTimeout(this.#helloTimer);
         clearInterval(this.#heartbeat);
+        this.#compression?.destroy();
         this.#socket.terminate();
         if (error === undefined || signal.aborted) resolve();
         else reject(error);
@@ -119,10 +122,20 @@ export class GatewayConnection {
       const onAbort = () => finish();
       this.#socket.on('error', () => finish(new Error('Micup Gateway connection failed')));
       this.#socket.on('close', (code, reason) => finish(new GatewayCloseError(code, reason.toString())));
+      const receive = (packet: string) => this.#receive(packet, finish);
+      if (this.options.endpoint.searchParams.get('compress') === 'zstd-stream') {
+        this.#compression = new GatewayCompression(this.#lifetime.signal, receive, finish, () => this.#socket.resume());
+      }
       this.#socket.on('message', (data, binary) => {
         if (this.#lifetime.signal.aborted) return;
         try {
-          this.#receive(data, binary, finish);
+          if (this.#compression) {
+            if (!binary) throw new Error('Unexpected text packet on compressed Micup Gateway connection');
+            if (!this.#compression.receive(data)) this.#socket.pause();
+          } else {
+            if (binary) throw new Error('Unexpected binary Micup Gateway packet');
+            receive(data.toString());
+          }
         } catch (error) {
           finish(error);
         }
@@ -133,9 +146,8 @@ export class GatewayConnection {
     });
   }
 
-  #receive(raw: RawData, binary: boolean, finish: (error?: unknown) => void): void {
-    if (binary) throw new Error('Unexpected binary Micup Gateway packet');
-    const packet = decodePacket(raw.toString());
+  #receive(text: string, finish: (error?: unknown) => void): void {
+    const packet = decodePacket(text);
     const op = GatewayOpcode;
     switch (packet.op) {
       case op.Hello: {
@@ -149,7 +161,7 @@ export class GatewayConnection {
         this.#heartbeat = setInterval(() => {
           try {
             if (this.#pendingHeartbeat !== undefined) throw new Error('Micup Gateway heartbeat timed out');
-            this.#beat();
+            void this.#beat().catch(finish);
           } catch (error) {
             finish(error);
           }
@@ -158,7 +170,7 @@ export class GatewayConnection {
         break;
       }
       case op.Heartbeat:
-        this.#beat();
+        void this.#beat().catch(finish);
         break;
       case op.HeartbeatAck:
         if (this.#pendingHeartbeat !== undefined) {
@@ -199,14 +211,14 @@ export class GatewayConnection {
     try {
       const { resume, token, shard, flags, ignoredEvents } = this.options;
       if (resume.sessionId && resume.sequence !== null) {
-        this.#write(this.#encode(GatewayOpcode.Resume, {
+        await this.#write(this.#encode(GatewayOpcode.Resume, {
           token, session_id: resume.sessionId, seq: resume.sequence,
         }));
       } else {
         if (waitForIdentify) await this.options.beforeIdentify?.(this.#lifetime.signal);
         this.#lifetime.signal.throwIfAborted();
         const presence = this.options.presence();
-        this.#write(this.#encode(GatewayOpcode.Identify, {
+        await this.#write(this.#encode(GatewayOpcode.Identify, {
           token,
           properties: { os: process.platform, browser: 'micup.ts', device: 'micup.ts' },
           shard,
@@ -258,12 +270,17 @@ export class GatewayConnection {
   }
 
   #dispatch(packet: GatewayPacket): GatewayDispatch {
-    return { name: packet.t!, sequence: packet.s ?? null, data: packet.d, shardId: this.options.shard[0] };
+    const generation = this.#generation.signal;
+    return {
+      name: packet.t!, sequence: packet.s ?? null, data: packet.d, shardId: this.options.shard[0],
+      send: (opcode, data, { signal } = {}) => this.send(opcode, data,
+        signal ? AbortSignal.any([signal, generation]) : generation),
+    };
   }
 
-  #beat(): void {
+  async #beat(): Promise<void> {
     this.#pendingHeartbeat ??= performance.now();
-    this.#write(this.#encode(GatewayOpcode.Heartbeat, this.options.resume.sequence));
+    await this.#write(this.#encode(GatewayOpcode.Heartbeat, this.options.resume.sequence));
   }
 
   #encode(op: number, d: unknown): string {
@@ -273,8 +290,12 @@ export class GatewayConnection {
     return payload;
   }
 
-  #write(payload: string): void {
-    if (this.#socket.readyState !== WebSocket.OPEN) throw new Error('Micup Gateway is disconnected');
-    this.#socket.send(payload);
+  async #write(payload: string, signal?: AbortSignal): Promise<void> {
+    const write = (data: Buffer | string) => {
+      if (this.#socket.readyState !== WebSocket.OPEN) throw new Error('Micup Gateway is disconnected');
+      this.#socket.send(data);
+    };
+    if (this.#compression) await this.#compression.send(payload, write, signal);
+    else write(payload);
   }
 }

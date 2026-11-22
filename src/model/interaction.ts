@@ -1,4 +1,4 @@
-import type { MicupMessage, MicupUser } from '../rest/client.js';
+import type { MicupMessage, MicupUser } from './entities.js';
 import type { MicupChannel, MicupMember, MicupRole } from './guild.js';
 
 export const InteractionType = { Ping: 1, Command: 2, Component: 3, Autocomplete: 4, Modal: 5 } as const;

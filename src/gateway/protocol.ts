@@ -40,6 +40,7 @@ export interface GatewayDispatch {
   readonly data: unknown;
   readonly sequence: number | null;
   readonly shardId: number;
+  readonly send?: (opcode: number, data: unknown, options?: { signal?: AbortSignal }) => Promise<void>;
 }
 
 export interface GatewayPacket {
@@ -63,7 +64,7 @@ export function decodePacket(data: string): GatewayPacket {
   return packet;
 }
 
-export function gatewayEndpoint(raw: string): URL {
+export function gatewayEndpoint(raw: string, compress = false): URL {
   const endpoint = new URL(raw);
   if (!['ws:', 'wss:'].includes(endpoint.protocol) || endpoint.username ||
       endpoint.password || endpoint.hash) {
@@ -71,7 +72,12 @@ export function gatewayEndpoint(raw: string): URL {
   }
   endpoint.searchParams.set('v', '1');
   endpoint.searchParams.set('encoding', 'json');
-  endpoint.searchParams.delete('compress');
-  endpoint.searchParams.delete('stream');
+  if (compress) {
+    endpoint.searchParams.set('compress', 'zstd-stream');
+    endpoint.searchParams.set('stream', '1');
+  } else {
+    endpoint.searchParams.delete('compress');
+    endpoint.searchParams.delete('stream');
+  }
   return endpoint;
 }
