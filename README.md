@@ -43,6 +43,30 @@ The session reconnects with backoff and resumes from the last successfully proce
 
 With `bot.newShardManager({ shardCount, session: { handler: events.handle } })`, a single process can run multiple shards. The manager spaces IDENTIFY commands and `manager.forGuild(guildId)` returns the local session responsible for a guild.
 
+## Commands and interactions
+
+Register slash commands for a development guild using `client.commands.set`. Omit `guildId` to register globally.
+
+```js
+import { EventMux, InteractionRouter, MicupClient } from 'micup.ts';
+
+const client = await MicupClient.connect({ token: process.env.MICUP_BOT_TOKEN });
+await client.commands.set([{ name: 'ping', description: 'Check the bot' }], {
+  guildId: process.env.MICUP_GUILD_ID,
+});
+
+const router = new InteractionRouter().command('ping', (interaction, signal) =>
+  client.interactions.respond(interaction, 'pong', { signal }),
+);
+const events = new EventMux();
+events.on('INTERACTION_CREATE', async (interaction, event, signal) => {
+  await router.handle(interaction, signal);
+});
+await client.newSession({ handler: events.handle }).run();
+```
+
+The router also handles autocomplete, buttons, select menus and modal submissions. Use `client.interactions.defer` and `editResponse` when work needs more time.
+
 ## Voice
 
 The optional [`@micupts/voice`](packages/voice) workspace publishes audio to LiveKit. The main SDK can be installed independently.

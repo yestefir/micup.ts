@@ -5,6 +5,8 @@ import type { VoiceServerUpdate } from '../session/voice.js';
 
 import type { MicupChannel, MicupGuildCreate, MicupMember, MicupMembersChunk, MicupRole, MicupVoiceState } from '../model/guild.js';
 
+import type { MicupInteraction } from '../model/interaction.js';
+
 export interface MicupEvents {
   READY: { session_id: string; user: MicupUser; guilds?: MicupGuildCreate[]; private_channels?: MicupChannel[] };
   RESUMED: Record<string, never>;
@@ -12,6 +14,7 @@ export interface MicupEvents {
   MESSAGE_UPDATE: Partial<MicupMessage> & Pick<MicupMessage, 'id' | 'channel_id'>;
   MESSAGE_DELETE: Pick<MicupMessage, 'id' | 'channel_id'> & { guild_id?: string };
   USER_UPDATE: MicupUser;
+  INTERACTION_CREATE: MicupInteraction;
   VOICE_STATE_UPDATE: MicupVoiceState;
   GUILD_CREATE: MicupGuildCreate;
   GUILD_SYNC: MicupGuildCreate;

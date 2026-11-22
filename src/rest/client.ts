@@ -7,6 +7,9 @@ import { RestTransport, type MicupRequestOptions, type RestMethod, type RestRequ
 
 import { messageBody, messageQuery, messagesPath, snowflake, type ListMessageOptions, type MessageInput } from './messages.js';
 
+import { MicupCommands } from './commands.js';
+import { MicupInteractions } from './interactions.js';
+
 const defaultOrigin = 'https://micup.gg';
 const connection = Symbol('Micup connection');
 
@@ -34,6 +37,8 @@ export class MicupClient {
   readonly #rest: RestTransport;
   readonly #gateway?: string;
   #botId?: string;
+  #commands?: MicupCommands;
+  readonly interactions: MicupInteractions;
 
   private constructor(key: typeof connection, token: string, api: string, gateway?: string, maxAttempts?: number) {
     if (key !== connection) {
@@ -41,6 +46,7 @@ export class MicupClient {
     }
     this.#token = token;
     this.#rest = new RestTransport(api, token, maxAttempts);
+    this.interactions = new MicupInteractions(this.#rest);
     this.#gateway = gateway;
   }
 
@@ -93,6 +99,11 @@ export class MicupClient {
     }
     client.#botId = user.id;
     return client;
+  }
+
+  get commands(): MicupCommands {
+    if (!this.#botId) throw new Error('Micup did not return the bot ID');
+    return this.#commands ??= new MicupCommands(this.#rest, this.#botId);
   }
 
   newSession(options: GatewaySessionOptions, shard: Pick<GatewaySessionConfig, 'shardId' | 'shardCount'> = {}): GatewaySession {

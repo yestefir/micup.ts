@@ -17,3 +17,8 @@ export type { AllowedMentions, ListMessageOptions, MessageInput, MicupEmbed, Mic
 export { GatewayState } from './state/cache.js';
 export { Permission, computePermissions, hasPermissions } from './model/permissions.js';
 export type { MicupChannel, MicupGuild, MicupGuildCreate, MicupMember, MicupMembersChunk, MicupRole, MicupVoiceState, PermissionOverwrite } from './model/guild.js';
+export { InteractionRouter } from './events/router.js';
+export { CommandOptionType, CommandType, InteractionType, commandPath } from './model/interaction.js';
+export type { CommandChoice, CommandData, CommandDefinition, CommandOption, CommandOptionValue, ComponentData, MicupCommand, MicupInteraction, ModalData } from './model/interaction.js';
+export type { CommandScope, MicupCommands } from './rest/commands.js';
+export type { InteractionReplyOptions, MicupInteractions, MicupModal } from './rest/interactions.js';
