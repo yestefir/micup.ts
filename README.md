@@ -8,7 +8,7 @@ The TypeScript SDK for [Micup](https://micup.gg) bots. It connects a bot to the 
 npm install micup.ts
 ```
 
-Requires Node.js 20.3 or later and a Micup bot token (Zstandard Gateway compression needs 22.15). Based on [micup.go](https://github.com/yestefir/micup.go), the Go library that runs production bots.
+Requires Node.js 24 or later and a Micup bot token. Based on [micup.go](https://github.com/yestefir/micup.go), the Go library that runs production bots.
 
 ## Quick start
 
@@ -160,7 +160,9 @@ Your code still decides whom the bot messages and what it says; the SDK never wo
 
 ## Reliability
 
-The test suite runs the SDK against mocked servers. The voice workspace also includes an optional local LiveKit integration test; start a development server on loopback and set `MICUP_TEST_LIVEKIT_ENDPOINT` to include it. Run `npm run test:live` with `MICUP_TEST_BOT_TOKEN` and `MICUP_TEST_ORIGIN` set for read-only checks of bot identity, application access, guild listing, shard recommendation, and, when the bot belongs to a guild, guild/channel/role/member reads and the Gateway handshake. It does not create or edit server data and does not accept a user token. An explicit origin is required so the smoke test cannot silently use production. The `Live smoke` workflow runs these checks weekly when both the bot token repository secret and sandbox origin repository variable are configured.
+The test suite runs the SDK against mocked servers. The voice workspace also includes an optional local LiveKit integration test; start a development server on loopback and set `MICUP_TEST_LIVEKIT_ENDPOINT` to include it. Run `npm run test:live` with `MICUP_TEST_BOT_TOKEN` and `MICUP_TEST_ORIGIN` set for read-only checks of bot identity, application access, guild listing, shard recommendation, and, when the bot belongs to a guild, guild/channel/role/member reads and the Gateway handshake. It does not create or edit server data. An explicit origin is required so the smoke test cannot silently use production. The `Live smoke` workflow runs these checks weekly when both the bot token repository secret and sandbox origin repository variable are configured.
+
+Set `MICUP_TEST_USER_TOKEN` as an optional secret to add a read-only user identity check against the same sandbox. Keep it separate from `MICUP_TEST_BOT_TOKEN`. The weekly `Live smoke` workflow runs this check when that secret is configured.
 
 Run `npm ci` once, then `npm test` to verify both workspaces locally.
 

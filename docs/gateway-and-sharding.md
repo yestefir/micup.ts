@@ -20,7 +20,7 @@ await session.run({ signal: stop.signal });
 | --- | --- |
 | `handler` | required; called with every dispatch and an `AbortSignal` that aborts when the connection or session is replaced |
 | `ignoredEvents` | event names the session does not need |
-| `compress` | continuous Zstandard stream; needs Node.js 22.15 or later |
+| `compress` | continuous Zstandard stream; available on the supported Node.js 24 and later runtimes |
 | `trackMembers` | maintain paginated member inventories, read through `session.memberInventories()` |
 | `presence` | initial presence |
 | `minBackoffMs`, `maxBackoffMs` | reconnect delay bounds (1 s and 15 s by default) |

@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { CommandWindow } from '../gateway/window.js';
 import { MicupAPIError, retryDelay } from './errors.js';
+import { readLimitedJson } from './json.js';
 
 export type RestMethod = 'GET' | 'HEAD' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
@@ -240,37 +241,6 @@ class RateLimits {
   }
 }
 
-async function readJson(response: Response, limit: number): Promise<unknown> {
-  if (!response.body) return undefined;
-  if (Number(response.headers.get('content-length')) > limit) {
-    await response.body.cancel();
-    throw new RangeError('Micup API response exceeds its size limit');
-  }
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const next = await reader.read();
-      if (next.done) break;
-      size += next.value.length;
-      if (size > limit) {
-        await reader.cancel();
-        throw new RangeError('Micup API response exceeds its size limit');
-      }
-      chunks.push(next.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  if (!size) return undefined;
-  try {
-    return JSON.parse(Buffer.concat(chunks, size).toString('utf8'));
-  } catch (cause) {
-    throw new Error('Micup API returned invalid JSON', { cause });
-  }
-}
-
 export class RestTransport {
   readonly #limits = new RateLimits();
   readonly #api: URL;
@@ -410,7 +380,7 @@ export class RestTransport {
         this.#rejected.delete(guardKey);
         if (authenticated) this.#unauthorized.count = 0;
         try {
-          const result = await readJson(response, 2 * 1024 * 1024);
+          const result = await readLimitedJson(response, 2 * 1024 * 1024, 'Micup API', signal);
           signal?.throwIfAborted();
           return result as T;
         } catch (error) {
@@ -419,7 +389,7 @@ export class RestTransport {
         }
       }
 
-      const errorBody = await readJson(response, 64 * 1024).catch(() => undefined);
+      const errorBody = await readLimitedJson(response, 64 * 1024, 'Micup API', signal).catch(() => undefined);
       signal?.throwIfAborted();
       const error = new MicupAPIError(response, errorBody as ConstructorParameters<typeof MicupAPIError>[1]);
       last = error;

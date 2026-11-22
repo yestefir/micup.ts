@@ -1,6 +1,6 @@
 {
   "name": "micup.ts",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "description": "The TypeScript SDK for Micup bots: Gateway sessions and shards, REST, slash commands, buttons, modals, soundboard and voice",
   "keywords": [
     "micup",
@@ -61,7 +61,7 @@
     "CHANGELOG.md"
   ],
   "engines": {
-    "node": ">=20.3.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "build": "node node_modules/typescript/lib/tsc.js",

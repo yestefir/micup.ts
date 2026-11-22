@@ -15,6 +15,7 @@ export async function openAudioTrack(room: VoiceRoom): Promise<VoiceTrack> {
 
 export async function createTypedChannel(client: MicupClient): Promise<void> {
   await client.channels.create('1', { name: 'general', type: 0 });
+  await client.sendMessage('1', { content: 'typed nonce', nonce: 0, enforce_nonce: true });
 }
 
 import { InteractionRouter as ConsumerRouter, EventMux as ConsumerMux, MicupClient as ConsumerClient } from 'micup.ts';

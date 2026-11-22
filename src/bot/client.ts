@@ -5,6 +5,7 @@ import { ShardManager, type ShardManagerOptions } from '../shard/manager.js';
 import { MicupAPIError } from '../rest/errors.js';
 import { RestTransport, type MicupLogger, type MicupRequestOptions, type RestMethod, type RestRequestOptions } from '../rest/transport.js';
 import { tokenId } from '../rest/identity.js';
+import { maxDiscoveryResponseBytes, readLimitedJson } from '../rest/json.js';
 import { MessageFlag } from '../model/entities.js';
 import type { MicupApplication } from '../rest/users.js';
 
@@ -104,11 +105,11 @@ export class MicupClient {
       signal,
     });
     if (!response.ok) {
-      await response.body?.cancel();
+      await response.body?.cancel().catch(() => {});
       throw new MicupAPIError(response);
     }
 
-    const discovery: unknown = await response.json();
+    const discovery = await readLimitedJson(response, maxDiscoveryResponseBytes, 'Micup discovery', signal);
     if (!discovery || typeof discovery !== 'object' || Array.isArray(discovery)) {
       throw new Error('Micup discovery returned an invalid response');
     }

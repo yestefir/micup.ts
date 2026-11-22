@@ -8,7 +8,7 @@
 npm install micup.ts
 ```
 
-Node.js 20.3 veya üstü ve bir Micup bot token'ı gerekir (Zstandard Gateway sıkıştırması için 22.15). Üretimdeki botları çalıştıran Go kütüphanesi [micup.go](https://github.com/yestefir/micup.go) temel alınmıştır.
+Node.js 24 veya üstü ve bir Micup bot token'ı gerekir. Üretimdeki botları çalıştıran Go kütüphanesi [micup.go](https://github.com/yestefir/micup.go) temel alınmıştır.
 
 Kullanıcı profili düzenlemek için bot token'ından ayrı olarak `MicupUserSession` ve kullanıcı oturumu token'ı kullanılır. Bot istemcisi kullanıcı oturumuna özel rotaları çağırmaz.
 
@@ -163,7 +163,9 @@ Dokümanlar İngilizcedir.
 
 ## Güvenilirlik
 
-Test paketi SDK'yı sahte sunucular ve yerel bir LiveKit odasına karşı çalıştırır. `npm run test:live`, `MICUP_TEST_BOT_TOKEN` ve açıkça belirtilmiş `MICUP_TEST_ORIGIN` ile bot kimliğini, uygulama erişimini, sunucu listesini, shard önerisini, botun üye olduğu ilk sunucudaki sunucu/kanal/rol/üye okumalarını ve Gateway el sıkışmasını salt okunur biçimde denetler. Sunucu verisi oluşturmaz veya değiştirmez ve kullanıcı token'ı kabul etmez. Üretim dışı sandbox için `MICUP_TEST_ORIGIN` değerini ayarlayın; adres belirtilmezse test üretime yönelmez.
+Test paketi SDK'yı sahte sunucular ve yerel bir LiveKit odasına karşı çalıştırır. `npm run test:live`, `MICUP_TEST_BOT_TOKEN` ve açıkça belirtilmiş `MICUP_TEST_ORIGIN` ile bot kimliğini, uygulama erişimini, sunucu listesini, shard önerisini, botun üye olduğu ilk sunucudaki sunucu/kanal/rol/üye okumalarını ve Gateway el sıkışmasını salt okunur biçimde denetler. Sunucu verisi oluşturmaz veya değiştirmez. Üretim dışı sandbox için `MICUP_TEST_ORIGIN` değerini ayarlayın; adres belirtilmezse test üretime yönelmez.
+
+Aynı sandbox üzerinde salt okunur kullanıcı kimliği kontrolünü eklemek için isteğe bağlı `MICUP_TEST_USER_TOKEN` sırrını ayarlayın. Bunu `MICUP_TEST_BOT_TOKEN` değerinden ayrı tutun. Bu sır tanımlandığında haftalık `Live smoke` iş akışı kullanıcı kontrolünü de çalıştırır.
 
 İki çalışma alanını yerelde doğrulamak için bir kez `npm ci`, ardından `npm test` çalıştırın.
 

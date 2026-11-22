@@ -136,6 +136,10 @@ test('commands validate translations with the place in the message and drop empt
   assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', default_member_permissions: '-1' }), /unsigned 64-bit/);
   assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', default_member_permissions: '18446744073709551616' }), /unsigned 64-bit/);
   assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', default_member_permissions: 1 }), /unsigned 64-bit/);
+  assert.throws(() => bot.commands.create(null), /definition must be an object/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', id: '1' }), /definitions do not support the id field/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', name_localized: 'stale response field' }), /definitions do not support the name_localized field/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', options: {} }), /options must be an array/);
   assert.throws(() => bot.commands.edit('1', { default_member_permissions: '-1' }), /unsigned 64-bit/);
   assert.throws(() => bot.commands.edit('1', { name_localized: 'stale response field' }), /do not support the name_localized field/);
   assert.throws(() => bot.commands.edit('1', { dm_permission: 'yes' }), /must be a boolean/);

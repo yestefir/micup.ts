@@ -316,7 +316,7 @@ export class MicupChannels {
     threadStart(input);
     if (('type' in input && input.type !== 11) || 'invitable' in input) throw new TypeError('Invalid Micup forum post thread options');
     if (applied_tags !== undefined && !Array.isArray(applied_tags)) throw new TypeError('Forum post tags must be an array');
-    if ((applied_tags?.length ?? 0) > 5 || message.nonce || message.enforce_nonce || message.tts) {
+    if ((applied_tags?.length ?? 0) > 5 || message.nonce !== undefined || message.enforce_nonce !== undefined || message.tts !== undefined) {
       throw new TypeError('Invalid forum post tags or message options');
     }
     for (const tagId of applied_tags ?? []) snowflake(tagId, 'Forum tag ID');

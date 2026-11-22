@@ -25,7 +25,7 @@ Differences to expect:
 - Methods that change state live on resources: `client.guilds.kick()`, `client.channels.pin()`, `client.webhooks.execute()`.
 - Every call takes an `AbortSignal`, and failures throw `MicupAPIError`.
 - micup.ts sends no telemetry.
-- Node.js 20.3 or later and ES modules.
+- Node.js 24 or later and ES modules.
 
 ## From discord.js
 

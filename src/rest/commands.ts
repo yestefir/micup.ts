@@ -146,10 +146,19 @@ function commandOptionBody(option: CommandOption): CommandOption {
 }
 
 function commandBody(command: CommandDefinition): CommandDefinition {
+  if (!command || typeof command !== 'object' || Array.isArray(command)) throw new TypeError('A command definition must be an object');
+  const fields = new Set([
+    'name', 'type', 'description', 'name_localizations', 'description_localizations', 'options',
+    'default_member_permissions', 'dm_permission',
+  ]);
+  for (const field of Object.keys(command)) {
+    if (!fields.has(field)) throw new TypeError(`Command definitions do not support the ${field} field`);
+  }
   const type = command.type ?? CommandType.ChatInput;
   const { name, description, options, name_localizations, description_localizations, default_member_permissions, dm_permission } = command;
   validateDefaultMemberPermissions(default_member_permissions);
   if (dm_permission !== undefined && typeof dm_permission !== 'boolean') throw new TypeError('Command dm_permission must be a boolean');
+  if (options !== undefined && !Array.isArray(options)) throw new TypeError('Command options must be an array');
   if (type === CommandType.ChatInput) {
     if (!chatName.test(name) || !lengthWithin(description, 100)) throw new TypeError('Invalid Micup command name or description');
     validateLocalizations(name_localizations, (text) => chatName.test(text), 'the name of command "' + name + '"');

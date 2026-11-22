@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 2.0.0 - 2026-11-22
+
+- Require Node.js 24 or later in both packages and run CI against supported Node.js 24 and 26 releases. Node.js 20 and 22 are end-of-life.
+- Limit discovery document responses to 64 KiB and share bounded JSON parsing with REST responses.
+- Preserve discovery HTTP errors even when cancelling a rejected response body fails.
+- Reject unsupported and response-only fields in root slash-command definitions before sending requests.
+
+- Extend the sandbox live smoke checks with an optional read-only user-token identity check.
+- Forum post creation rejects unsupported nonce and boolean message fields based on field presence, including false and zero values.
 
 - Added a separate user-token REST session for current-user profile edits; the bot client's old profile method now rejects locally instead of sending a request that rejects bot credentials.
 - Discovery create and edit requests reject response-only fields and empty edits before sending.
@@ -87,10 +95,6 @@
 - Voice players reject PCM sources that yield non-byte chunks instead of silently skipping them.
 - Voice `AudioInputStream` describes pipe destinations structurally without exposing `any` or requiring Node.js types in consumer declarations.
 - Voice event emitters contain synchronous listener throws and asynchronous listener rejections, forwarding failures to registered `error` listeners.
-
-### Compatibility
-
-- CI exercises the Node.js 20.3 minimum on Linux and Node.js 20.20, 22 and 24 on Linux, Windows and macOS.
 
 ## 1.3.0 - 2026-11-22
 

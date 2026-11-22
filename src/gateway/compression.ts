@@ -57,7 +57,7 @@ class JsonPackets {
 
 export function assertZstdAvailable(): void {
   if (typeof zlib.createZstdCompress !== 'function' || typeof zlib.createZstdDecompress !== 'function') {
-    throw new Error('Micup zstd-stream requires Node.js with native Zstandard support (22.15+ on Node.js 22)');
+    throw new Error('Micup zstd-stream requires Node.js 24 or later with native Zstandard support');
   }
 }
 

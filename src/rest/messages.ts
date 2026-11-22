@@ -26,7 +26,7 @@ export interface MessageInput {
   flags?: number;
   files?: readonly MicupFile[];
   uploads?: readonly UploadedAttachment[];
-  nonce?: string;
+  nonce?: string | number;
   enforce_nonce?: boolean;
   tts?: boolean;
   favorite_meme_id?: string | null;

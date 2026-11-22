@@ -129,6 +129,16 @@ test('rejects discovery on a different origin before sending the token', async (
   assert.equal(fetch.mock.callCount(), 1);
 });
 
+test('preserves the discovery HTTP error when its body cannot be cancelled', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response(new ReadableStream({
+    cancel() {
+      return Promise.reject(new Error('stream cancellation failed'));
+    },
+  }), { status: 503 }));
+  await assert.rejects(MicupClient.connect({ token: 'fixture', origin }), (error) =>
+    error instanceof MicupAPIError && error.status === 503);
+});
+
 test('rejects bot identity responses without a numeric bot ID', async (t) => {
   const identities = [
     { username: 'missing-id', bot: true },
@@ -165,6 +175,17 @@ test('rejects malformed discovery documents before authenticating', async (t) =>
   }
   assert.equal(index, documents.length);
   assert.equal(fetch.mock.callCount(), documents.length);
+});
+
+test('rejects oversized discovery responses before authenticating', async (t) => {
+  const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(64 * 1024 + 1));
+      controller.close();
+    },
+  })));
+  await assert.rejects(MicupClient.connect({ token: 'fixture', origin }), /discovery response exceeds its size limit/);
+  assert.equal(fetch.mock.callCount(), 1);
 });
 
 test('exposes HTTP rate limit details', async (t) => {

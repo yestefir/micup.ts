@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Node.js 20.3 or later. Zstandard Gateway compression (`compress: true`) needs 22.15 or later.
+- Node.js 24 or later.
 - A Micup bot token. Create an application in the Micup developer area, enable its bot and copy the token.
 - An ES module project: set `"type": "module"` in `package.json` or use `.mjs` files. TypeScript projects use `"module": "NodeNext"`.
 

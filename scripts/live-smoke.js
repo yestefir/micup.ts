@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
-import { MicupClient } from '../dist/index.js';
+import { MicupClient, MicupUserSession } from '../dist/index.js';
 
 const token = process.env.MICUP_TEST_BOT_TOKEN;
 if (!token) throw new Error('Set MICUP_TEST_BOT_TOKEN to run the live smoke checks');
 const origin = process.env.MICUP_TEST_ORIGIN;
 if (!origin) throw new Error('Set MICUP_TEST_ORIGIN to the sandbox origin; live smoke checks do not default to production');
+const userToken = process.env.MICUP_TEST_USER_TOKEN;
+if (userToken && userToken === token) throw new Error('Bot and user smoke checks require separate credentials');
 
 const client = await MicupClient.connect({
   token,
@@ -70,3 +72,11 @@ try {
 assert.equal(gatewayReady, true, 'the Gateway did not become ready before the deadline');
 assert.equal(session.ready, false, 'the smoke session should be closed after its handshake');
 process.stdout.write('Gateway handshake check passed\n');
+
+if (userToken) {
+  const userSession = await MicupUserSession.connect({ token: userToken, origin });
+  assert.equal(userSession.self.bot, false, 'the credential must belong to a user');
+  assert.equal(typeof userSession.self.id, 'string');
+  assert.ok(userSession.self.id.length > 0);
+  process.stdout.write('User identity check passed\n');
+}

@@ -17,6 +17,7 @@ jobs:
       - name: Run live checks
         env:
           MICUP_TEST_BOT_TOKEN: ${{ secrets.MICUP_TEST_BOT_TOKEN }}
+          MICUP_TEST_USER_TOKEN: ${{ secrets.MICUP_TEST_USER_TOKEN }}
           MICUP_TEST_ORIGIN: ${{ vars.MICUP_TEST_ORIGIN }}
         run: |
           if [[ -z "$MICUP_TEST_BOT_TOKEN" || -z "$MICUP_TEST_ORIGIN" ]]; then

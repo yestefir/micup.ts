@@ -1,4 +1,5 @@
 import { MicupAPIError } from '../rest/errors.js';
+import { maxDiscoveryResponseBytes, readLimitedJson } from '../rest/json.js';
 import { RestTransport, type MicupLogger, type MicupRequestOptions } from '../rest/transport.js';
 import type { MicupUser } from '../model/entities.js';
 
@@ -69,10 +70,10 @@ export class MicupUserSession {
     }
     const response = await fetch(new URL('/.well-known/fluxer', url), { redirect: 'error', signal });
     if (!response.ok) {
-      await response.body?.cancel();
+      await response.body?.cancel().catch(() => {});
       throw new MicupAPIError(response);
     }
-    const discovery: unknown = await response.json();
+    const discovery = await readLimitedJson(response, maxDiscoveryResponseBytes, 'Micup discovery', signal);
     if (!discovery || typeof discovery !== 'object' || Array.isArray(discovery)) throw new Error('Micup discovery returned an invalid response');
     const endpoints = (discovery as { endpoints?: unknown }).endpoints;
     if (!endpoints || typeof endpoints !== 'object' || Array.isArray(endpoints)) throw new Error('Micup discovery returned an invalid endpoint list');

@@ -42,6 +42,30 @@ test('rejects a discovered API on another origin before sending the user token',
   assert.equal(calls.length, 1);
 });
 
+test('preserves the discovery HTTP error when its body cannot be cancelled', async (t) => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    cancel() {
+      return Promise.reject(new Error('stream cancellation failed'));
+    },
+  }), { status: 503 });
+  t.after(() => { globalThis.fetch = originalFetch; });
+  await assert.rejects(MicupUserSession.connect({ token: 'user.fixture', origin: 'https://micup.example' }), (error) =>
+    error.name === 'MicupAPIError' && error.status === 503);
+});
+
+test('rejects oversized discovery responses before authenticating a user', async (t) => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response('', { headers: { 'content-length': String(64 * 1024 + 1) } });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+  await assert.rejects(MicupUserSession.connect({ token: 'user.fixture', origin: 'https://micup.example' }), /discovery response exceeds its size limit/);
+  assert.equal(calls, 1);
+});
+
 test('rejects bot credentials for a user session', async (t) => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input) => new URL(input).pathname === '/.well-known/fluxer'

@@ -1,6 +1,6 @@
 {
   "name": "@micup.ts/voice",
-  "version": "1.1.2",
+  "version": "2.0.0",
   "description": "Voice for Micup bots: LiveKit audio, FFmpeg decoding, a PCM player and a connection object with events",
   "keywords": [
     "micup",
@@ -35,7 +35,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=20.3.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "build": "node ../../node_modules/typescript/lib/tsc.js -p tsconfig.json",
