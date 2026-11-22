@@ -2,7 +2,7 @@
 
 TypeScript client for the Micup bot API, based on [micup.go](https://github.com/yestefir/micup.go). The initial release covers endpoint discovery, bot identity and sending text messages or replies.
 
-Requires Node.js 22 or later and a Micup bot token. The npm package includes JavaScript and TypeScript declarations.
+Requires Node.js 22 or later and a Micup bot token. The build produces JavaScript and TypeScript declarations. After the first npm release, install it with:
 
 ```sh
 npm install micup-js
