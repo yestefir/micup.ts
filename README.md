@@ -43,6 +43,10 @@ The session reconnects with backoff and resumes from the last successfully proce
 
 With `bot.newShardManager({ shardCount, session: { handler: events.handle } })`, a single process can run multiple shards. The manager spaces IDENTIFY commands and `manager.forGuild(guildId)` returns the local session responsible for a guild.
 
+## Voice
+
+The optional [`@micupts/voice`](packages/voice) workspace publishes audio to LiveKit. The main SDK can be installed independently.
+
 Run `npm ci` once, then `npm test` to verify the REST client locally.
 
 MIT license. See [LICENSE](LICENSE).

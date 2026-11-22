@@ -1,0 +1,36 @@
+{
+  "name": "@micupts/voice",
+  "version": "0.1.0",
+  "description": "LiveKit audio publisher and PCM player for Micup bots",
+  "type": "module",
+  "exports": {
+    "types": "./dist/index.d.ts",
+    "default": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test \"test/*.test.js\"",
+    "prepack": "npm run build"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yestefir/micup.ts.git",
+    "directory": "packages/voice"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5"
+  },
+  "dependencies": {
+    "@livekit/rtc-node": "1.2.3"
+  }
+}
