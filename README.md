@@ -79,6 +79,8 @@ Use `session.subscribe()` or `manager.subscribe()` for Lazy Request subscription
 
 `client.users` handles DM channels and profiles. `client.webhooks` and `client.expressions` manage webhooks and guild emoji or stickers. Use `client.attachments.upload()` for direct uploads, then pass the result in the message's `uploads` field. Forum posts, archived threads and reaction users are available through `client.channels`.
 
+The SDK exports the constant groups of micup.go (`ChannelType`, `AuditAction`, `GuildFeature`, `Limits` and more), builders such as `primaryButton()` and `stringSelect()`, readers such as `optionString()`, `optionMember()` and `modalValue()`, and permission helpers such as `permissionNames()` and `missingPermissions()`.
+
 The SDK exports message catalogs, mention and snowflake helpers, media URLs, and builders for embeds, buttons, selects and modals. Pass `client.media` an entity to build its discovered CDN URL.
 
 ## Soundboard, voice rooms and identity

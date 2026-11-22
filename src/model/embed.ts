@@ -5,10 +5,26 @@ export interface MicupEmbed {
   color?: number;
   timestamp?: string;
   fields?: readonly { name: string; value: string; inline?: boolean }[];
-  image?: { url: string };
-  thumbnail?: { url: string };
-  footer?: { text: string; icon_url?: string };
-  author?: { name: string; url?: string; icon_url?: string };
+  image?: EmbedMedia;
+  thumbnail?: EmbedMedia;
+  video?: EmbedMedia;
+  audio?: EmbedMedia;
+  footer?: { text: string; icon_url?: string; proxy_icon_url?: string };
+  author?: { name: string; url?: string; icon_url?: string; proxy_icon_url?: string };
+  provider?: { name: string; url?: string };
+  type?: string;
+  nsfw?: boolean;
+  children?: readonly MicupEmbed[];
+}
+
+export interface EmbedMedia {
+  url: string;
+  proxy_url?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  description?: string;
+  content_type?: string;
 }
 
 const length = (value?: string) => value === undefined ? 0 : [...value].length;

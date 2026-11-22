@@ -88,7 +88,14 @@ export class Player {
 
     const write = async (bytes: number) => {
       const remaining = nextFrameAt - performance.now();
-      if (remaining > 0) await delay(Math.ceil(remaining), undefined, { signal });
+      if (remaining > 0) {
+        try {
+          await delay(Math.ceil(remaining), undefined, { signal });
+        } catch (error) {
+          signal.throwIfAborted();
+          throw error;
+        }
+      }
       await waitWhilePaused();
 
       const samples = new Int16Array(bytes / 2);

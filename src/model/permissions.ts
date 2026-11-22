@@ -56,6 +56,42 @@ export function hasPermissions(permissions: bigint, required: bigint): boolean {
   return (permissions & required) === required;
 }
 
+const permissionNameList: readonly (readonly [string, bigint])[] = [
+  ['CREATE_INSTANT_INVITE', Permission.CreateInstantInvite], ['KICK_MEMBERS', Permission.KickMembers], ['BAN_MEMBERS', Permission.BanMembers],
+  ['ADMINISTRATOR', Permission.Administrator], ['MANAGE_CHANNELS', Permission.ManageChannels], ['MANAGE_GUILD', Permission.ManageGuild],
+  ['ADD_REACTIONS', Permission.AddReactions], ['VIEW_AUDIT_LOG', Permission.ViewAuditLog], ['PRIORITY_SPEAKER', Permission.PrioritySpeaker],
+  ['STREAM', Permission.Stream], ['VIEW_CHANNEL', Permission.ViewChannel], ['SEND_MESSAGES', Permission.SendMessages],
+  ['SEND_TTS_MESSAGES', Permission.SendTTSMessages], ['MANAGE_MESSAGES', Permission.ManageMessages], ['EMBED_LINKS', Permission.EmbedLinks],
+  ['ATTACH_FILES', Permission.AttachFiles], ['READ_MESSAGE_HISTORY', Permission.ReadMessageHistory], ['MENTION_EVERYONE', Permission.MentionEveryone],
+  ['USE_EXTERNAL_EMOJIS', Permission.UseExternalEmojis], ['CONNECT', Permission.Connect], ['SPEAK', Permission.Speak],
+  ['MUTE_MEMBERS', Permission.MuteMembers], ['DEAFEN_MEMBERS', Permission.DeafenMembers], ['MOVE_MEMBERS', Permission.MoveMembers],
+  ['USE_VAD', Permission.UseVAD], ['CHANGE_NICKNAME', Permission.ChangeNickname], ['MANAGE_NICKNAMES', Permission.ManageNicknames],
+  ['MANAGE_ROLES', Permission.ManageRoles], ['MANAGE_WEBHOOKS', Permission.ManageWebhooks], ['MANAGE_EXPRESSIONS', Permission.ManageExpressions],
+  ['MANAGE_THREADS', Permission.ManageThreads], ['CREATE_PUBLIC_THREADS', Permission.CreatePublicThreads],
+  ['CREATE_PRIVATE_THREADS', Permission.CreatePrivateThreads], ['USE_EXTERNAL_STICKERS', Permission.UseExternalStickers],
+  ['SEND_MESSAGES_IN_THREADS', Permission.SendMessagesInThreads], ['MODERATE_MEMBERS', Permission.ModerateMembers],
+  ['CREATE_EXPRESSIONS', Permission.CreateExpressions], ['PIN_MESSAGES', Permission.PinMessages], ['BYPASS_SLOWMODE', Permission.BypassSlowmode],
+  ['UPDATE_RTC_REGION', Permission.UpdateRTCRegion], ['VIEW_CHANNEL_MEMBERS', Permission.ViewChannelMembers],
+  ['MANAGE_ROOM_STAGE', Permission.ManageRoomStage],
+];
+
+export const ElevatedPermissions: bigint =
+  Permission.KickMembers | Permission.BanMembers | Permission.Administrator | Permission.ManageChannels | Permission.ManageGuild |
+  Permission.ManageMessages | Permission.ManageRoles | Permission.ManageWebhooks | Permission.ModerateMembers | Permission.ManageThreads;
+
+export function permissionNames(permissions: bigint): string[] {
+  return permissionNameList.filter(([, bit]) => (permissions & bit) === bit).map(([name]) => name);
+}
+
+export function parsePermission(name: string): bigint | undefined {
+  const wanted = name.trim().toUpperCase();
+  return permissionNameList.find(([known]) => known === wanted)?.[1];
+}
+
+export function missingPermissions(have: bigint, required: bigint): bigint {
+  return (have & Permission.Administrator) === Permission.Administrator ? 0n : required & ~have;
+}
+
 export function computePermissions(
   guildId: string,
   ownerId: string | undefined,

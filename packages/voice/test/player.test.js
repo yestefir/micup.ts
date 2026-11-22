@@ -77,3 +77,14 @@ test('skipping a stalled input closes the source and clears queued audio before 
   assert.equal(player.playing, false);
   assert.equal(cleared, true);
 });
+
+test('skipping while the player waits for the next frame rejects with the skip error', async () => {
+  const player = new Player({ async write() {}, async drain() {} });
+  const source = (async function* () {
+    for (let index = 0; index < 500; index++) yield Buffer.alloc(bytesPerFrame);
+  })();
+  const playing = player.play(source);
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.equal(player.skip(), true);
+  await assert.rejects(playing, PlaybackSkippedError);
+});

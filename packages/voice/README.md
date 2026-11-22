@@ -36,6 +36,27 @@ try {
 
 The grant accepts the `endpoint` and `token` from a Micup Gateway voice-server update. Keep grants out of logs and persistent storage. The publisher supports unencrypted LiveKit rooms. The player supports pause, resume, skip and volume. Queue and playlist management belong to the application.
 
+## VoiceConnection
+
+`VoiceConnection` joins the channel, connects to LiveKit, owns a player and leaves the channel again when it closes. It emits `start`, `finish` (`{ stopped }`), `status` (`connecting`, `ready`, `reconnecting`, `disconnected`), `memberJoin`, `memberLeave`, `disconnect` and `error`.
+
+```js
+import { VoiceConnection } from '@micupts/voice';
+
+const session = bot.newSession({
+  handler: events.handle,
+  onVoiceGrant: (grant) => voice.get(grant.guild_id)?.regrant(grant),
+});
+const connection = await VoiceConnection.connect(session, guildId, channelId, { selfDeaf: true, volume: 0.8 });
+connection.on('finish', ({ stopped }) => console.log(stopped ? 'stopped' : 'ended'));
+await connection.play('https://example.com/stream.mp3', { ffmpegArgs: ['-af', 'bass=g=5'] });
+await connection.disconnect();
+```
+
+`play()` takes a file path, an HTTP(S) URL or a `Readable`. Pass `raw: true` to play 48 kHz stereo signed 16-bit PCM from a stream or an async iterable. A new `play()` replaces the current track, and `stop()`, `pause()`, `resume()` and `setVolume()` act on it. `regrant(grant)` moves the connection to the channel of a new voice grant, stops the current track and reconnects; the volume stays. A dropped LiveKit room closes the connection, leaves the channel and emits `disconnect`.
+
+`openSource()` also accepts `ffmpegArgs` (inserted before the output options), a `Readable` input and the `FFMPEG_PATH` environment variable. HTTP(S) inputs reconnect automatically after a dropped connection. Treat `ffmpegArgs` as trusted input.
+
 ## Track lifecycle
 
 `VoiceRoom.connect()` publishes a default track. Pass `publishOnConnect: false` to connect first and call `room.openTrack()` when you are ready to publish. A track can be closed independently of its room. Use `Player.playing` and `Player.paused` to inspect playback. Skipping stops the current source and clears queued PCM.

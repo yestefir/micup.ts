@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Added `VoiceConnection` to `@micupts/voice` with events, a status machine, `regrant()`, `memberCount` and raw PCM, file, URL and stream playback. `VoiceRoom` now emits `memberJoin`, `memberLeave` and `disconnected`.
+- Added `ffmpegArgs`, `Readable` input, HTTP reconnect flags and `FFMPEG_PATH` to `openSource()`.
+- Fixed `Player.skip()` rejecting with an `AbortError` instead of `PlaybackSkippedError` while the player waits for the next frame.
+- Added the constant groups of micup.go (`ChannelType`, `AuditAction`, `GuildFeature`, `MessageType`, `UserFlag`, `GatewayCloseCode`, `Limits` and more) generated from its source.
+- Added builders and readers like micup.go: `primaryButton`, `stringSelect`, `shortInput`, `optionString`, `optionMember`, `modalValue`, `selectedUsers`, `isButtonInteraction`, `isDMChannel`, `memberTimedOut`, `imageData` and related helpers.
+- Added `permissionNames`, `parsePermission`, `missingPermissions` and `ElevatedPermissions`.
+- Completed the message, user, attachment, channel, member, role, guild and embed typings with the fields micup.go decodes.
+
 - Added `client.sounds` for guild soundboard sounds, playback in a voice channel and guild or channel notification sounds, and the `GUILD_SOUNDBOARD_SOUNDS_UPDATE` and `GUILD_SOUNDBOARD_SOUND_PLAY` events.
 - Added `client.discovery` to read, apply for, edit and withdraw a guild discovery listing.
 - Added `client.rooms` for the voice room stage (board, video, host and effects) and room tournaments, and the `ManageRoomStage` permission.
