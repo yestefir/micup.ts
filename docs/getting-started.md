@@ -40,7 +40,25 @@ console.log(url);
 
 Pass `guildId` to preselect a server. Permissions are `bigint` values; `permissionNames(bits)` lists their names.
 
-## A first bot
+## A first bot with the easy client
+
+```js
+import { Client } from 'micup.ts/easy';
+
+const client = new Client();
+
+client.on('ready', (ready) => console.log('Logged in as', ready.user.username));
+client.on('messageCreate', async (message) => {
+  if (message.author.bot || message.content !== '!ping') return;
+  await message.reply('pong');
+});
+
+await client.login();
+```
+
+`new Client()` reads `MICUP_BOT_TOKEN`. See [The easy client](easy-client.md) for commands, buttons, modals and error handling.
+
+## A first bot with the core API
 
 ```js
 import { EventMux, MicupClient } from 'micup.ts';

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.0 - 2026-11-22
+
+### The easy client
+
+- `micup.ts/easy`: a discord.js-style `Client` on top of the SDK. `new Client()` reads `MICUP_BOT_TOKEN`; `login()` connects, waits for the Gateway and the initial servers, registers commands and emits `ready`. REST-only mode with `gateway: false`; `shards: 'auto'` or a number for sharding.
+- Events: `messageCreate`, `messageUpdate`, `messageDelete`, `interactionCreate`, guild, member, ban, channel, reaction and voice events with wrapped objects, plus every raw Gateway event by name. Errors in listeners are emitted as `error` and never crash the bot or replay the event.
+- Objects with methods: `User`, `Member`, `Guild`, `Channel`, `Message` (`reply`, `edit`, `delete`, `react`, `pin`, ...).
+- Interactions: `CommandInteraction`, `AutocompleteInteraction`, `ComponentInteraction`, `ModalSubmitInteraction` with `reply`, `deferReply`, `editReply`, `followUp`, `update`, `showModal`, `respond`, typed option readers (`getString`, `getInteger`, `getMember`, ...), and `InteractionRepliedError` for double answers.
+- `SlashCommand` builder (options, subcommands, groups, choices, localizations), `userCommand()`, `messageCommand()` and `modal()`.
+- `client.command()`, `client.component()`, `client.modal()` and `client.autocomplete()` route interactions by command path, exact id, prefix (`vote:*`) or pattern. `registerCommands()` creates, edits and optionally prunes commands, and runs at login.
+- A routed handler that fails before answering sends a private error reply (`errorReply` option).
+- `awaitInteraction()`, `setStatus()`, `setCustomStatus()`, `setPresence()`, `permissionsFor()`, `sessionFor()` and `handleDispatch()`.
+- `micup.ts/easy` re-exports everything in `micup.ts`; `client.rest` is the full SDK client.
+
 ## 1.2.0 - 2026-11-22
 
 - `client.newSession()` and the shard manager accept a `logger` option that reports Gateway readiness, resumes, invalidated sessions and disconnects (close code, whether it reconnects) with the shard number. This matches `SessionOptions.Logger` of micup.go.

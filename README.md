@@ -12,17 +12,31 @@ Requires Node.js 22 or later and a Micup bot token. Based on [micup.go](https://
 
 ## Quick start
 
-Send a message:
+The easy client is the fastest way to a working bot. Set `MICUP_BOT_TOKEN` and run:
 
 ```js
-import { MicupClient } from 'micup.ts';
+import { Client, SlashCommand, actionRow, primaryButton } from 'micup.ts/easy';
 
-const client = await MicupClient.connect({ token: process.env.MICUP_BOT_TOKEN });
-console.log(client.self.username);
-await client.sendMessage(process.env.MICUP_CHANNEL_ID, 'Merhaba!');
+const client = new Client();
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot || message.content !== '!ping') return;
+  await message.reply('pong');
+});
+
+client.command(new SlashCommand('hello', 'Say hello').addString('name', 'Who to greet'), async (interaction) => {
+  const name = interaction.options.getString('name') ?? interaction.user.displayName;
+  await interaction.reply({ content: `Merhaba ${name}!`, components: [actionRow(primaryButton('again', 'Again'))] });
+});
+
+client.component('again', (interaction) => interaction.update({ content: 'Merhaba again!', components: [] }));
+
+await client.login();
 ```
 
-Answer a command and a button:
+`login()` connects, waits for your servers, registers the `hello` command and starts routing. Errors in your handlers never crash the bot: they are emitted as `error`, and a command that fails before answering gets a private error reply. See [The easy client](docs/easy-client.md).
+
+For full control over sessions, shards and handler retries, use the core API:
 
 ```js
 import { EventMux, InteractionRouter, MicupClient, actionRow, primaryButton } from 'micup.ts';
@@ -53,6 +67,7 @@ await client.newSession({ handler: events.handle }).run({ signal: stop.signal })
 
 | Area | What you get | Start here |
 | --- | --- | --- |
+| Easy client | `Client` with events, `message.reply()`, `interaction.reply()`, a slash command builder, automatic command registration and routing, buttons, menus, modals, autocomplete and safe error handling | `micup.ts/easy` |
 | Client | Authenticated REST with rate-limit waits, retries, audit-log reasons, `AbortSignal` support, bot identity (`self`, `application()`, `tokenId`) | `MicupClient` |
 | Gateway | Supervised sessions with resume, heartbeat checks, Zstandard compression, presence, lazy subscriptions, member inventories, guild and channel counts | `client.newSession()` |
 | Sharding | Shard manager that spaces IDENTIFY, routes guilds to shards and recommends a shard count | `client.newShardManager()` |
@@ -118,6 +133,7 @@ const client = await MicupClient.connect({
 
 ## Documentation
 
+- [The easy client](docs/easy-client.md): `micup.ts/easy`, events, objects, commands, interactions and errors
 - [Getting started](docs/getting-started.md): token, invite link, first bot, project layout
 - [Commands and interactions](docs/commands-and-interactions.md): commands, options, buttons, selects, modals, autocomplete, private replies
 - [Gateway and sharding](docs/gateway-and-sharding.md): sessions, resume, presence, shards, state cache, events

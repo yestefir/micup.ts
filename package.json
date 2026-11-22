@@ -1,6 +1,6 @@
 {
   "name": "micup.ts",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "The TypeScript SDK for Micup bots: Gateway sessions and shards, REST, slash commands, buttons, modals, soundboard and voice",
   "keywords": [
     "micup",
@@ -20,7 +20,8 @@
     "sharding",
     "voice",
     "livekit",
-    "soundboard"
+    "soundboard",
+    "client"
   ],
   "homepage": "https://github.com/yestefir/micup.ts#readme",
   "bugs": {
@@ -34,9 +35,23 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "easy": [
+        "dist/easy/index.d.ts"
+      ]
+    }
+  },
   "exports": {
-    "types": "./dist/index.d.ts",
-    "default": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./easy": {
+      "types": "./dist/easy/index.d.ts",
+      "default": "./dist/easy/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "sideEffects": false,
   "files": [

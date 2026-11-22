@@ -12,17 +12,31 @@ Node.js 22 veya üstü ve bir Micup bot token'ı gerekir. Üretimdeki botları �
 
 ## Hızlı başlangıç
 
-Mesaj gönderme:
+Kolay istemci, çalışan bir bota giden en kısa yoldur. `MICUP_BOT_TOKEN` değişkenini ayarlayıp çalıştırın:
 
 ```js
-import { MicupClient } from 'micup.ts';
+import { Client, SlashCommand, actionRow, primaryButton } from 'micup.ts/easy';
 
-const client = await MicupClient.connect({ token: process.env.MICUP_BOT_TOKEN });
-console.log(client.self.username);
-await client.sendMessage(process.env.MICUP_CHANNEL_ID, 'Merhaba!');
+const client = new Client();
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot || message.content !== '!ping') return;
+  await message.reply('pong');
+});
+
+client.command(new SlashCommand('merhaba', 'Selam ver').addString('isim', 'Kime selam verilecek'), async (interaction) => {
+  const name = interaction.options.getString('isim') ?? interaction.user.displayName;
+  await interaction.reply({ content: `Merhaba ${name}!`, components: [actionRow(primaryButton('again', 'Tekrar'))] });
+});
+
+client.component('again', (interaction) => interaction.update({ content: 'Tekrar merhaba!', components: [] }));
+
+await client.login();
 ```
 
-Komut ve butona yanıt verme:
+`login()` bağlanır, sunucularınızı bekler, `merhaba` komutunu kaydeder ve yönlendirmeyi başlatır. İşleyicilerinizdeki hatalar botu çökertmez: `error` olayı olarak yayılır ve yanıtlamadan başarısız olan komut kullanıcıya gizli bir hata yanıtı alır. Bkz. [Kolay istemci](docs/easy-client.md) (İngilizce).
+
+Oturumlar, shard'lar ve işleyici yeniden denemeleri üzerinde tam denetim için çekirdek API'yi kullanın:
 
 ```js
 import { EventMux, InteractionRouter, MicupClient, actionRow, primaryButton } from 'micup.ts';
@@ -53,6 +67,7 @@ await client.newSession({ handler: events.handle }).run({ signal: stop.signal })
 
 | Alan | Ne sağlar | Başlangıç |
 | --- | --- | --- |
+| Kolay istemci | Olaylar, `message.reply()`, `interaction.reply()`, slash komutu oluşturucu, otomatik komut kaydı ve yönlendirme, butonlar, menüler, modallar, otomatik tamamlama ve güvenli hata yönetimi sunan `Client` | `micup.ts/easy` |
 | İstemci | Hız sınırı beklemeli, yeniden denemeli, denetim kaydı sebepli, `AbortSignal` destekli REST; bot kimliği (`self`, `application()`, `tokenId`) | `MicupClient` |
 | Gateway | Resume, kalp atışı denetimi, Zstandard sıkıştırma, durum (presence), tembel abonelikler, üye envanteri ve sayımlar içeren denetlenen oturumlar | `client.newSession()` |
 | Shard | IDENTIFY'ları aralıklayan, sunucuları shard'lara yönlendiren ve shard sayısı öneren yönetici | `client.newShardManager()` |
@@ -118,6 +133,7 @@ const client = await MicupClient.connect({
 
 ## Dokümantasyon
 
+- [Kolay istemci](docs/easy-client.md) (İngilizce): `micup.ts/easy`, olaylar, nesneler, komutlar, etkileşimler ve hatalar
 - [Başlangıç](docs/getting-started.md): token, davet bağlantısı, ilk bot, proje düzeni
 - [Komutlar ve etkileşimler](docs/commands-and-interactions.md)
 - [Gateway ve shard](docs/gateway-and-sharding.md)

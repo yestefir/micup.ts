@@ -2,6 +2,7 @@
 
 | Guide | Read it when you want to |
 | --- | --- |
+| [The easy client](easy-client.md) | write a bot with `micup.ts/easy`: events, `message.reply()`, commands, buttons, modals and error handling |
 | [Getting started](getting-started.md) | install the SDK, get a token, invite the bot and run a first bot |
 | [Commands and interactions](commands-and-interactions.md) | register slash commands and answer commands, buttons, select menus and modals |
 | [Gateway and sharding](gateway-and-sharding.md) | keep a bot connected, handle events, read cached state and run several shards |
