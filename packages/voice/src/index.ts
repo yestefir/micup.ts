@@ -9,4 +9,5 @@ export type {
 } from './connection.js';
 export type { VoiceGrant, VoiceRoomOptions } from './room.js';
 export { openSource } from './source.js';
-export type { AudioSource, AudioSourceOptions } from './source.js';
+export type { AudioInputStream, AudioSource, AudioSourceOptions } from './source.js';
+export { TypedEmitter } from './emitter.js';

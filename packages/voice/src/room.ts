@@ -1,6 +1,6 @@
-import { EventEmitter } from 'node:events';
 import type { Room } from '@livekit/rtc-node';
 import { withAbort } from './abort.js';
+import { TypedEmitter } from './emitter.js';
 import type { PCMTrack, VoiceTrack, VoiceTrackOptions } from './pcm.js';
 import { LiveKitVoiceTrack, type RTC } from './track.js';
 
@@ -21,13 +21,7 @@ export interface VoiceRoomEvents {
   disconnected: [reason: Error];
 }
 
-export interface VoiceRoom {
-  on<K extends keyof VoiceRoomEvents>(event: K, listener: (...args: VoiceRoomEvents[K]) => void): this;
-  once<K extends keyof VoiceRoomEvents>(event: K, listener: (...args: VoiceRoomEvents[K]) => void): this;
-  off<K extends keyof VoiceRoomEvents>(event: K, listener: (...args: VoiceRoomEvents[K]) => void): this;
-}
-
-export class VoiceRoom extends EventEmitter implements PCMTrack {
+export class VoiceRoom extends TypedEmitter<VoiceRoomEvents> implements PCMTrack {
   readonly #lifetime = new AbortController();
   readonly #tracks = new Set<VoiceTrack>();
   #closing?: Promise<void>;

@@ -1,9 +1,8 @@
-import { EventEmitter } from 'node:events';
-import type { Readable } from 'node:stream';
+import { TypedEmitter } from './emitter.js';
 import type { PCMTrack } from './pcm.js';
 import { PlaybackSkippedError, Player } from './player.js';
 import { VoiceRoom, type VoiceGrant, type VoiceRoomOptions } from './room.js';
-import { openSource, type AudioSource } from './source.js';
+import { openSource, type AudioInputStream, type AudioSource } from './source.js';
 
 export type VoiceConnectionStatus = 'connecting' | 'ready' | 'reconnecting' | 'disconnected';
 
@@ -52,15 +51,9 @@ export interface VoiceConnectionEvents {
   error: [error: Error];
 }
 
-export interface VoiceConnection {
-  on<K extends keyof VoiceConnectionEvents>(event: K, listener: (...args: VoiceConnectionEvents[K]) => void): this;
-  once<K extends keyof VoiceConnectionEvents>(event: K, listener: (...args: VoiceConnectionEvents[K]) => void): this;
-  off<K extends keyof VoiceConnectionEvents>(event: K, listener: (...args: VoiceConnectionEvents[K]) => void): this;
-}
-
 type PCMInput = AsyncIterable<Uint8Array> & { close?(): void | Promise<void> };
 
-export class VoiceConnection extends EventEmitter {
+export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
   readonly #session: VoiceSessionLike;
   readonly #options: VoiceConnectionOptions;
   readonly #player: Player;
@@ -153,7 +146,7 @@ export class VoiceConnection extends EventEmitter {
     return this.#player.skip();
   }
 
-  async play(input: string | Readable | PCMInput, options: PlayOptions = {}): Promise<void> {
+  async play(input: string | AudioInputStream | PCMInput, options: PlayOptions = {}): Promise<void> {
     if (this.destroyed || this.#status === 'connecting') throw new Error('The voice connection is not ready');
     while (this.#current) {
       this.#player.skip();
@@ -189,14 +182,14 @@ export class VoiceConnection extends EventEmitter {
     return this.#closing ??= this.#finish();
   }
 
-  async #run(input: string | Readable | PCMInput, options: PlayOptions): Promise<void> {
+  async #run(input: string | AudioInputStream | PCMInput, options: PlayOptions): Promise<void> {
     const raw = options.raw === true;
     let source: PCMInput;
     if (raw) {
       if (typeof input === 'string') throw new TypeError('Raw playback needs a PCM stream');
       source = input as PCMInput;
     } else {
-      const decoded: AudioSource = openSource(input as string | Readable, {
+      const decoded: AudioSource = openSource(input as string | AudioInputStream, {
         ffmpeg: options.ffmpeg, startSeconds: options.seek, ffmpegArgs: options.ffmpegArgs, signal: options.signal,
       });
       source = decoded;

@@ -1,14 +1,16 @@
 {
   "name": "micup.ts",
-  "version": "1.0.0",
-  "description": "TypeScript SDK for Micup bots (Fluxer API)",
+  "version": "1.1.0",
+  "description": "The TypeScript SDK for Micup bots: Gateway sessions and shards, REST, slash commands, buttons, modals, soundboard and voice",
   "type": "module",
   "exports": {
     "types": "./dist/index.d.ts",
     "default": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "docs",
+    "README.tr.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -21,8 +23,23 @@
   "license": "MIT",
   "keywords": [
     "micup",
-    "fluxer",
-    "bot"
+    "micup-bot",
+    "micup-api",
+    "bot",
+    "sdk",
+    "typescript",
+    "gateway",
+    "websocket",
+    "rest",
+    "slash-commands",
+    "interactions",
+    "components",
+    "buttons",
+    "modals",
+    "sharding",
+    "voice",
+    "livekit",
+    "soundboard"
   ],
   "repository": {
     "type": "git",
@@ -37,5 +54,6 @@
   },
   "workspaces": [
     "packages/voice"
-  ]
+  ],
+  "homepage": "https://github.com/yestefir/micup.ts#readme"
 }

@@ -9,6 +9,13 @@ export interface AudioSourceOptions {
   signal?: AbortSignal;
 }
 
+export interface AudioInputStream {
+  pipe(destination: any): unknown;
+  unpipe(destination?: any): unknown;
+  destroy(error?: Error): unknown;
+  on(event: 'error', listener: (error: Error) => void): unknown;
+}
+
 export interface AudioSource extends AsyncIterable<Uint8Array> {
   close(): Promise<void>;
 }
@@ -19,7 +26,7 @@ function isReadable(input: unknown): input is Readable {
   return typeof input === 'object' && input !== null && typeof (input as Readable).pipe === 'function' && typeof (input as Readable).on === 'function';
 }
 
-export function openSource(input: string | Readable, options: AudioSourceOptions = {}): AudioSource {
+export function openSource(input: string | AudioInputStream, options: AudioSourceOptions = {}): AudioSource {
   const { ffmpeg = process.env.FFMPEG_PATH || 'ffmpeg', startSeconds = 0, ffmpegArgs = [], signal } = options;
   const stream = isReadable(input);
   if (!stream && (typeof input !== 'string' || !input || input.startsWith('-') || input.includes('\0'))) {

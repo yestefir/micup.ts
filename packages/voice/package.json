@@ -1,7 +1,7 @@
 {
   "name": "@micupts/voice",
-  "version": "1.0.0",
-  "description": "LiveKit audio publisher and PCM player for Micup bots",
+  "version": "1.1.0",
+  "description": "Voice for Micup bots: LiveKit audio, FFmpeg decoding, a PCM player and a connection object with events",
   "type": "module",
   "exports": {
     "types": "./dist/index.d.ts",
@@ -32,5 +32,17 @@
   },
   "dependencies": {
     "@livekit/rtc-node": "1.2.3"
-  }
+  },
+  "keywords": [
+    "micup",
+    "micup-bot",
+    "voice",
+    "livekit",
+    "audio",
+    "bot",
+    "ffmpeg",
+    "pcm",
+    "music"
+  ],
+  "homepage": "https://github.com/yestefir/micup.ts/tree/main/packages/voice#readme"
 }

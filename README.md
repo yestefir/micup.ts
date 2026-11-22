@@ -1,97 +1,134 @@
 # micup.ts
 
-TypeScript SDK for Micup bots (Fluxer API), based on [micup.go](https://github.com/yestefir/micup.go). The SDK includes API discovery, REST requests and supervised Gateway sessions.
+The TypeScript SDK for [Micup](https://micup.gg) bots. It connects a bot to the Micup Gateway and REST API with reconnects, resume, sharding, rate-limit handling and full type declarations, and covers slash commands, buttons, select menus, modals, soundboard, voice rooms and voice playback.
 
-Requires Node.js 22 or later and a Micup bot token. The build produces JavaScript and TypeScript declarations. Install it with:
+[Türkçe README](README.tr.md) · [Docs](docs/README.md) · [Changelog](CHANGELOG.md)
 
 ```sh
 npm install micup.ts
 ```
 
+Requires Node.js 22 or later and a Micup bot token. Based on [micup.go](https://github.com/yestefir/micup.go), the Go library that runs production bots.
+
+## Quick start
+
+Send a message:
+
 ```js
 import { MicupClient } from 'micup.ts';
 
 const client = await MicupClient.connect({ token: process.env.MICUP_BOT_TOKEN });
-const user = await client.getCurrentUser();
-console.log(user.username);
-
+console.log(client.self.username);
 await client.sendMessage(process.env.MICUP_CHANNEL_ID, 'Merhaba!');
 ```
 
-Supply a message ID as `{ replyTo: '123456789' }` in the third argument to send a reply. Supply an `AbortSignal` as `{ signal }` to cancel an operation. HTTP errors expose `status`, the Micup error `code` when present, and the raw `retryAfter` header when present.
-
-## Gateway
-
-Use a session to keep a bot connected and receive events.
+Answer a command and a button:
 
 ```js
-import { EventMux, MicupClient } from 'micup.ts';
-
-const bot = await MicupClient.connect({ token: process.env.MICUP_BOT_TOKEN });
-const events = new EventMux();
-events.on('MESSAGE_CREATE', async (message, event, signal) => {
-  if (message.author.bot || message.content !== '!ping') return;
-  await bot.sendMessage(message.channel_id, 'pong', { replyTo: message.id, signal });
-});
-const stop = new AbortController();
-process.once('SIGINT', () => stop.abort());
-process.once('SIGTERM', () => stop.abort());
-await bot.newSession({ handler: events.handle }).run({ signal: stop.signal });
-```
-
-The session reconnects with backoff and resumes from the last successfully processed sequence. A failed handler can receive the event again, so make externally visible effects safe to repeat. The handler's signal is aborted when the connection or session is replaced. Unknown event names can be registered with the mux and have an `unknown` payload until you provide a type.
-
-With `bot.newShardManager({ shardCount, session: { handler: events.handle } })`, a single process can run multiple shards. The manager spaces IDENTIFY commands and `manager.forGuild(guildId)` returns the local session responsible for a guild.
-
-## Commands and interactions
-
-Register slash commands for a development guild using `client.commands.set`. Omit `guildId` to register globally.
-
-```js
-import { EventMux, InteractionRouter, MicupClient } from 'micup.ts';
+import { EventMux, InteractionRouter, MicupClient, actionRow, primaryButton } from 'micup.ts';
 
 const client = await MicupClient.connect({ token: process.env.MICUP_BOT_TOKEN });
-await client.commands.set([{ name: 'ping', description: 'Check the bot' }], {
-  guildId: process.env.MICUP_GUILD_ID,
-});
+await client.commands.create({ name: 'ping', description: 'Check the bot' }, { guildId: process.env.MICUP_GUILD_ID });
 
-const router = new InteractionRouter().command('ping', (interaction, signal) =>
-  client.interactions.respond(interaction, 'pong', { signal }),
-);
+const router = new InteractionRouter()
+  .command('ping', (interaction, signal) =>
+    client.interactions.respond(interaction, {
+      content: 'pong',
+      components: [actionRow(primaryButton('again', 'Again'))],
+    }, { signal }))
+  .component('again', (interaction, signal) =>
+    client.interactions.update(interaction, { content: 'pong again', components: [] }, { signal }));
+
 const events = new EventMux();
-events.on('INTERACTION_CREATE', async (interaction, event, signal) => {
-  await router.handle(interaction, signal);
-});
-await client.newSession({ handler: events.handle }).run();
+events.on('INTERACTION_CREATE', (interaction, event, signal) => router.handle(interaction, signal));
+
+const stop = new AbortController();
+process.once('SIGINT', () => stop.abort());
+await client.newSession({ handler: events.handle }).run({ signal: stop.signal });
 ```
 
-The router also handles autocomplete, buttons, select menus and modal submissions. Use `client.interactions.defer` and `editResponse` when work needs more time.
+`client.newSession().run()` reconnects with backoff and resumes from the last processed sequence. A failed handler can receive its event again, so keep externally visible effects safe to repeat.
 
-## Server administration
+## What is inside
 
-Use the `client.guilds` and `client.channels` APIs for members, roles, channel permissions, threads, pins, reactions and invitations. Each Gateway session exposes `session.state` for cached guilds, channels, members, voice states and permission checks.
+| Area | What you get | Start here |
+| --- | --- | --- |
+| Client | Authenticated REST with rate-limit waits, retries, audit-log reasons, `AbortSignal` support, bot identity (`self`, `application()`, `tokenId`) | `MicupClient` |
+| Gateway | Supervised sessions with resume, heartbeat checks, Zstandard compression, presence, lazy subscriptions, member inventories, guild and channel counts | `client.newSession()` |
+| Sharding | Shard manager that spaces IDENTIFY, routes guilds to shards and recommends a shard count | `client.newShardManager()` |
+| State | Cache of guilds, channels, threads, members, roles and voice states with permission and hierarchy checks | `session.state` |
+| Commands and interactions | Slash and context menu commands, autocomplete, buttons, select menus, modals, deferred and private replies, follow-ups, routing by name | `client.commands`, `client.interactions`, `InteractionRouter` |
+| Messages | Send, edit, reply, forward, crosspost, search, bulk delete, embeds, direct uploads, embed suppression, reactions, pins | `client.sendMessage()`, `client.channels`, `client.attachments` |
+| Servers | Guild, member, role, ban, timeout, audit log, vanity URL, channel layout, invites, threads and forums, webhooks | `client.guilds`, `client.channels`, `client.webhooks` |
+| Expressions | Emoji and sticker listing, creation, cloning, bulk creation | `client.expressions` |
+| Sound | Soundboard sounds, playback in a voice channel, guild and channel notification sounds | `client.sounds` |
+| Voice rooms | The 3D room stage (board or video on the room TV, host, effects) and room tournaments | `client.rooms` |
+| Discovery | Read, apply for, edit and withdraw a server discovery listing | `client.discovery` |
+| Events | A typed catalog of Gateway events, an event mux and handler wrappers | `EventMux`, `knownGatewayEvents`, `safeHandler()` |
+| Helpers | Constant groups, button and select builders, command option readers, permission helpers, mentions, timestamps, snowflakes, localized message catalogs | `ChannelType`, `primaryButton()`, `optionString()`, `permissionNames()` |
+| Voice playback | LiveKit audio with FFmpeg decoding, PCM player and a connection object with events | [`@micupts/voice`](packages/voice) |
 
-## Gateway and REST options
+Everything takes an optional `AbortSignal`. HTTP failures throw `MicupAPIError` with `status`, `code`, field errors, `retryAfter` and helpers such as `notFound`, `rateLimited` and `hasFieldCode()`. `MicupErrorCode` names the error codes.
 
-Pass `compress: true` to use Micup's continuous Zstandard Gateway stream. On Node.js 22 this requires 22.15 or later. Use `session.runOnce()` when your application manages reconnects. Set `trackMembers: true` to maintain paginated member inventories and read their availability and completeness through `session.memberInventories()`.
+## More examples
 
-Use `session.subscribe()` or `manager.subscribe()` for Lazy Request subscriptions. The shard manager groups subscriptions and counts by their owning shard. The typed event catalog is available as `knownGatewayEvents`.
+Read command options and open a modal:
 
-`client.users` handles DM channels and profiles. `client.webhooks` and `client.expressions` manage webhooks and guild emoji or stickers. Use `client.attachments.upload()` for direct uploads, then pass the result in the message's `uploads` field. Forum posts, archived threads and reaction users are available through `client.channels`.
+```js
+import { modalRows, optionString, shortInput } from 'micup.ts';
 
-The SDK exports the constant groups of micup.go (`ChannelType`, `AuditAction`, `GuildFeature`, `Limits` and more), builders such as `primaryButton()` and `stringSelect()`, readers such as `optionString()`, `optionMember()` and `modalValue()`, and permission helpers such as `permissionNames()` and `missingPermissions()`.
+router.command('hello', async (interaction, signal) => {
+  const name = optionString(interaction.data, 'name') ?? 'there';
+  await client.interactions.respond(interaction, `Hello ${name}`, { ephemeral: true, signal });
+});
 
-The SDK exports message catalogs, mention and snowflake helpers, media URLs, and builders for embeds, buttons, selects and modals. Pass `client.media` an entity to build its discovered CDN URL.
+router.command('feedback', (interaction, signal) =>
+  client.interactions.modal(interaction, {
+    title: 'Feedback',
+    custom_id: 'feedback',
+    components: modalRows(shortInput('subject', 'Subject')),
+  }, { signal }));
+```
 
-## Soundboard, voice rooms and identity
+Run several shards and move slow work off the Gateway handler:
 
-`client.sounds` manages guild soundboard sounds, plays them in a voice channel and sets guild or channel notification sounds. `client.rooms` runs the 3D room stage (board or video on the room TV, host character, effects) and room tournaments of a guild voice channel. Both need a bot token, and the server decides whether the feature is switched on. `MicupErrorCode` names the error codes, and `MicupAPIError` has `notFound`, `forbidden`, `rateLimited` and `hasFieldCode()`.
+```js
+import { background } from 'micup.ts';
 
-`client.self`, `client.application()`, `client.applicationId()` and `client.tokenId` read the bot identity without repeating requests. Pass `logger: { warn }` to `MicupClient.connect()` to log a request the bot lacks permission for, at most once a minute per route. `client.guilds.iterateMembers()`, `iterateAuditLog()`, `client.channels.iteratePins()`, `iterateThreadMembers()` and `iterateMessages()` page through large collections. `background()` runs slow work outside a Gateway handler with a timeout and a contained error. `client.suppressEmbeds()` hides or shows the embeds of a message and keeps its other flags.
+const manager = client.newShardManager({
+  shardCount: await client.recommendedShards(),
+  session: { handler: events.handle, compress: true, trackMembers: true },
+});
+void background(async (signal) => { await slowSearch(signal); }, { timeoutMs: 30_000, name: 'search' });
+await manager.run({ signal: stop.signal });
+```
+
+Log requests that fail because the bot lacks a permission, at most once a minute per route:
+
+```js
+const client = await MicupClient.connect({
+  token: process.env.MICUP_BOT_TOKEN,
+  logger: { warn: (message, fields) => console.warn(message, fields) },
+});
+```
 
 ## Voice
 
-The optional [`@micupts/voice`](packages/voice) workspace publishes audio to LiveKit. Install it with `npm install @micupts/voice` when your bot needs audio playback.
+[`@micupts/voice`](packages/voice) publishes audio to a voice channel through LiveKit. `VoiceConnection` joins the channel, plays files, URLs, streams or raw PCM, and emits `start`, `finish`, `status`, `memberJoin`, `memberLeave`, `disconnect` and `error`. Install it with `npm install @micupts/voice` and install FFmpeg to decode files and streams.
+
+## Documentation
+
+- [Getting started](docs/getting-started.md): token, invite link, first bot, project layout
+- [Commands and interactions](docs/commands-and-interactions.md): commands, options, buttons, selects, modals, autocomplete, private replies
+- [Gateway and sharding](docs/gateway-and-sharding.md): sessions, resume, presence, shards, state cache, events
+- [REST reference](docs/rest-reference.md): every resource and method
+- [Voice](docs/voice.md): joining, playing, regranting, soundboard and voice rooms
+- [Errors and limits](docs/errors-and-limits.md): error handling, rate limits, cancellation, logging
+- [Migrating](docs/migrating.md): from micup.js, micup.gg.js or discord.js
+
+## Reliability
+
+The test suite runs the SDK against mocked servers and a local LiveKit room. Releases are also checked end to end against the Micup service with a live bot: commands, autocomplete, buttons, select menus, modals, deferred and private replies, REST resources and voice playback.
 
 Run `npm ci` once, then `npm test` to verify both workspaces locally.
 

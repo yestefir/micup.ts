@@ -173,3 +173,22 @@ test('opens FFmpeg sources from streams and validates the extra arguments', asyn
   await source.close();
   assert.equal(stream.destroyed, true);
 });
+
+test('the typed emitter supports once, off and listener counts without Node types', async () => {
+  const { TypedEmitter } = await import('@micupts/voice');
+  const emitter = new TypedEmitter();
+  const seen = [];
+  const listener = (value) => seen.push('on:' + value);
+  emitter.on('tick', listener);
+  emitter.once('tick', (value) => seen.push('once:' + value));
+  assert.equal(emitter.listenerCount('tick'), 2);
+  assert.equal(emitter.emit('tick', 1), true);
+  assert.equal(emitter.emit('tick', 2), true);
+  assert.deepEqual(seen, ['on:1', 'once:1', 'on:2']);
+  emitter.off('tick', listener);
+  assert.equal(emitter.emit('tick', 3), false);
+  assert.equal(emitter.listenerCount('tick'), 0);
+  emitter.on('a', () => {});
+  emitter.removeAllListeners();
+  assert.equal(emitter.listenerCount('a'), 0);
+});

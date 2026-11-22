@@ -1,25 +1,45 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 - 2026-11-22
 
-- Added `VoiceConnection` to `@micupts/voice` with events, a status machine, `regrant()`, `memberCount` and raw PCM, file, URL and stream playback. `VoiceRoom` now emits `memberJoin`, `memberLeave` and `disconnected`.
-- Added `ffmpegArgs`, `Readable` input, HTTP reconnect flags and `FFMPEG_PATH` to `openSource()`.
+### New resources
+
+- `client.sounds`: guild soundboard sounds, playback in a voice channel, and guild or channel notification sounds. The `GUILD_SOUNDBOARD_SOUNDS_UPDATE` and `GUILD_SOUNDBOARD_SOUND_PLAY` events are typed.
+- `client.rooms`: the voice room stage (board or video on the room TV, host character, effects) and room tournaments. New `ManageRoomStage` permission.
+- `client.discovery`: read, apply for, edit and withdraw a server discovery listing.
+
+### Servers, channels and users
+
+- Guilds: `vanityUrl`, `editVanityUrl`, `role`, `getBan`, `findMembers`, `moveChannels`, `editCurrentMember`, `setNickname`, `transferOwnership`, `deleteOwnMessages`.
+- Channels: `addRecipient`, `removeRecipient`, `deleteOwnMessages`, `crosspostSource`, `archiveThread`, `lockThread`.
+- `expressions.emoji`, `sticker` and `source`; `commands.clear`; `users.editCurrentUser` and `users.publicApplication`; `client.suppressEmbeds()`.
+- Paging generators: `iterateMembers`, `iterateAuditLog`, `iteratePins`, `iterateThreadMembers`.
+
+### Reliability and diagnostics
+
+- `MicupErrorCode` (including the DM quota and spam codes) and `notFound`, `forbidden`, `rateLimited` and `hasFieldCode()` on `MicupAPIError`.
+- `client.self`, `client.application()`, `client.applicationId()`, `client.tokenId` and `tokenId()`.
+- The `logger` option reports requests the bot lacks permission for, once a minute per route.
+- `background()` runs slow work outside a Gateway handler with a timeout and a contained error.
+
+### Helpers and typings
+
+- Constant groups: `ChannelType`, `AuditAction`, `GuildFeature`, `MessageType`, `UserFlag`, `GatewayCloseCode`, `Limits` and more, generated from micup.go. `MessageFlag` is exported.
+- Builders: `primaryButton`, `secondaryButton`, `successButton`, `dangerButton`, `linkButton`, `stringSelect`, `userSelect`, `roleSelect`, `mentionableSelect`, `channelSelect`, `shortInput`, `paragraphInput`, `disableButtons`, `imageData`.
+- Readers: `optionString`, `optionInteger`, `optionMember`, `focusedOption`, `targetUser`, `modalValue`, `selectedUsers` and related, plus `isButtonInteraction`, `isSelectInteraction`, `isDMChannel`, `isThreadChannel`, `memberTimedOut`, `guildHasFeature`.
+- Permissions: `permissionNames`, `parsePermission`, `missingPermissions`, `ElevatedPermissions`.
+- The message, user, attachment, channel, member, role, guild and embed typings carry the fields micup.go decodes.
+
+### @micupts/voice 1.1.0
+
+- `VoiceConnection`: joins, connects, plays and leaves; emits `start`, `finish`, `status`, `memberJoin`, `memberLeave`, `disconnect` and `error`; `regrant()` follows a bot that is moved; plays files, URLs, streams and raw PCM.
+- `VoiceRoom` emits `memberJoin`, `memberLeave` and `disconnected` and reports `memberCount`.
+- `openSource()` accepts `ffmpegArgs`, a `Readable` input and the `FFMPEG_PATH` environment variable, and HTTP inputs reconnect after a dropped connection.
 - Fixed `Player.skip()` rejecting with an `AbortError` instead of `PlaybackSkippedError` while the player waits for the next frame.
-- Added the constant groups of micup.go (`ChannelType`, `AuditAction`, `GuildFeature`, `MessageType`, `UserFlag`, `GatewayCloseCode`, `Limits` and more) generated from its source.
-- Added builders and readers like micup.go: `primaryButton`, `stringSelect`, `shortInput`, `optionString`, `optionMember`, `modalValue`, `selectedUsers`, `isButtonInteraction`, `isDMChannel`, `memberTimedOut`, `imageData` and related helpers.
-- Added `permissionNames`, `parsePermission`, `missingPermissions` and `ElevatedPermissions`.
-- Completed the message, user, attachment, channel, member, role, guild and embed typings with the fields micup.go decodes.
 
-- Added `client.sounds` for guild soundboard sounds, playback in a voice channel and guild or channel notification sounds, and the `GUILD_SOUNDBOARD_SOUNDS_UPDATE` and `GUILD_SOUNDBOARD_SOUND_PLAY` events.
-- Added `client.discovery` to read, apply for, edit and withdraw a guild discovery listing.
-- Added `client.rooms` for the voice room stage (board, video, host and effects) and room tournaments, and the `ManageRoomStage` permission.
-- Added guild `vanityUrl`, `editVanityUrl`, `role`, `getBan`, `findMembers`, `moveChannels`, `editCurrentMember`, `setNickname`, `transferOwnership` and `deleteOwnMessages`.
-- Added channel `addRecipient`, `removeRecipient`, `deleteOwnMessages`, `crosspostSource`, `archiveThread` and `lockThread`.
-- Added `expressions.emoji`, `sticker` and `source`, `commands.clear`, `users.editCurrentUser` and `users.publicApplication`.
-- Added `MicupErrorCode`, including the new DM quota and spam codes, and `notFound`, `forbidden`, `rateLimited` and `hasFieldCode()` on `MicupAPIError`.
-- Added `client.self`, `client.application()`, `client.applicationId()`, `client.tokenId` and `tokenId()`.
-- Added the `logger` option that reports requests the bot lacks permission for, once a minute per route.
-- Added `iterateMembers`, `iterateAuditLog`, `iteratePins` and `iterateThreadMembers`, `background()`, `client.suppressEmbeds()` and `MessageFlag`.
+### Documentation
+
+- A rewritten README, a Turkish README, and guides for getting started, commands and interactions, the Gateway and sharding, the REST reference, voice, errors and limits, and migration from micup.js, micup.gg.js and discord.js.
 
 ## 1.0.0
 
