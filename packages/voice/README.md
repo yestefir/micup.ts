@@ -35,3 +35,7 @@ try {
 ```
 
 The grant accepts the `endpoint` and `token` from a Micup Gateway voice-server update. Keep grants out of logs and persistent storage. The publisher supports unencrypted LiveKit rooms. The player supports pause, resume, skip and volume. Queue and playlist management belong to the application.
+
+## Local LiveKit test
+
+Start a LiveKit server in development mode on loopback. Set `MICUP_TEST_LIVEKIT_ENDPOINT` to its WebSocket URL and run `npm test --workspace @micupts/voice`. The integration test publishes an audible PCM signal and verifies that a second participant receives it.
