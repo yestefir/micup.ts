@@ -50,6 +50,7 @@ export class MicupClient {
   readonly #token: string;
   readonly #api: string;
   readonly #gateway?: string;
+  #botId?: string;
 
   private constructor(key: typeof connection, token: string, api: string, gateway?: string) {
     if (key !== connection) {
@@ -107,17 +108,18 @@ export class MicupClient {
     if (user?.bot !== true) {
       throw new Error('The credential must belong to a Micup bot');
     }
+    client.#botId = user.id;
     return client;
   }
 
   newSession(options: GatewaySessionOptions, shard: Pick<GatewaySessionConfig, 'shardId' | 'shardCount'> = {}): GatewaySession {
     if (!this.#gateway) throw new Error('Micup discovery returned no Gateway endpoint');
-    return new GatewaySession({ ...shard, endpoint: this.#gateway, token: this.#token }, options);
+    return new GatewaySession({ ...shard, endpoint: this.#gateway, token: this.#token, botId: this.#botId }, options);
   }
 
   newShardManager(options: ShardManagerOptions): ShardManager {
     if (!this.#gateway) throw new Error('Micup discovery returned no Gateway endpoint');
-    return new ShardManager({ endpoint: this.#gateway, token: this.#token }, options);
+    return new ShardManager({ endpoint: this.#gateway, token: this.#token, botId: this.#botId }, options);
   }
 
   getCurrentUser({ signal }: MicupRequestOptions = {}): Promise<MicupUser> {

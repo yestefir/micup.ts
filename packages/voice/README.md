@@ -23,4 +23,15 @@ export async function playAudio(grant, input, signal) {
 }
 ```
 
+Use the Gateway session to obtain a grant before connecting the audio publisher:
+
+```js
+const grant = await session.joinVoice(guildId, channelId, { selfDeaf: true, signal });
+try {
+  await playAudio(grant, input, signal);
+} finally {
+  await session.leaveVoice(guildId, grant.connection_id);
+}
+```
+
 The grant accepts the `endpoint` and `token` from a Micup Gateway voice-server update. Keep grants out of logs and persistent storage. The publisher supports unencrypted LiveKit rooms. The player supports pause, resume, skip and volume. Queue and playlist management belong to the application.

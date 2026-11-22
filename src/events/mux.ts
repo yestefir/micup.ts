@@ -1,6 +1,8 @@
 import type { GatewayDispatch } from '../gateway/protocol.js';
 import type { MicupMessage, MicupUser } from '../rest/client.js';
 
+import type { VoiceServerUpdate } from '../session/voice.js';
+
 export interface MicupEvents {
   READY: { session_id: string; user: MicupUser };
   RESUMED: Record<string, never>;
@@ -8,6 +10,8 @@ export interface MicupEvents {
   MESSAGE_UPDATE: Partial<MicupMessage> & Pick<MicupMessage, 'id' | 'channel_id'>;
   MESSAGE_DELETE: Pick<MicupMessage, 'id' | 'channel_id'> & { guild_id?: string };
   USER_UPDATE: MicupUser;
+  VOICE_STATE_UPDATE: { guild_id: string; user_id: string; channel_id: string | null; connection_id?: string };
+  VOICE_SERVER_UPDATE: VoiceServerUpdate;
 }
 
 type Payload<Events, Name extends string> = Name extends keyof Events ? Events[Name] : unknown;

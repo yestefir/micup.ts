@@ -2,14 +2,17 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { GatewayConnection, type GatewayResume } from '../gateway/connection.js';
 import { GatewayCloseError, gatewayEndpoint, type GatewayDispatch } from '../gateway/protocol.js';
 
+import { SessionVoice, type VoiceJoinOptions, type VoiceServerUpdate, type VoiceSessionOptions } from './voice.js';
+
 export interface GatewaySessionConfig {
   readonly endpoint: string;
   readonly token: string;
+  readonly botId?: string;
   readonly shardId?: number;
   readonly shardCount?: number;
 }
 
-export interface GatewaySessionOptions {
+export interface GatewaySessionOptions extends VoiceSessionOptions {
   readonly handler: (event: GatewayDispatch, signal: AbortSignal) => void | Promise<void>;
   readonly ignoredEvents?: readonly string[];
   readonly flags?: number;
@@ -29,6 +32,7 @@ export class GatewaySession {
   readonly #options: Readonly<GatewaySessionOptions>;
   readonly #ignoredEvents: string[];
   readonly #flags: number;
+  readonly #voice: SessionVoice;
   readonly #minBackoff: number;
   readonly #maxBackoff: number;
   #running = false;
@@ -47,6 +51,7 @@ export class GatewaySession {
     this.#shard = [id, count];
     if (typeof options?.handler !== 'function') throw new TypeError('A Gateway event handler is required');
     this.#options = { ...options };
+    this.#voice = new SessionVoice(config.botId, this.send.bind(this), this.#options);
     this.#ignoredEvents = [...(options.ignoredEvents ?? [])];
     if (this.#ignoredEvents.length > 256 || this.#ignoredEvents.some((name) => !/^[A-Z][A-Z_0-9]*$/.test(name))) {
       throw new TypeError('Invalid Micup ignored Gateway events');
@@ -82,6 +87,22 @@ export class GatewaySession {
     await this.#connection.send(opcode, data, signal);
   }
 
+  joinVoice(guildId: string, channelId: string, options?: VoiceJoinOptions): Promise<VoiceServerUpdate> {
+    return this.#voice.join(guildId, channelId, options);
+  }
+
+  voice(guildId: string): VoiceServerUpdate | undefined {
+    return this.#voice.grant(guildId);
+  }
+
+  leaveVoice(guildId: string, connectionId: string, { signal }: { signal?: AbortSignal } = {}): Promise<void> {
+    return this.#voice.leave(guildId, connectionId, signal);
+  }
+
+  updateVoiceState(guildId: string, options: VoiceJoinOptions): Promise<void> {
+    return this.#voice.update(guildId, options);
+  }
+
   async run({ signal = new AbortController().signal }: { signal?: AbortSignal } = {}): Promise<void> {
     if (this.#running) throw new Error('Micup Gateway session is already running');
     this.#running = true;
@@ -98,8 +119,15 @@ export class GatewaySession {
             resume: this.#resume,
             beforeIdentify: this.#options.beforeIdentify,
             dispatch: async (event, lifetime) => this.#options.handler(event, lifetime),
-            onGatewayError: this.#options.onGatewayError,
-            onInvalidate: () => { this.#ready = false; },
+            receive: (event) => this.#voice.receive(event),
+            onGatewayError: (data) => {
+              this.#voice.refuse(data);
+              this.#options.onGatewayError?.(data);
+            },
+            onInvalidate: () => {
+              this.#ready = false;
+              this.#voice.invalidate();
+            },
             onReady: (resumed) => {
               this.#ready = true;
               backoff = this.#minBackoff;
@@ -111,6 +139,7 @@ export class GatewaySession {
           this.#connection = undefined;
           if (signal.aborted) return;
           if (error instanceof GatewayCloseError && error.resetsSession) {
+            this.#voice.invalidate();
             this.#resume.sessionId = undefined;
             this.#resume.sequence = null;
           }
@@ -126,6 +155,7 @@ export class GatewaySession {
       this.#ready = false;
       this.#connection = undefined;
       this.#running = false;
+      this.#voice.invalidate();
     }
   }
 }

@@ -8,3 +8,5 @@ export { GatewaySession } from './session/session.js';
 export type { GatewaySessionConfig, GatewaySessionOptions } from './session/session.js';
 export { ShardManager, shardForGuild } from './shard/manager.js';
 export type { ShardManagerOptions } from './shard/manager.js';
+export { VoiceRefusedError } from './session/voice.js';
+export type { VoiceJoinOptions, VoiceServerUpdate, VoiceSessionOptions } from './session/voice.js';

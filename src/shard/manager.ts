@@ -25,7 +25,7 @@ export class ShardManager {
   readonly shardCount: number;
   #running = false;
 
-  constructor(config: Pick<GatewaySessionConfig, 'endpoint' | 'token'>, options: ShardManagerOptions) {
+  constructor(config: Pick<GatewaySessionConfig, 'endpoint' | 'token' | 'botId'>, options: ShardManagerOptions) {
     const { shardCount, identifyIntervalMs = 5000 } = options;
     if (!Number.isSafeInteger(shardCount) || shardCount < 1) throw new RangeError('Shard count must be positive');
     if (!Number.isSafeInteger(identifyIntervalMs) || identifyIntervalMs < 1 || identifyIntervalMs > 2_147_483_647) {

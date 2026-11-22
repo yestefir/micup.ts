@@ -16,6 +16,7 @@ interface ConnectionOptions {
   resume: GatewayResume;
   beforeIdentify?: (signal: AbortSignal) => Promise<void>;
   dispatch: (event: GatewayDispatch, signal: AbortSignal) => Promise<void>;
+  receive: (event: GatewayDispatch) => void;
   onInvalidate: () => void;
   onReady: (resumed: boolean) => void;
   onGatewayError?: (data: unknown) => void;
@@ -182,6 +183,7 @@ export class GatewayConnection {
       case op.Dispatch:
         if (!this.#authenticated) throw new Error('Micup Gateway dispatched before authentication');
         if (this.#dispatches.length >= 1024) throw new Error('Micup Gateway event queue is full');
+        this.options.receive(this.#dispatch(packet));
         this.#dispatches.push(packet);
         this.#drain(finish).catch(finish);
         break;
@@ -229,7 +231,7 @@ export class GatewayConnection {
             this.options.resume.sessionId = undefined;
             this.options.resume.sequence = null;
           }
-          await this.options.dispatch({ name, sequence, data: packet.d, shardId: this.options.shard[0] }, signal);
+          await this.options.dispatch(this.#dispatch(packet), signal);
           if (signal.aborted) continue;
           if (name === 'READY') {
             const id = (packet.d as { session_id?: unknown } | null)?.session_id;
@@ -248,6 +250,10 @@ export class GatewayConnection {
     } finally {
       this.#draining = false;
     }
+  }
+
+  #dispatch(packet: GatewayPacket): GatewayDispatch {
+    return { name: packet.t!, sequence: packet.s ?? null, data: packet.d, shardId: this.options.shard[0] };
   }
 
   #beat(): void {

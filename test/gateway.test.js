@@ -168,3 +168,54 @@ test('routes snowflakes and shuts down all local shards on a fatal close', { tim
   assert.deepEqual([...closed].sort(), [0, 2]);
   assert.equal(manager.ready, false);
 });
+
+test('completes a voice join while a Gateway event handler waits for the grant', { timeout: 5000 }, async (t) => {
+  const { server, endpoint } = await createGateway(t);
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const writes = [];
+  let result;
+  server.on('connection', (socket) => {
+    send(socket, op.Hello, { heartbeat_interval: 100 });
+    socket.on('message', (raw) => {
+      const packet = JSON.parse(raw);
+      if (packet.op === op.Identify) {
+        send(socket, op.Dispatch, { session_id: 'voice', user: { id: '202' } }, 'READY', 1);
+        send(socket, op.Dispatch, {}, 'MESSAGE_CREATE', 2);
+      } else if (packet.op === op.VoiceStateUpdate) {
+        writes.push(packet.d);
+        if (packet.d.channel_id) {
+          send(socket, op.Dispatch, {
+            guild_id: '888', channel_id: '555', connection_id: 'wrong', endpoint: 'voice.example', token: 'fixture',
+          }, 'VOICE_SERVER_UPDATE', 3);
+          send(socket, op.Dispatch, {
+            guild_id: '123', channel_id: '456', connection_id: 'connection', endpoint: 'voice.example', token: 'fixture',
+          }, 'VOICE_SERVER_UPDATE', 4);
+        } else {
+          controller.abort();
+        }
+      } else if (packet.op === op.Heartbeat) {
+        send(socket, op.HeartbeatAck);
+      }
+    });
+  });
+
+  const session = new GatewaySession({ endpoint, token: 'fixture' }, {
+    handler: async (event, signal) => {
+      if (event.name !== 'MESSAGE_CREATE') return;
+      result = await session.joinVoice('123', '456', { selfDeaf: true, signal });
+      assert.equal(session.voice('123')?.connection_id, 'connection');
+      await session.leaveVoice('123', 'old-connection', { signal });
+      await session.leaveVoice('123', result.connection_id, { signal });
+    },
+  });
+
+  await session.run({ signal: controller.signal });
+  assert.equal(result.endpoint, 'voice.example');
+  assert.equal(result.connection_id, 'connection');
+  assert.deepEqual(writes, [
+    { guild_id: '123', channel_id: '456', self_mute: false, self_deaf: true, self_video: false, self_stream: false },
+    { guild_id: '123', channel_id: null, connection_id: 'connection' },
+  ]);
+  assert.equal(session.voice('123'), undefined);
+});
