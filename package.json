@@ -1,5 +1,5 @@
 {
-  "name": "micup-js",
+  "name": "micup.ts",
   "version": "0.1.0",
   "description": "JavaScript REST client for Micup bots",
   "type": "module",
@@ -26,7 +26,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yestefir/micup-js.git"
+    "url": "git+https://github.com/yestefir/micup.ts.git"
   },
   "devDependencies": {
     "typescript": "7.0.2"

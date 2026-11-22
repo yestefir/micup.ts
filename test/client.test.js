@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MicupAPIError, MicupClient } from 'micup-js';
+import { MicupAPIError, MicupClient } from 'micup.ts';
 
 const origin = 'https://micup.example';
 const bot = { id: '101', username: 'fixture', bot: true };
