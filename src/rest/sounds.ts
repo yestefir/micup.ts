@@ -66,6 +66,22 @@ function channelPath(id: string): string {
   return '/channels/' + snowflake(id, 'Channel ID');
 }
 
+function soundInput(input: SoundboardSoundInput): SoundboardSoundInput {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('A soundboard sound input must be an object');
+  for (const field of Object.keys(input)) {
+    if (!['name', 'audio', 'volume'].includes(field)) throw new TypeError('Unsupported soundboard sound field: ' + field);
+  }
+  return input;
+}
+
+function soundEdit(input: SoundboardSoundEdit): SoundboardSoundEdit {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('A soundboard sound edit must be an object');
+  for (const field of Object.keys(input)) {
+    if (!['name', 'volume'].includes(field)) throw new TypeError('Unsupported soundboard sound edit field: ' + field);
+  }
+  return input;
+}
+
 export class MicupSounds {
   constructor(private readonly rest: RestTransport) {}
 
@@ -74,7 +90,8 @@ export class MicupSounds {
     return sounds;
   }
 
-  create(guildId: string, { name, audio, volume }: SoundboardSoundInput, options?: MicupRequestOptions): Promise<MicupSoundboardSound> {
+  create(guildId: string, input: SoundboardSoundInput, options?: MicupRequestOptions): Promise<MicupSoundboardSound> {
+    const { name, audio, volume } = soundInput(input);
     return this.rest.request('POST', guildPath(guildId) + '/soundboard-sounds', {
       ...options,
       body: {
@@ -85,7 +102,8 @@ export class MicupSounds {
     });
   }
 
-  edit(guildId: string, soundId: string, { name, volume }: SoundboardSoundEdit, options?: MicupRequestOptions): Promise<MicupSoundboardSound> {
+  edit(guildId: string, soundId: string, input: SoundboardSoundEdit, options?: MicupRequestOptions): Promise<MicupSoundboardSound> {
+    const { name, volume } = soundEdit(input);
     if (name === undefined && volume === undefined) throw new TypeError('A soundboard sound edit needs a name or a volume');
     return this.rest.request('PATCH', guildPath(guildId) + '/soundboard-sounds/' + snowflake(soundId, 'Sound ID'), {
       ...options,

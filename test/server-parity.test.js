@@ -66,6 +66,8 @@ test('manages guild soundboard sounds and plays them in a channel', async (t) =>
   assert.deepEqual(calls[5].body, { session_id: 'session', connection_id: 'connection' });
 
   assert.throws(() => bot.sounds.edit('10', '5', {}), TypeError);
+  assert.throws(() => bot.sounds.create('10', { name: 'airhorn', audio: 'AQID', creator_id: '9' }), /Unsupported soundboard sound field: creator_id/);
+  assert.throws(() => bot.sounds.edit('10', '5', { volume: 1, guild_id: '10' }), /Unsupported soundboard sound edit field: guild_id/);
   assert.throws(() => bot.sounds.create('10', { name: '', audio: 'AQID' }), RangeError);
   assert.throws(() => bot.sounds.create('10', { name: 'loud', audio: 'AQID', volume: 2 }), RangeError);
   assert.throws(() => bot.sounds.play('20', '5', { sessionId: '', connectionId: 'c' }), TypeError);

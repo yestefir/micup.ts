@@ -41,11 +41,13 @@ function validateProfile(edit: UserProfileEdit): void {
     const value = edit[field];
     if (typeof value === 'string' && value.length === 0) throw new TypeError(field + ' must be a nonempty string or null');
   }
-  for (const field of ['accent_color', 'mention_flags'] as const) {
-    const value = edit[field];
-    if (value !== undefined && value !== null && (!Number.isSafeInteger(value) || value < 0)) {
-      throw new TypeError(field + ' must be a nonnegative safe integer');
-    }
+  if (edit.accent_color !== undefined && edit.accent_color !== null &&
+      (!Number.isSafeInteger(edit.accent_color) || edit.accent_color < 0)) {
+    throw new TypeError('accent_color must be a nonnegative safe integer or null');
+  }
+  if (edit.mention_flags !== undefined &&
+      (!Number.isSafeInteger(edit.mention_flags) || edit.mention_flags < 0)) {
+    throw new TypeError('mention_flags must be a nonnegative safe integer');
   }
 }
 

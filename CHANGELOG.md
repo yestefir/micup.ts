@@ -6,6 +6,10 @@
 - Limit discovery document responses to 64 KiB and share bounded JSON parsing with REST responses.
 - Preserve discovery HTTP errors even when cancelling a rejected response body fails.
 - Reject unsupported and response-only fields in root slash-command definitions before sending requests.
+- Require string names in slash-command and option definitions before validating their character rules.
+- Validate command option entries before inspecting their structure, including null and sparse entries.
+- Reject non-object command localization maps instead of silently omitting them.
+- Reject unsupported fields in soundboard sound create and edit requests.
 
 - Extend the sandbox live smoke checks with an optional read-only user-token identity check.
 - Forum post creation rejects unsupported nonce and boolean message fields based on field presence, including false and zero values.
@@ -197,3 +201,8 @@
 - Added slash and context menu commands, interaction routing, autocomplete, modals, deferred replies and follow-ups.
 - Added channel, thread, member, role, moderation, invite, pin and reaction operations.
 - Added Gateway voice grants and the separate `@micupts/voice` package for outgoing LiveKit audio with an FFmpeg source and a PCM player.
+- Reject null values for user profile mention flags.
+- Disable pagination controls when its wait is aborted.
+- Validate pagination options before sending the initial page.
+- Avoid sending a page when pagination starts with an aborted signal.
+- Acknowledge failed lazy page loads and stop pagination without reloading a page.

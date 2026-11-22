@@ -36,9 +36,31 @@ function randomId(): string {
 }
 
 export async function paginate(target: Interaction | Message, source: PageSource, options: PaginateOptions = {}): Promise<PaginateResult> {
+  if (!target || typeof target !== 'object' || !('client' in target)) throw new TypeError('Pagination target must be a message or interaction');
+  if (!Array.isArray(source) && (!source || typeof source !== 'object' ||
+      typeof (source as { page?: unknown }).page !== 'function')) {
+    throw new TypeError('A paginated source must be an array or provide a page function');
+  }
   const total = Array.isArray(source) ? source.length : (source as { count: number }).count;
   if (!Number.isSafeInteger(total) || total < 1) throw new RangeError('Pagination needs at least one page');
   const { timeoutMs = 120_000, onlyInvoker = true, ephemeral, jumpButtons = false, deniedReply, signal } = options;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647) {
+    throw new RangeError('Pagination timeout must be a positive timer duration');
+  }
+  if (typeof onlyInvoker !== 'boolean' || typeof jumpButtons !== 'boolean' ||
+      (ephemeral !== undefined && typeof ephemeral !== 'boolean')) {
+    throw new TypeError('Pagination access, jump, and ephemeral options must be booleans');
+  }
+  if (deniedReply !== undefined && deniedReply !== false && typeof deniedReply !== 'string') {
+    throw new TypeError('Pagination denied reply must be a string or false');
+  }
+  if (options.labels !== undefined) {
+    if (!options.labels || typeof options.labels !== 'object' || Array.isArray(options.labels) ||
+        Object.keys(options.labels).some((key) => !['first', 'previous', 'next', 'last', 'stop'].includes(key)) ||
+        Object.values(options.labels).some((label) => typeof label !== 'string' || !label || [...label].length > 80)) {
+      throw new TypeError('Pagination labels must be nonempty strings of up to 80 characters');
+    }
+  }
   const labels = { ...defaultLabels, ...options.labels };
   let index = options.startPage ?? 0;
   if (!Number.isSafeInteger(index) || index < 0 || index >= total) throw new RangeError('The start page is outside the pages');
@@ -62,7 +84,9 @@ export async function paginate(target: Interaction | Message, source: PageSource
   };
   const view = async (position: number, disabled = false): Promise<MessageInput> => ({ ...(await load(position)), components: total > 1 ? [row(position, disabled)] : [] });
 
+  if (signal?.aborted) return { reason: 'aborted', page: index };
   const first = await view(index);
+  if (signal?.aborted) return { reason: 'aborted', page: index };
   let message: Message | undefined;
   if (target instanceof Message) {
     message = await target.reply(first);
@@ -90,7 +114,10 @@ export async function paginate(target: Interaction | Message, source: PageSource
         signal,
       });
     } catch (error) {
-      if (signal?.aborted) return { reason: 'aborted', page: index };
+      if (signal?.aborted) {
+        await close();
+        return { reason: 'aborted', page: index };
+      }
       if (error instanceof Error && error.message.startsWith('Timed out')) {
         await close();
         return { reason: 'timeout', page: index };
@@ -107,10 +134,20 @@ export async function paginate(target: Interaction | Message, source: PageSource
     }
     const action = click.customId.slice(prefix.length);
     if (action === 'stop') {
-      await click.update({ ...(await load(index)), components: [] });
+      await click.update({ components: [] });
       return { reason: 'stopped', page: index };
     }
-    index = action === 'first' ? 0 : action === 'last' ? total - 1 : action === 'next' ? Math.min(total - 1, index + 1) : Math.max(0, index - 1);
-    await click.update(await view(index));
+    const next = action === 'first' ? 0 : action === 'last' ? total - 1 : action === 'next' ? Math.min(total - 1, index + 1) : Math.max(0, index - 1);
+    let nextView: MessageInput;
+    try {
+      nextView = await view(next);
+    } catch (error) {
+      try {
+        await click.reply({ content: 'Could not load that page. Please try again.', ephemeral: true });
+      } catch {}
+      throw error;
+    }
+    await click.update(nextView);
+    index = next;
   }
 }

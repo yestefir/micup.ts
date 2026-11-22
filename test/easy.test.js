@@ -788,6 +788,8 @@ test('disables the buttons after the idle timeout and honors an abort signal', a
   controller.abort();
   await until(() => aborted);
   assert.deepEqual(aborted, { reason: 'aborted', page: 0 });
+  const abortedEdit = calls.filter((call) => call.method === 'PATCH' && call.path === '/webhooks/77/tok/messages/@original').at(-1);
+  assert.ok(abortedEdit.body.components[0].components.every((button) => button.disabled === true));
 });
 
 test('loads pages lazily, shows jump buttons and starts on a chosen page', async (t) => {
@@ -812,7 +814,38 @@ test('loads pages lazily, shows jump buttons and starts on a chosen page', async
   await until(() => callbacks(calls).length >= 3);
   assert.equal(callbacks(calls)[2].body.data.content, 'page 0');
   assert.deepEqual(loaded, [2, 4, 0]);
+  await click(client, prefix, 'stop');
+  await until(() => result);
+  assert.deepEqual(result, { reason: 'stopped', page: 0 });
+  assert.deepEqual(callbacks(calls)[3].body.data, { components: [] });
+  assert.deepEqual(loaded, [2, 4, 0]);
   client.destroy();
+});
+
+test('acknowledges failed lazy page loads without changing the current page', async (t) => {
+  const { client, calls } = await setup(t, () => Response.json(pageMessage));
+  const loaded = [];
+  let result;
+  client.command('list', async (interaction) => {
+    try {
+      result = await paginate(interaction, { count: 2, page: (index) => {
+        loaded.push(index);
+        if (index === 1) throw new Error('fixture page failure');
+        return 'page ' + index;
+      } }, { timeoutMs: 5000 });
+    } catch (error) {
+      assert.match(error.message, /fixture page failure/);
+    }
+  });
+  await dispatch(client, 'INTERACTION_CREATE', { ...base, type: 2, data: commandData('list') });
+  await until(() => callbacks(calls).length >= 1);
+  const prefix = callbacks(calls)[0].body.data.components[0].components[0].custom_id.replace('previous', '');
+  await click(client, prefix, 'next');
+  await until(() => callbacks(calls).length >= 2);
+  assert.deepEqual(callbacks(calls)[1].body.data, {
+    content: 'Could not load that page. Please try again.', flags: 64,
+  });
+  assert.deepEqual(loaded, [0, 1]);
 });
 
 test('sends a single page without buttons and paginates a message with replies', async (t) => {
@@ -838,15 +871,24 @@ test('sends a single page without buttons and paginates a message with replies',
 });
 
 test('rejects empty page sources and invalid start pages', async (t) => {
-  const { client } = await setup(t);
+  const { client, calls } = await setup(t);
   const seen = [];
   client.command('bad', async (interaction) => {
     await assert.rejects(paginate(interaction, []), RangeError);
     await assert.rejects(paginate(interaction, { count: 0, page: () => 'x' }), RangeError);
     await assert.rejects(paginate(interaction, ['a'], { startPage: 3 }), RangeError);
+    await assert.rejects(paginate(interaction, ['a', 'b'], { timeoutMs: 0 }), RangeError);
+    await assert.rejects(paginate(interaction, ['a', 'b'], { onlyInvoker: 'yes' }), TypeError);
+    await assert.rejects(paginate(interaction, ['a'], { labels: { previous: '' } }), TypeError);
+    await assert.rejects(paginate(interaction, { count: 2, page: 2 }), TypeError);
+    const controller = new AbortController();
+    controller.abort();
+    const result = await paginate(interaction, ['a', 'b'], { signal: controller.signal });
+    assert.deepEqual(result, { reason: 'aborted', page: 0 });
     seen.push('checked');
   });
   await dispatch(client, 'INTERACTION_CREATE', { ...base, type: 2, data: commandData('bad') });
   await until(() => seen.length);
   assert.deepEqual(seen, ['checked']);
+  assert.equal(calls.length, 0);
 });

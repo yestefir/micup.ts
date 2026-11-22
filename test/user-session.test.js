@@ -27,6 +27,7 @@ test('connects with a user session and edits only supported profile fields', asy
   assert.deepEqual(JSON.parse(calls[2].init.body), { username: 'updated', bio: null });
   assert.throws(() => session.editCurrentUser({ email: 'private@example.com' }), /Unsupported Micup profile field/);
   assert.throws(() => session.editCurrentUser({}), /at least one field/);
+  assert.throws(() => session.editCurrentUser({ mention_flags: null }), /mention_flags must be a nonnegative safe integer/);
   assert.equal(calls.length, 3);
 });
 

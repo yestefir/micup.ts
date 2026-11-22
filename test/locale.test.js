@@ -140,6 +140,13 @@ test('commands validate translations with the place in the message and drop empt
   assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', id: '1' }), /definitions do not support the id field/);
   assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', name_localized: 'stale response field' }), /definitions do not support the name_localized field/);
   assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', options: {} }), /options must be an array/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', options: [null] }), /Invalid Micup command option/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', name_localizations: 42 }), /name of command "play" localizations must be an object/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', description_localizations: null }), /description of command "play" localizations must be an object/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', name_localizations: ['play'] }), /name of command "play" localizations must be an object/);
+  assert.throws(() => bot.commands.edit('1', { name_localizations: null }), /name of command "micup" localizations must be an object/);
+  assert.throws(() => bot.commands.create({ name: 123, description: 'Play' }), /Invalid Micup command name or description/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', options: [{ type: 3, name: 123, description: 'Query' }] }), /Invalid or duplicate Micup command option/);
   assert.throws(() => bot.commands.edit('1', { default_member_permissions: '-1' }), /unsigned 64-bit/);
   assert.throws(() => bot.commands.edit('1', { name_localized: 'stale response field' }), /do not support the name_localized field/);
   assert.throws(() => bot.commands.edit('1', { dm_permission: 'yes' }), /must be a boolean/);

@@ -15,6 +15,8 @@ function validateDefaultMemberPermissions(value: unknown): void {
 }
 
 function validateLocalizations(values: Readonly<Record<string, string>> | undefined, validate: (text: string) => boolean, what: string): void {
+  if (values === undefined) return;
+  if (!values || typeof values !== 'object' || Array.isArray(values)) throw new TypeError(what + ' localizations must be an object');
   for (const [locale, text] of Object.entries(values ?? {})) {
     if (!isLocaleTag(locale)) throw new TypeError('"' + locale + '" in ' + what + ' is not a language tag such as tr or en-US');
     if (typeof text !== 'string' || !validate(text)) throw new TypeError('Invalid translation "' + String(text) + '" in ' + what + ' for the locale ' + locale);
@@ -45,7 +47,7 @@ function validateOptions(options: readonly CommandOption[], depth: number, group
   if (options.length > 25) throw new RangeError('A command can contain at most 25 options per level');
   const names = new Set<string>();
   let optional = false;
-  const nested = options.some((option) => option.type === 1 || option.type === 2);
+  const nested = options.some((option) => option && typeof option === 'object' && (option.type === 1 || option.type === 2));
   for (const option of options) {
     if (!option || typeof option !== 'object' || Array.isArray(option)) throw new TypeError('Invalid Micup command option');
     const fields = new Set([
@@ -56,7 +58,7 @@ function validateOptions(options: readonly CommandOption[], depth: number, group
       if (!fields.has(field)) throw new TypeError(`Command options do not support the ${field} field`);
     }
     const structural = option.type === 1 || option.type === 2;
-    if (!chatName.test(option.name) || names.has(option.name) || !lengthWithin(option.description, 100)) {
+    if (typeof option.name !== 'string' || !chatName.test(option.name) || names.has(option.name) || !lengthWithin(option.description, 100)) {
       throw new TypeError('Invalid or duplicate Micup command option: ' + option.name);
     }
     names.add(option.name);
@@ -160,7 +162,9 @@ function commandBody(command: CommandDefinition): CommandDefinition {
   if (dm_permission !== undefined && typeof dm_permission !== 'boolean') throw new TypeError('Command dm_permission must be a boolean');
   if (options !== undefined && !Array.isArray(options)) throw new TypeError('Command options must be an array');
   if (type === CommandType.ChatInput) {
-    if (!chatName.test(name) || !lengthWithin(description, 100)) throw new TypeError('Invalid Micup command name or description');
+    if (typeof name !== 'string' || !chatName.test(name) || !lengthWithin(description, 100)) {
+      throw new TypeError('Invalid Micup command name or description');
+    }
     validateLocalizations(name_localizations, (text) => chatName.test(text), 'the name of command "' + name + '"');
     validateLocalizations(description_localizations, (text) => lengthWithin(text, 100), 'the description of command "' + name + '"');
     validateOptions(options ?? [], 0);
