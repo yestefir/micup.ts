@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bytesPerFrame, PlaybackSkippedError, Player, scaleVolume } from '@micupts/voice';
+import { bytesPerFrame, PlaybackSkippedError, Player, scaleVolume } from '@micup.ts/voice';
 
 function pcm(samples) {
   const bytes = Buffer.alloc(samples.length * 2);

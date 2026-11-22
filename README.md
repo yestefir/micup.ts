@@ -66,7 +66,7 @@ await client.newSession({ handler: events.handle }).run({ signal: stop.signal })
 | Discovery | Read, apply for, edit and withdraw a server discovery listing | `client.discovery` |
 | Events | A typed catalog of Gateway events, an event mux and handler wrappers | `EventMux`, `knownGatewayEvents`, `safeHandler()` |
 | Helpers | Constant groups, button and select builders, command option readers, permission helpers, mentions, timestamps, snowflakes, localized message catalogs | `ChannelType`, `primaryButton()`, `optionString()`, `permissionNames()` |
-| Voice playback | LiveKit audio with FFmpeg decoding, PCM player and a connection object with events | [`@micupts/voice`](packages/voice) |
+| Voice playback | LiveKit audio with FFmpeg decoding, PCM player and a connection object with events | [`@micup.ts/voice`](packages/voice) |
 
 Everything takes an optional `AbortSignal`. HTTP failures throw `MicupAPIError` with `status`, `code`, field errors, `retryAfter` and helpers such as `notFound`, `rateLimited` and `hasFieldCode()`. `MicupErrorCode` names the error codes.
 
@@ -114,7 +114,7 @@ const client = await MicupClient.connect({
 
 ## Voice
 
-[`@micupts/voice`](packages/voice) publishes audio to a voice channel through LiveKit. `VoiceConnection` joins the channel, plays files, URLs, streams or raw PCM, and emits `start`, `finish`, `status`, `memberJoin`, `memberLeave`, `disconnect` and `error`. Install it with `npm install @micupts/voice` and install FFmpeg to decode files and streams.
+[`@micup.ts/voice`](packages/voice) publishes audio to a voice channel through LiveKit. `VoiceConnection` joins the channel, plays files, URLs, streams or raw PCM, and emits `start`, `finish`, `status`, `memberJoin`, `memberLeave`, `disconnect` and `error`. Install it with `npm install @micup.ts/voice` and install FFmpeg to decode files and streams.
 
 ## Documentation
 

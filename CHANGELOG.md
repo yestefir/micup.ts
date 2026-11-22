@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1 - 2026-11-22
+
+- The voice package moved to the `@micup.ts` scope: install `@micup.ts/voice` instead of `@micupts/voice`. The code is the same as `@micupts/voice` 1.1.0, and the README and guides point to the new name.
+
 ## 1.1.0 - 2026-11-22
 
 ### New resources

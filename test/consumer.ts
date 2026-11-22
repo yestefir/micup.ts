@@ -1,5 +1,5 @@
 import { GatewaySession, MicupClient, knownGatewayEvents, type GatewaySubscription, type MessageForward } from 'micup.ts';
-import { Player, VoiceRoom, type VoiceTrack } from '@micupts/voice';
+import { Player, VoiceRoom, type VoiceTrack } from '@micup.ts/voice';
 
 export const exportsForTypeCheck = { GatewaySession, MicupClient, Player, VoiceRoom, knownGatewayEvents };
 export const subscription: GatewaySubscription = { active: true };

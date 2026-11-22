@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
 import { test } from 'node:test';
-import { bytesPerFrame, openSource, VoiceConnection } from '@micupts/voice';
+import { bytesPerFrame, openSource, VoiceConnection } from '@micup.ts/voice';
 
 class FakeRoom extends EventEmitter {
   connected = true;
@@ -175,7 +175,7 @@ test('opens FFmpeg sources from streams and validates the extra arguments', asyn
 });
 
 test('the typed emitter supports once, off and listener counts without Node types', async () => {
-  const { TypedEmitter } = await import('@micupts/voice');
+  const { TypedEmitter } = await import('@micup.ts/voice');
   const emitter = new TypedEmitter();
   const seen = [];
   const listener = (value) => seen.push('on:' + value);

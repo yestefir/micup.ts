@@ -1,9 +1,9 @@
 # Voice
 
-Micup carries voice over LiveKit. micup.ts joins a voice channel through the Gateway and gives you a short-lived grant; the optional [`@micupts/voice`](../packages/voice) package connects to LiveKit with that grant and publishes audio.
+Micup carries voice over LiveKit. micup.ts joins a voice channel through the Gateway and gives you a short-lived grant; the optional [`@micup.ts/voice`](../packages/voice) package connects to LiveKit with that grant and publishes audio.
 
 ```sh
-npm install @micupts/voice
+npm install @micup.ts/voice
 ```
 
 Install FFmpeg to decode files, URLs and streams. You can skip it if you only play raw PCM. The package supports unencrypted rooms; a grant with `e2ee_key` or `p2p` is refused.
@@ -13,7 +13,7 @@ Install FFmpeg to decode files, URLs and streams. You can skip it if you only pl
 `VoiceConnection` joins, connects, owns a player and leaves when it closes.
 
 ```js
-import { VoiceConnection } from '@micupts/voice';
+import { VoiceConnection } from '@micup.ts/voice';
 
 const session = client.newSession({
   handler: events.handle,

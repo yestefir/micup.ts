@@ -13,7 +13,7 @@ micup.ts is lower level than discord.js-style libraries: you create the client, 
 | Raw call | `client.rest('GET', '/users/@me')` | `client.request('GET', '/users/@me')` |
 | Buttons and menus | emulated with reactions (micup.js) | real components: `actionRow(primaryButton(...))`, `selectRow(stringSelect(...))` |
 | Slash commands | not available (micup.js) or `client.rest.createGlobalApplicationCommand` | `client.commands.create/set` and an `InteractionRouter` |
-| Voice | `connection.play(url)` | `VoiceConnection.connect(session, guildId, channelId)` then `connection.play(url)` from `@micupts/voice` |
+| Voice | `connection.play(url)` | `VoiceConnection.connect(session, guildId, channelId)` then `connection.play(url)` from `@micup.ts/voice` |
 | Presence | `client.setPresence(...)` | `session.setStatus()` and `session.setCustomStatus()` |
 | Shards | not available | `client.newShardManager()` |
 
@@ -39,6 +39,6 @@ The concepts match; the names are closer to the wire format.
 | `EmbedBuilder` | `EmbedBuilder` with `.title()`, `.description()`, `.field()`, `.build()` |
 | `PermissionsBitField` | `Permission` (bigint masks), `permissionNames()`, `hasPermissions()` |
 | `ShardingManager` | `client.newShardManager()` |
-| `@discordjs/voice` | `@micupts/voice` (LiveKit) |
+| `@discordjs/voice` | `@micup.ts/voice` (LiveKit) |
 
 Micup does not have polls, auto moderation rules, scheduled events, stage channels or bulk bans.

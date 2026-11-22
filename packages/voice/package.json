@@ -1,5 +1,5 @@
 {
-  "name": "@micupts/voice",
+  "name": "@micup.ts/voice",
   "version": "1.1.0",
   "description": "Voice for Micup bots: LiveKit audio, FFmpeg decoding, a PCM player and a connection object with events",
   "type": "module",

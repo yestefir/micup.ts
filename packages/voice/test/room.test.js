@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { VoiceRoom, openSource } from '@micupts/voice';
+import { VoiceRoom, openSource } from '@micup.ts/voice';
 
 test('rejects unsupported LiveKit grants and nonlocal cleartext endpoints', async () => {
   await assert.rejects(

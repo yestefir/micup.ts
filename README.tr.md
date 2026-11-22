@@ -66,7 +66,7 @@ await client.newSession({ handler: events.handle }).run({ signal: stop.signal })
 | Keşif | Sunucu keşif kaydını okuma, başvuru, düzenleme ve geri çekme | `client.discovery` |
 | Olaylar | Tipli Gateway olay kataloğu, olay çoklayıcı ve işleyici sarmalayıcıları | `EventMux`, `knownGatewayEvents`, `safeHandler()` |
 | Yardımcılar | Sabit grupları, buton ve seçim menüsü oluşturucular, komut seçeneği okuyucuları, izin yardımcıları, etiketleme, zaman damgası, snowflake, yerelleştirilmiş mesaj kataloğu | `ChannelType`, `primaryButton()`, `optionString()`, `permissionNames()` |
-| Ses çalma | FFmpeg çözmeli LiveKit sesi, PCM oynatıcı ve olay yayan bağlantı nesnesi | [`@micupts/voice`](packages/voice) |
+| Ses çalma | FFmpeg çözmeli LiveKit sesi, PCM oynatıcı ve olay yayan bağlantı nesnesi | [`@micup.ts/voice`](packages/voice) |
 
 Her çağrı isteğe bağlı `AbortSignal` alır. HTTP hataları `status`, `code`, alan hataları, `retryAfter` ve `notFound`, `rateLimited`, `hasFieldCode()` gibi yardımcılarla `MicupAPIError` olarak gelir. Hata kodlarının adları `MicupErrorCode` içindedir.
 
@@ -114,7 +114,7 @@ const client = await MicupClient.connect({
 
 ## Ses
 
-[`@micupts/voice`](packages/voice) sesi LiveKit üzerinden ses kanalına yayınlar. `VoiceConnection` kanala girer; dosya, URL, akış veya ham PCM çalar ve `start`, `finish`, `status`, `memberJoin`, `memberLeave`, `disconnect`, `error` olaylarını yayar. `npm install @micupts/voice` ile kurun; dosya ve akışları çözmek için FFmpeg kurun.
+[`@micup.ts/voice`](packages/voice) sesi LiveKit üzerinden ses kanalına yayınlar. `VoiceConnection` kanala girer; dosya, URL, akış veya ham PCM çalar ve `start`, `finish`, `status`, `memberJoin`, `memberLeave`, `disconnect`, `error` olaylarını yayar. `npm install @micup.ts/voice` ile kurun; dosya ve akışları çözmek için FFmpeg kurun.
 
 ## Dokümantasyon
 

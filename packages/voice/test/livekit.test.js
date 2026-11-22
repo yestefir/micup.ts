@@ -5,7 +5,7 @@ import { mkdtemp, unlink, rmdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { bytesPerFrame, channels, Player, sampleRate, VoiceRoom, openSource } from '@micupts/voice';
+import { bytesPerFrame, channels, Player, sampleRate, VoiceRoom, openSource } from '@micup.ts/voice';
 
 const endpoint = process.env.MICUP_TEST_LIVEKIT_ENDPOINT;
 
