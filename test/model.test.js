@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  ButtonStyle, ComponentType, EmbedBuilder, MessageCatalog, MicupMedia,
+  ButtonStyle, ComponentType, EmbedBuilder, inviteURL, MessageCatalog, MicupMedia,
   TimestampStyle, actionRow, disableComponents, formatTimestamp, knownGatewayEvents, mentionChannel,
   modalRows, selectRow, snowflakeAt, snowflakeTime,
 } from 'micup.ts';
@@ -39,4 +39,15 @@ test('builds and validates components, embeds, and media URLs without mutating i
   const media = new MicupMedia('https://media.example/');
   assert.equal(media.userAvatar({ id: '20', username: 'fixture', avatar: 'a_hash' }, { format: 'png', size: 64 }),
     'https://media.example/avatars/20/a_hash.png?animated=false&size=64');
+});
+
+test('keeps media bases and invite links on safe public URL paths', () => {
+  for (const base of ['javascript:alert(1)', 'data:text/plain,unsafe', 'https://user:pass@media.example', 'https://media.example?token=secret', 'https://media.example/#fragment']) {
+    assert.equal(new MicupMedia(base).userAvatar({ id: '20', username: 'fixture', avatar: 'hash' }), '');
+    assert.throws(() => inviteURL(base, 'valid-code'), /base URL and code/);
+  }
+
+  assert.equal(inviteURL('https://media.example/root/', 'a/b ?'), 'https://media.example/root/a%2Fb%20%3F');
+  assert.equal(new MicupMedia('https://media.example/root/').stickerImage('sticker/a b'),
+    'https://media.example/root/stickers/sticker%2Fa%20b.webp');
 });

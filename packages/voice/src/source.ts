@@ -10,8 +10,8 @@ export interface AudioSourceOptions {
 }
 
 export interface AudioInputStream {
-  pipe(destination: any): unknown;
-  unpipe(destination?: any): unknown;
+  pipe(destination: object): unknown;
+  unpipe(destination?: object): unknown;
   destroy(error?: Error): unknown;
   on(event: 'error', listener: (error: Error) => void): unknown;
   removeListener(event: 'error', listener: (error: Error) => void): unknown;

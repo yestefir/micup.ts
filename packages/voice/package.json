@@ -39,7 +39,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test \"test/*.test.js\"",
+    "test": "npm run build && node --test \"test/*.test.js\" && tsc -p test/tsconfig.json",
     "prepack": "npm run build"
   },
   "publishConfig": {

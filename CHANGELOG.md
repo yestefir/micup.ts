@@ -24,6 +24,7 @@
 - Discovery rejects malformed endpoint documents and URLs before sending the bot token to the API.
 - Aborted application metadata lookups do not cancel requests from other callers.
 - Client login rejects bot identity responses without a numeric bot ID.
+- Easy Client ignores malformed Gateway readiness fields instead of tracking invalid guilds or replacing its bot identity.
 - Member inventory lookup failures are reported through the Gateway logger before retrying.
 - Background tasks honor a parent signal that was already aborted before the task starts.
 - `safeHandler()` contains failures from synchronous and asynchronous error reporters.
@@ -32,6 +33,7 @@
 - Gateway voice grants, FFmpeg executables, readable audio inputs and player PCM sources are validated before use. Abort listener setup is consistent across REST, Gateway and interaction waits.
 - Voice players close PCM sources when cancellation or iterator creation prevents playback from starting.
 - Voice players reject PCM sources that yield non-byte chunks instead of silently skipping them.
+- Voice `AudioInputStream` describes pipe destinations structurally without exposing `any` or requiring Node.js types in consumer declarations.
 - Voice event emitters contain synchronous listener throws and asynchronous listener rejections, forwarding failures to registered `error` listeners.
 
 ### Compatibility

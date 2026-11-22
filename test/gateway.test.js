@@ -2,9 +2,47 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { test } from 'node:test';
 import { WebSocketServer } from 'ws';
-import { EventMux, GatewayCloseError, GatewayOpcode as op, GatewaySession, safeHandler, ShardManager, shardForGuild } from 'micup.ts';
+import { EventMux, GatewayCloseError, GatewayOpcode as op, GatewaySession, onGuildTagChange, safeHandler, ShardManager, shardForGuild } from 'micup.ts';
 import { MemberInventory } from '../dist/session/inventory.js';
 import { SessionRequests } from '../dist/session/requests.js';
+
+test('guild tag changes are detected from member, user, and chunk events', async () => {
+  const events = new EventMux();
+  const changes = [];
+  const signals = [];
+  const unregister = onGuildTagChange(events, (change, signal) => {
+    changes.push(change);
+    signals.push(signal);
+  });
+  const controller = new AbortController();
+  const dispatch = (name, data) => events.handle({ name, data, sequence: changes.length, shardId: 0 }, controller.signal);
+
+  await dispatch('GUILD_MEMBERS_CHUNK', {
+    guild_id: 'guild-1',
+    members: [{ user: { id: 'user-1', tag_guild_id: 'tag-1' } }],
+  });
+  await dispatch('GUILD_MEMBER_UPDATE', {
+    guild_id: 'guild-1',
+    user: { id: 'user-1', tag_guild_id: 'tag-1' },
+  });
+  await dispatch('GUILD_MEMBER_UPDATE', {
+    guild_id: 'guild-1',
+    user: { id: 'user-1', tag_guild_id: 'tag-2' },
+  });
+  await dispatch('USER_UPDATE', { id: 'user-1', tag_guild_id: null });
+  await dispatch('USER_UPDATE', { id: 'user-1' });
+
+  assert.deepEqual(changes, [
+    { userId: 'user-1', guildId: 'guild-1', previous: 'tag-1', current: 'tag-2', cleared: false },
+    { userId: 'user-1', guildId: undefined, previous: 'tag-2', current: undefined, cleared: true },
+  ]);
+  assert.equal(signals[0], controller.signal);
+  assert.equal(signals[1], controller.signal);
+
+  unregister();
+  await dispatch('USER_UPDATE', { id: 'user-1', tag_guild_id: 'tag-3' });
+  assert.equal(changes.length, 2);
+});
 
 test('a cancelled slot waiter passes an available slot to the next waiter', async () => {
   const sent = [];
@@ -218,18 +256,31 @@ test('routes snowflakes and shuts down all local shards on a fatal close', { tim
 });
 
 test('rejects shard IDs outside the configured shard range', () => {
-  const create = (shardIds) => new ShardManager({ endpoint: 'ws://localhost', token: 'fixture' }, {
+  const create = (options = {}) => new ShardManager({ endpoint: 'ws://localhost', token: 'fixture' }, {
     shardCount: 3,
-    shardIds,
     session: { handler: () => {} },
+    ...options,
   });
 
-  assert.throws(() => create([-1]), /within the shard count/);
-  assert.throws(() => create([3]), /within the shard count/);
-  assert.throws(() => create([1.5]), /within the shard count/);
-  assert.throws(() => create([Number.MAX_SAFE_INTEGER + 1]), /within the shard count/);
-  assert.throws(() => create([]), /At least one shard ID/);
-  assert.deepEqual(create([2, 0]).shards.map((shard) => shard.shardId), [0, 2]);
+  assert.throws(() => create({ shardIds: [-1] }), /within the shard count/);
+  assert.throws(() => create({ shardIds: [3] }), /within the shard count/);
+  assert.throws(() => create({ shardIds: [1.5] }), /within the shard count/);
+  assert.throws(() => create({ shardIds: [Number.MAX_SAFE_INTEGER + 1] }), /within the shard count/);
+  assert.throws(() => create({ shardIds: [] }), /At least one shard ID/);
+  assert.throws(() => create({ shardIds: [1, 1] }), /must be unique/);
+  assert.throws(() => create({ shardCount: 0 }), /Shard count must be positive/);
+  assert.throws(() => create({ shardCount: 1.5 }), /Shard count must be positive/);
+  assert.throws(() => create({ identifyIntervalMs: 0 }), /Invalid shard IDENTIFY interval/);
+  assert.throws(() => create({ identifyIntervalMs: 2_147_483_648 }), /Invalid shard IDENTIFY interval/);
+  assert.deepEqual(create({ shardIds: [2, 0] }).shards.map((shard) => shard.shardId), [0, 2]);
+});
+
+test('validates guild snowflakes before calculating a shard', () => {
+  assert.throws(() => shardForGuild('not-a-snowflake', 3), /numeric snowflake/);
+  assert.throws(() => shardForGuild('-1', 3), /numeric snowflake/);
+  assert.throws(() => shardForGuild('18446744073709551616', 3), /exceeds the snowflake range/);
+  assert.throws(() => shardForGuild('1', 0), /Shard count must be positive/);
+  assert.throws(() => shardForGuild('1', 1.5), /Shard count must be positive/);
 });
 
 test('completes a voice join while a Gateway event handler waits for the grant', { timeout: 5000 }, async (t) => {

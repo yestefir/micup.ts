@@ -41,6 +41,13 @@ test('login needs a token and exposes the bot user without a Gateway', async (t)
   await assert.rejects(client.login(), /already/);
 });
 
+test('ignores malformed readiness fields without replacing the bot identity', async (t) => {
+  const { client } = await setup(t, undefined, { sequential: true });
+  await dispatch(client, 'READY', { guilds: {}, user: 'invalid' });
+  await dispatch(client, 'GUILD_CREATE', null);
+  assert.equal(client.user.id, '77');
+});
+
 test('wraps messages and replies, reacts, edits and deletes through the REST client', async (t) => {
   const { client, calls } = await setup(t, (url, init) => Response.json(init.method === 'GET' ? {} : { id: '901', channel_id: '20', content: 'sent', author: { id: '77', username: 'robot', bot: true } }));
   const seen = [];
@@ -467,11 +474,33 @@ test('wraps users, members and channels with working helpers', async (t) => {
   const channel = await user.createDM();
   assert.equal(channel.isDM(), true);
 
-  const { Member, Channel } = await import('micup.ts/easy');
+  const { Member, Channel, User } = await import('micup.ts/easy');
+  const wrappedUser = new User(client, { ...author, global_name: null, discriminator: '1234', system: true });
+  assert.equal(wrappedUser.username, 'ada');
+  assert.equal(wrappedUser.globalName, null);
+  assert.equal(wrappedUser.displayName, 'ada');
+  assert.equal(wrappedUser.tag, 'ada#1234');
+  assert.equal(wrappedUser.bot, false);
+  assert.equal(wrappedUser.system, true);
+  assert.equal(wrappedUser.mention, '<@5>');
+  assert.equal(wrappedUser.equals('5'), true);
+  assert.equal(wrappedUser.equals({ id: '6' }), false);
+  assert.equal(wrappedUser.toString(), '<@5>');
+  assert.equal(wrappedUser.avatarURL(), '');
+  assert.equal(wrappedUser.bannerURL(), '');
   const member = new Member(client, { roles: ['9'], user: author, communication_disabled_until: '2999-01-01T00:00:00Z', joined_at: '2026-01-01T00:00:00Z' }, '10');
   assert.equal(member.isTimedOut(), true);
   assert.equal(member.hasRole('9'), true);
   assert.equal(member.hasPermission(Permission.SendMessages), false);
+  assert.equal(member.id, '5');
+  assert.equal(member.nick, null);
+  assert.deepEqual(member.roles, ['9']);
+  assert.equal(member.displayName, 'Ada');
+  assert.equal(member.joinedAt.toISOString(), '2026-01-01T00:00:00.000Z');
+  assert.equal(member.bot, false);
+  assert.equal(member.guild, undefined);
+  assert.equal(member.avatarURL(), '');
+  assert.equal(member.toString(), '<@5>');
   assert.equal((await member.setNickname('New')).nick, 'New');
   await member.addRole('10');
   await member.removeRole('10');
@@ -488,6 +517,21 @@ test('wraps users, members and channels with working helpers', async (t) => {
   assert.equal(text.isText(), true);
   assert.equal(new Channel(client, { id: '21', type: 11 }).isThread(), true);
   assert.equal(new Channel(client, { id: '22', type: 2 }).isVoice(), true);
+  assert.equal(text.name, undefined);
+  assert.equal(text.topic, null);
+  assert.equal(text.guildId, '10');
+  assert.equal(text.parentId, null);
+  assert.equal(text.nsfw, false);
+  assert.equal(text.mention, '<#20>');
+  assert.equal(text.guild, undefined);
+  assert.equal(text.isVoice(), false);
+  assert.equal(text.isDM(), false);
+  assert.equal(text.isCategory(), false);
+  assert.equal(text.isForum(), false);
+  assert.equal(text.toString(), '<#20>');
+  assert.equal(new Channel(client, { id: '23', type: 1 }).isDM(), true);
+  assert.equal(new Channel(client, { id: '24', type: 4 }).isCategory(), true);
+  assert.equal(new Channel(client, { id: '25', type: 15 }).isForum(), true);
   await text.sendTyping();
   await text.bulkDelete([{ id: '1' }, '2']);
   assert.ok(calls.some((call) => call.path === '/channels/20/typing'));

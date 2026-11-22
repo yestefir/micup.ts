@@ -3,7 +3,7 @@ import { MicupClient } from '../bot/client.js';
 import type { MicupEvents } from '../events/mux.js';
 import type { MessageCatalog } from '../model/locale.js';
 import { localizeCommand } from '../model/localize.js';
-import type { MicupGuild, MicupVoiceState } from '../model/guild.js';
+import type { MicupVoiceState } from '../model/guild.js';
 import type { MicupMessage, MicupUser } from '../model/entities.js';
 import type { CommandDefinition, MicupCommand, MicupInteraction } from '../model/interaction.js';
 import type { Presence, PresenceStatus, CustomStatus } from '../model/presence.js';
@@ -37,6 +37,12 @@ export interface MemberRemoveEvent {
 export interface GuildDeleteEvent {
   id: string;
   unavailable: boolean;
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
 }
 
 export class MessageUpdate {
@@ -651,18 +657,25 @@ export class Client {
     }
   }
 
-  #track(event: GatewayDispatch, data: any): void {
+  #track(event: GatewayDispatch, data: unknown): void {
     if (event.name === 'READY') {
       this.#readyShards.add(event.shardId);
-      for (const guild of (data?.guilds ?? []) as MicupGuild[]) if (guild?.id && guild.unavailable !== false) this.#pendingGuilds.add(guild.id);
-      if (data?.user) this.user = new User(this, data.user as MicupUser);
+      const payload = record(data);
+      if (Array.isArray(payload?.guilds)) {
+        for (const item of payload.guilds) {
+          const guild = record(item);
+          if (typeof guild?.id === 'string' && guild.id && guild.unavailable !== false) this.#pendingGuilds.add(guild.id);
+        }
+      }
+      const user = record(payload?.user);
+      if (user) this.user = new User(this, user as unknown as MicupUser);
       void this.#emit('shardReady', [event.shardId]);
       this.#gate?.check();
     } else if (event.name === 'RESUMED') {
       void this.#emit('shardResume', [event.shardId]);
     } else if (event.name === 'GUILD_CREATE' || event.name === 'GUILD_DELETE') {
-      const id = (data as { id?: string } | null)?.id;
-      if (id) this.#pendingGuilds.delete(id);
+      const id = record(data)?.id;
+      if (typeof id === 'string' && id) this.#pendingGuilds.delete(id);
       this.#gate?.check();
     }
   }

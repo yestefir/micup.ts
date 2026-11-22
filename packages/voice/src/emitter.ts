@@ -1,10 +1,10 @@
-type Listener = (...args: any[]) => unknown;
+type Listener = (...args: unknown[]) => unknown;
 
 export class TypedEmitter<Events extends { [K in keyof Events]: unknown[] }> {
-  readonly #listeners = new Map<keyof Events, Map<Listener, Listener>>();
+  readonly #listeners = new Map<keyof Events, Map<unknown, Listener>>();
 
   on<K extends keyof Events>(event: K, listener: (...args: Events[K]) => unknown): this {
-    return this.#add(event, listener, listener);
+    return this.#add(event, listener, (...args) => listener(...args as Events[K]));
   }
 
   once<K extends keyof Events>(event: K, listener: (...args: Events[K]) => unknown): this {
@@ -12,12 +12,12 @@ export class TypedEmitter<Events extends { [K in keyof Events]: unknown[] }> {
       this.off(event, listener);
       return listener(...args);
     };
-    return this.#add(event, listener, wrapper);
+    return this.#add(event, listener, (...args) => wrapper(...args as Events[K]));
   }
 
   off<K extends keyof Events>(event: K, listener: (...args: Events[K]) => unknown): this {
     const entries = this.#listeners.get(event);
-    entries?.delete(listener as Listener);
+    entries?.delete(listener);
     if (entries && !entries.size) this.#listeners.delete(event);
     return this;
   }
@@ -27,7 +27,7 @@ export class TypedEmitter<Events extends { [K in keyof Events]: unknown[] }> {
     if (!entries?.size) return false;
     for (const wrapper of [...entries.values()]) {
       try {
-        const result = (wrapper as (...values: Events[K]) => unknown)(...args);
+        const result = wrapper(...args);
         if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
           void Promise.resolve(result).catch((error) => this.#reportListenerError(error, event));
         }
@@ -48,13 +48,13 @@ export class TypedEmitter<Events extends { [K in keyof Events]: unknown[] }> {
     return this;
   }
 
-  #add<K extends keyof Events>(event: K, key: (...args: Events[K]) => unknown, wrapper: (...args: Events[K]) => unknown): this {
+  #add<K extends keyof Events>(event: K, key: unknown, wrapper: Listener): this {
     let entries = this.#listeners.get(event);
     if (!entries) {
       entries = new Map();
       this.#listeners.set(event, entries);
     }
-    entries.set(key as Listener, wrapper as Listener);
+    entries.set(key, wrapper);
     return this;
   }
 
