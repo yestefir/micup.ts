@@ -46,6 +46,7 @@ events.on('GUILD_MEMBER_ADD', safeHandler((event, signal) => { /* ... */ }, { ti
 ```
 
 `knownGatewayEvents` lists every typed event: messages, reactions, guilds, members, roles, channels, threads, invites, webhooks, bans, audit log entries, presence, typing, voice states, calls, soundboard changes and playback, and more. Unknown names can be registered and carry an `unknown` payload. Use `onGuildTagChange()` to follow guild tag changes.
+`GUILD_UPDATE` carries both `id` and `guild_id`; the easy client wraps it as a `Guild`.
 
 Do slow work such as searches outside the handler so the next event is not delayed:
 

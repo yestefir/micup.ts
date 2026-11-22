@@ -52,6 +52,11 @@ export async function easyUsage(): Promise<void> {
   client.component('vote:*', (interaction) => interaction.update({ content: interaction.customId, components: [] }));
   client.modal(/^form/, (interaction) => void interaction.fields.getTextInputValue('a', true).length);
   client.autocomplete('tool echo', (interaction) => interaction.respond(['a', { name: 'B', value: 'b' }]));
+client.on('GUILD_UPDATE', (guild) => {
+  const id: string = guild.id;
+  const guildId: string = guild.guild_id;
+  void [id, guildId];
+});
   client.command('pages', (interaction) => easyPaginate(interaction, ['a', { content: 'b', embeds: [] }], { jumpButtons: true, timeoutMs: 1000 }).then((outcome) => void outcome.reason));
   client.command('lazy', (interaction) => easyPaginate(interaction, { count: 3, page: async (index: number) => 'page ' + index }));
   const catalog = new EasyCatalog('en-US', { 'en-US': { 'tool.name': 'tool', hi: 'Hi %s' }, tr: { 'tool.name': 'arac', hi: 'Selam %s' } });

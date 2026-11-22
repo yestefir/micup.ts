@@ -16,6 +16,19 @@
 | `newSession()`, `newShardManager()`, `recommendedShards()` | Gateway entry points |
 | `botInviteURL()`, `getCurrentUser()`, `application()`, `applicationId()`, `request()` | invite link, identity, raw request |
 
+## User sessions
+
+`MicupUserSession` is separate from `MicupClient` and accepts a user session token. It exposes the authenticated user as `self` and supports profile updates through `editCurrentUser`.
+
+```js
+import { MicupUserSession } from 'micup.ts';
+
+const session = await MicupUserSession.connect({ token: process.env.MICUP_USER_TOKEN });
+await session.editCurrentUser({ bio: 'Hello from Micup' });
+```
+
+Profile edits accept `username`, `global_name`, `avatar`, `banner`, `bio`, `pronouns`, `accent_color` and `mention_flags`. Fields outside this set are rejected before a request is sent.
+
 ## `client.guilds`
 
 | Group | Methods |
@@ -27,6 +40,7 @@
 
 `guilds.createRole` requires a nonempty name. Role colors and permission masks are checked locally, and permission masks are sent as decimal strings.
 Member updates validate role lists, nicknames, voice fields, timeout dates and profile values before sending requests.
+Member searches accept the documented sort fields and join sources, enforce timestamp ranges, and reject unsupported body fields.
 Guild updates accept only documented editable settings and validate field ranges, identifiers, feature lists and timestamps before sending requests.
 Sticker updates require the current description and tags because the API clears either field when omitted.
 
@@ -46,7 +60,7 @@ Sticker updates require the current description and tags because the API clears 
 
 | Object | Methods |
 | --- | --- |
-| `client.users` | `get`, `profile`, `createDM`, `application`, `publicApplication`, `editCurrentUser` (username, avatar, banner), `guilds`, `iterateGuilds`, `leaveGuild` |
+| `client.users` | `get`, `profile`, `createDM`, `application`, `publicApplication`, `editCurrentUser` (rejects for bot tokens), `guilds`, `iterateGuilds`, `leaveGuild` |
 | `client.webhooks` | `channel`, `guild`, `create`, `get`, `edit`, `delete`, `execute`, `message`, `editMessage`, `deleteMessage` |
 | `client.expressions` | `listEmojis`, `listStickers`, `emoji`, `sticker`, `createEmoji`, `createSticker`, `createEmojis`, `createStickers`, `cloneEmoji`, `cloneSticker`, `renameEmoji`, `editSticker`, `delete`, `metadata`, `source` |
 | `client.attachments` | `upload` (direct multipart upload for large files), `refresh` (refresh expiring URLs) |
@@ -57,7 +71,7 @@ Sticker updates require the current description and tags because the API clears 
 | `client.discovery` | `status`, `apply`, `edit`, `withdraw` |
 | `client.media` | builds CDN URLs for avatars, banners, icons, emoji and stickers |
 
-`users.editCurrentUser` validates the bot username and accepts image data as a nonempty string or `null` to clear it.
+`MicupUserSession` provides user-token profile editing through `editCurrentUser`. `client.users.editCurrentUser` remains as a compatibility shim and rejects without making a request because bot tokens are not accepted by user-session routes.
 Command edits validate the supplied partial definition and reject response-only command fields before sending requests.
 
 ## Patterns

@@ -175,6 +175,8 @@ test('delivers raw Gateway events by name and friendly events with wrappers', as
   const { client } = await setup(t);
   const seen = [];
   client.on('GUILD_BAN_ADD', (data, event) => seen.push(['raw', data.guild_id, event.name]));
+  client.on('GUILD_UPDATE', (data) => seen.push(['guild-raw', data.id, data.guild_id]));
+  client.on('guildUpdate', (guild) => seen.push(['guild-update', guild.id, guild.name]));
   client.on('guildBanAdd', ({ guildId, user }) => seen.push(['ban', guildId, user.tag]));
   client.on('guildMemberAdd', (member) => seen.push(['join', member.guildId, member.user.username, member.id]));
   client.on('guildMemberRemove', ({ guildId, user }) => seen.push(['leave', guildId, user.id]));
@@ -184,6 +186,7 @@ test('delivers raw Gateway events by name and friendly events with wrappers', as
   client.on('channelCreate', (channel) => seen.push(['channel', channel.id, channel.isText(), channel.mention]));
   client.on('raw', (event) => seen.push(['all', event.name]));
   await dispatch(client, 'GUILD_BAN_ADD', { guild_id: '10', user: author });
+  await dispatch(client, 'GUILD_UPDATE', { id: '10', guild_id: '10', name: 'Updated' });
   await dispatch(client, 'GUILD_MEMBER_ADD', { guild_id: '10', roles: [], user: author });
   await dispatch(client, 'GUILD_MEMBER_REMOVE', { guild_id: '10', user: author });
   await dispatch(client, 'MESSAGE_DELETE', { id: '1', channel_id: '20' });
@@ -192,10 +195,11 @@ test('delivers raw Gateway events by name and friendly events with wrappers', as
   await dispatch(client, 'CHANNEL_CREATE', { id: '21', type: 0, guild_id: '10' });
   await settle();
   assert.deepEqual(seen.filter(([kind]) => kind !== 'all'), [
-    ['raw', '10', 'GUILD_BAN_ADD'], ['ban', '10', 'ada'], ['join', '10', 'ada', '5'], ['leave', '10', '5'], ['delete', '1', '20'],
+    ['raw', '10', 'GUILD_BAN_ADD'], ['ban', '10', 'ada'], ['guild-raw', '10', '10'], ['guild-update', '10', 'Updated'],
+    ['join', '10', 'ada', '5'], ['leave', '10', '5'], ['delete', '1', '20'],
     ['update', '2', 'edited', true], ['reaction', '5', '🔥', '20'], ['channel', '21', true, '<#21>'],
   ]);
-  assert.equal(seen.filter(([kind]) => kind === 'all').length, 7);
+  assert.equal(seen.filter(([kind]) => kind === 'all').length, 8);
 });
 
 test('reports listener and handler errors without crashing or replaying the event', async (t) => {

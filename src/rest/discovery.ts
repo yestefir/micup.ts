@@ -33,12 +33,17 @@ export interface DiscoveryApplicationInput {
 export type DiscoveryApplicationEdit = Partial<DiscoveryApplicationInput>;
 
 const categories = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+const inputFields = new Set(['description', 'category_type', 'primary_language', 'custom_tags']);
 const languages = new Set([
   'ar', 'bg', 'cs', 'da', 'de', 'el', 'en-US', 'es-ES', 'es-419', 'fi', 'fr', 'he', 'hi', 'hr', 'hu', 'id', 'it', 'ja', 'ko', 'lt',
   'nl', 'no', 'pl', 'pt-BR', 'ro', 'ru', 'sv-SE', 'th', 'tr', 'uk', 'vi', 'zh-CN', 'zh-TW',
 ]);
 
-function check({ description, category_type, primary_language, custom_tags }: DiscoveryApplicationEdit): void {
+function check(edit: DiscoveryApplicationEdit): void {
+  if (!edit || typeof edit !== 'object' || Array.isArray(edit)) throw new TypeError('A discovery application must be an object');
+  const fields = Object.keys(edit);
+  for (const field of fields) if (!inputFields.has(field)) throw new TypeError('Unsupported discovery application field: ' + field);
+  const { description, category_type, primary_language, custom_tags } = edit;
   if (description !== undefined && (typeof description !== 'string' || [...description].length < 10 || [...description].length > 300)) {
     throw new RangeError('A discovery description takes 10 to 300 characters');
   }
@@ -60,6 +65,10 @@ function check({ description, category_type, primary_language, custom_tags }: Di
   if (custom_tags !== undefined && custom_tags.length > 10) throw new RangeError('A discovery listing takes up to 10 custom tags');
 }
 
+function applicationPayload(edit: DiscoveryApplicationEdit): DiscoveryApplicationEdit {
+  return Object.fromEntries(Object.entries(edit).filter(([field, value]) => inputFields.has(field) && value !== undefined)) as DiscoveryApplicationEdit;
+}
+
 export class MicupDiscovery {
   constructor(private readonly rest: RestTransport) {}
 
@@ -68,16 +77,17 @@ export class MicupDiscovery {
   }
 
   apply(guildId: string, application: DiscoveryApplicationInput, options?: MicupRequestOptions): Promise<DiscoveryApplication> {
+    check(application);
     if (application.description === undefined || application.category_type === undefined) {
       throw new TypeError('A discovery application needs a description and a category');
     }
-    check(application);
-    return this.rest.request('POST', guildPath(guildId) + '/discovery', { ...options, body: application });
+    return this.rest.request('POST', guildPath(guildId) + '/discovery', { ...options, body: applicationPayload(application) });
   }
 
   edit(guildId: string, edit: DiscoveryApplicationEdit, options?: MicupRequestOptions): Promise<DiscoveryApplication> {
     check(edit);
-    return this.rest.request('PATCH', guildPath(guildId) + '/discovery', { ...options, body: edit });
+    if (Object.keys(edit).length === 0) throw new TypeError('A discovery edit must contain at least one field');
+    return this.rest.request('PATCH', guildPath(guildId) + '/discovery', { ...options, body: applicationPayload(edit) });
   }
 
   withdraw(guildId: string, options?: MicupRequestOptions): Promise<void> {

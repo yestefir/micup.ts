@@ -69,6 +69,7 @@ await client.newSession({ handler: events.handle }).run({ signal: stop.signal })
 | --- | --- | --- |
 | Easy client | `Client` with events, `message.reply()`, `interaction.reply()`, a slash command builder, automatic command registration and routing, buttons, menus, modals, autocomplete, pagination and safe error handling | `micup.ts/easy` |
 | Client | Authenticated REST with rate-limit waits, retries, audit-log reasons, `AbortSignal` support, bot identity (`self`, `application()`, `tokenId`) | `MicupClient` |
+| User session | User-token REST session with validated current-user profile edits | `MicupUserSession` |
 | Gateway | Supervised sessions with resume, heartbeat checks, Zstandard compression, presence, lazy subscriptions, member inventories, guild and channel counts | `client.newSession()` |
 | Sharding | Shard manager that spaces IDENTIFY, routes guilds to shards and recommends a shard count | `client.newShardManager()` |
 | State | Cache of guilds, channels, threads, members, roles and voice states with permission and hierarchy checks | `session.state` |

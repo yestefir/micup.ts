@@ -5,6 +5,14 @@ import { WebSocketServer } from 'ws';
 import { EventMux, GatewayCloseError, GatewayOpcode as op, GatewaySession, onGuildTagChange, safeHandler, ShardManager, shardForGuild } from 'micup.ts';
 import { MemberInventory } from '../dist/session/inventory.js';
 import { SessionRequests } from '../dist/session/requests.js';
+import { CommandWindow } from '../dist/gateway/window.js';
+
+test('command windows reject unusable capacities and durations', () => {
+  assert.throws(() => new CommandWindow(0, 1000), RangeError);
+  assert.throws(() => new CommandWindow(1.5, 1000), RangeError);
+  assert.throws(() => new CommandWindow(1, 0), RangeError);
+  assert.throws(() => new CommandWindow(1, Number.POSITIVE_INFINITY), RangeError);
+});
 
 test('guild tag changes are detected from member, user, and chunk events', async () => {
   const events = new EventMux();

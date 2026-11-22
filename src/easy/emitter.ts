@@ -23,7 +23,8 @@ export class Emitter {
     const entries = this.#listeners.get(event);
     if (!entries) return;
     for (let index = entries.length - 1; index >= 0; index--) {
-      if (entries[index].key === key) {
+      const entry = entries[index];
+      if (entry?.key === key) {
         entries.splice(index, 1);
         break;
       }

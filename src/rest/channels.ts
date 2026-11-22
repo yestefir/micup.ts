@@ -448,6 +448,8 @@ export class MicupChannels {
     channelId: string, body: { max_uses?: number; max_age?: number; temporary?: boolean; unique?: boolean } = {}, options?: AuditOptions,
   ): Promise<MicupInvite> {
     if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('Micup invite options must be an object');
+    const fields = new Set(['max_uses', 'max_age', 'temporary', 'unique']);
+    for (const field of Object.keys(body)) if (!fields.has(field)) throw new TypeError('Unsupported Micup invite field: ' + field);
     if ((body.max_age !== undefined && !Number.isSafeInteger(body.max_age)) ||
         (body.max_uses !== undefined && !Number.isSafeInteger(body.max_uses))) {
       throw new TypeError('Micup invite limits must be integers');
@@ -462,6 +464,7 @@ export class MicupChannels {
         (body.unique !== undefined && typeof body.unique !== 'boolean')) {
       throw new TypeError('Micup invite temporary and unique options must be booleans');
     }
-    return this.rest.request('POST', channelPath(channelId) + '/invites', { ...options, body });
+    const payload = Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
+    return this.rest.request('POST', channelPath(channelId) + '/invites', { ...options, body: payload });
   }
 }

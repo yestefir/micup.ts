@@ -294,29 +294,29 @@ export class Client {
   on<K extends keyof ClientEvents>(event: K, listener: (...args: ClientEvents[K]) => unknown): this;
   on<K extends keyof MicupEvents>(event: K, listener: (data: MicupEvents[K], event: GatewayDispatch) => unknown): this;
   on(event: string, listener: (data: unknown, event: GatewayDispatch) => unknown): this;
-  on(event: string, listener: (...args: any[]) => unknown): this {
-    this.#emitter.add(event, listener);
+  on(event: string, listener: (...args: never[]) => unknown): this {
+    this.#emitter.add(event, listener as (...args: unknown[]) => unknown);
     return this;
   }
 
   once<K extends keyof ClientEvents>(event: K, listener: (...args: ClientEvents[K]) => unknown): this;
   once<K extends keyof MicupEvents>(event: K, listener: (data: MicupEvents[K], event: GatewayDispatch) => unknown): this;
   once(event: string, listener: (data: unknown, event: GatewayDispatch) => unknown): this;
-  once(event: string, listener: (...args: any[]) => unknown): this {
+  once(event: string, listener: (...args: never[]) => unknown): this {
     let remove: () => void;
     const wrapper = (...args: unknown[]) => {
       remove();
-      return listener(...args);
+      return (listener as (...values: unknown[]) => unknown)(...args);
     };
-    remove = this.#emitter.add(event, listener, wrapper);
+    remove = this.#emitter.add(event, listener as (...args: unknown[]) => unknown, wrapper);
     return this;
   }
 
   off<K extends keyof ClientEvents>(event: K, listener: (...args: ClientEvents[K]) => unknown): this;
   off<K extends keyof MicupEvents>(event: K, listener: (data: MicupEvents[K], event: GatewayDispatch) => unknown): this;
   off(event: string, listener: (data: unknown, event: GatewayDispatch) => unknown): this;
-  off(event: string, listener: (...args: any[]) => unknown): this {
-    this.#emitter.remove(event, listener);
+  off(event: string, listener: (...args: never[]) => unknown): this {
+    this.#emitter.remove(event, listener as (...args: unknown[]) => unknown);
     return this;
   }
 
@@ -605,7 +605,7 @@ export class Client {
 
   async #route(event: GatewayDispatch, signal: AbortSignal): Promise<void> {
     const name = event.name;
-    const data = event.data as any;
+    const data = event.data;
     try {
       this.#track(event, data);
     } catch (error) {
@@ -618,57 +618,76 @@ export class Client {
       if (this.#emitter.count(name)) push(name, [data, event]);
       switch (name) {
         case 'MESSAGE_CREATE':
-          if (this.#emitter.count('messageCreate')) push('messageCreate', [new Message(this, data)]);
+          if (this.#emitter.count('messageCreate')) push('messageCreate', [new Message(this, data as MicupEvents['MESSAGE_CREATE'])]);
           break;
         case 'MESSAGE_UPDATE':
-          if (this.#emitter.count('messageUpdate')) push('messageUpdate', [new MessageUpdate(this, data)]);
+          if (this.#emitter.count('messageUpdate')) push('messageUpdate', [new MessageUpdate(this, data as MicupEvents['MESSAGE_UPDATE'])]);
           break;
         case 'MESSAGE_DELETE':
           if (this.#emitter.count('messageDelete')) {
-            push('messageDelete', [{ id: data.id, channelId: data.channel_id, guildId: data.guild_id, content: data.content, authorId: data.author_id } satisfies MessageDeleteEvent]);
+            const message = data as MicupEvents['MESSAGE_DELETE'];
+            push('messageDelete', [{ id: message.id, channelId: message.channel_id, guildId: message.guild_id, content: message.content, authorId: message.author_id } satisfies MessageDeleteEvent]);
           }
           break;
         case 'GUILD_CREATE':
-          if (this.#emitter.count('guildCreate')) push('guildCreate', [new Guild(this, data)]);
+          if (this.#emitter.count('guildCreate')) push('guildCreate', [new Guild(this, data as MicupEvents['GUILD_CREATE'])]);
           break;
         case 'GUILD_UPDATE':
-          if (this.#emitter.count('guildUpdate')) push('guildUpdate', [new Guild(this, data)]);
+          if (this.#emitter.count('guildUpdate')) push('guildUpdate', [new Guild(this, data as MicupEvents['GUILD_UPDATE'])]);
           break;
         case 'GUILD_DELETE':
-          if (this.#emitter.count('guildDelete')) push('guildDelete', [{ id: data.id, unavailable: data.unavailable === true } satisfies GuildDeleteEvent]);
+          if (this.#emitter.count('guildDelete')) {
+            const guild = data as MicupEvents['GUILD_DELETE'];
+            push('guildDelete', [{ id: guild.id, unavailable: guild.unavailable === true } satisfies GuildDeleteEvent]);
+          }
           break;
         case 'GUILD_MEMBER_ADD':
-          if (this.#emitter.count('guildMemberAdd')) push('guildMemberAdd', [new Member(this, data, data.guild_id)]);
+          if (this.#emitter.count('guildMemberAdd')) {
+            const member = data as MicupEvents['GUILD_MEMBER_ADD'];
+            push('guildMemberAdd', [new Member(this, member, member.guild_id)]);
+          }
           break;
         case 'GUILD_MEMBER_UPDATE':
-          if (this.#emitter.count('guildMemberUpdate')) push('guildMemberUpdate', [new Member(this, data, data.guild_id)]);
+          if (this.#emitter.count('guildMemberUpdate')) {
+            const member = data as MicupEvents['GUILD_MEMBER_UPDATE'];
+            push('guildMemberUpdate', [new Member(this, member, member.guild_id)]);
+          }
           break;
         case 'GUILD_MEMBER_REMOVE':
-          if (this.#emitter.count('guildMemberRemove') && data.user) push('guildMemberRemove', [{ guildId: data.guild_id, user: new User(this, data.user) } satisfies MemberRemoveEvent]);
+          if (this.#emitter.count('guildMemberRemove')) {
+            const member = data as MicupEvents['GUILD_MEMBER_REMOVE'];
+            push('guildMemberRemove', [{ guildId: member.guild_id, user: new User(this, member.user) } satisfies MemberRemoveEvent]);
+          }
           break;
         case 'GUILD_BAN_ADD':
-          if (this.#emitter.count('guildBanAdd')) push('guildBanAdd', [{ guildId: data.guild_id, user: new User(this, data.user) } satisfies MemberRemoveEvent]);
+          if (this.#emitter.count('guildBanAdd')) {
+            const ban = data as MicupEvents['GUILD_BAN_ADD'];
+            push('guildBanAdd', [{ guildId: ban.guild_id, user: new User(this, ban.user) } satisfies MemberRemoveEvent]);
+          }
           break;
         case 'GUILD_BAN_REMOVE':
-          if (this.#emitter.count('guildBanRemove')) push('guildBanRemove', [{ guildId: data.guild_id, user: new User(this, data.user) } satisfies MemberRemoveEvent]);
+          if (this.#emitter.count('guildBanRemove')) {
+            const ban = data as MicupEvents['GUILD_BAN_REMOVE'];
+            push('guildBanRemove', [{ guildId: ban.guild_id, user: new User(this, ban.user) } satisfies MemberRemoveEvent]);
+          }
           break;
         case 'CHANNEL_CREATE':
-          if (this.#emitter.count('channelCreate')) push('channelCreate', [new Channel(this, data)]);
+          if (this.#emitter.count('channelCreate')) push('channelCreate', [new Channel(this, data as MicupEvents['CHANNEL_CREATE'])]);
           break;
         case 'CHANNEL_UPDATE':
-          if (this.#emitter.count('channelUpdate')) push('channelUpdate', [new Channel(this, data)]);
+          if (this.#emitter.count('channelUpdate')) push('channelUpdate', [new Channel(this, data as MicupEvents['CHANNEL_UPDATE'])]);
           break;
         case 'CHANNEL_DELETE':
-          if (this.#emitter.count('channelDelete')) push('channelDelete', [new Channel(this, data)]);
+          if (this.#emitter.count('channelDelete')) push('channelDelete', [new Channel(this, data as MicupEvents['CHANNEL_DELETE'])]);
           break;
         case 'MESSAGE_REACTION_ADD':
-          if (this.#emitter.count('messageReactionAdd')) push('messageReactionAdd', [new ReactionEvent(this, data)]);
+          if (this.#emitter.count('messageReactionAdd')) push('messageReactionAdd', [new ReactionEvent(this, data as MicupEvents['MESSAGE_REACTION_ADD'])]);
           break;
         case 'MESSAGE_REACTION_REMOVE':
-          if (this.#emitter.count('messageReactionRemove')) push('messageReactionRemove', [new ReactionEvent(this, data)]);
+          if (this.#emitter.count('messageReactionRemove')) push('messageReactionRemove', [new ReactionEvent(this, data as MicupEvents['MESSAGE_REACTION_REMOVE'])]);
           break;
         case 'VOICE_STATE_UPDATE':
-          if (this.#emitter.count('voiceStateUpdate')) push('voiceStateUpdate', [data]);
+          if (this.#emitter.count('voiceStateUpdate')) push('voiceStateUpdate', [data as MicupVoiceState]);
           break;
         case 'INTERACTION_CREATE':
           tasks.push(this.#interaction(data as MicupInteraction));

@@ -122,7 +122,7 @@ export interface GuildMemberSearch {
   joined_at_lte?: number;
   user_created_at_gte?: number;
   user_created_at_lte?: number;
-  sort_by?: string;
+  sort_by?: 'joinedAt' | 'relevance';
   sort_order?: 'asc' | 'desc';
 }
 
@@ -413,13 +413,20 @@ export class MicupGuilds {
   }
 
   ban(guildId: string, userId: string, body: GuildBanInput = {}, options?: AuditOptions): Promise<void> {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('Micup ban options must be an object');
+    const fields = new Set(['delete_message_seconds', 'ban_duration_seconds', 'reason']);
+    for (const field of Object.keys(body)) if (!fields.has(field)) throw new TypeError('Unsupported Micup ban field: ' + field);
     const deletion = body.delete_message_seconds ?? 0;
     const duration = body.ban_duration_seconds ?? 0;
     if (!Number.isInteger(deletion) || deletion < 0 || deletion > 604800 ||
         !Number.isInteger(duration) || (duration !== 0 && (duration < 60 || duration > 63072000))) {
       throw new RangeError('Invalid Micup ban duration or message deletion window');
     }
-    return this.rest.request('PUT', guildPath(guildId) + '/bans/' + snowflake(userId, 'User ID'), { ...options, body });
+    if (body.reason !== undefined && (typeof body.reason !== 'string' || [...body.reason].length > 512)) {
+      throw new TypeError('A ban reason must be a string of at most 512 characters');
+    }
+    const payload = Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
+    return this.rest.request('PUT', guildPath(guildId) + '/bans/' + snowflake(userId, 'User ID'), { ...options, body: payload });
   }
 
   unban(guildId: string, userId: string, options?: AuditOptions): Promise<void> {
@@ -443,6 +450,13 @@ export class MicupGuilds {
 
   searchMembers(guildId: string, search: GuildMemberSearch, options?: MicupRequestOptions): Promise<GuildMemberSearchPage> {
     if (!search || typeof search !== 'object' || Array.isArray(search)) throw new TypeError('A member search object is required');
+    const fields = new Set([
+      'query', 'limit', 'offset', 'role_ids', 'join_source_type', 'source_invite_code', 'is_bot',
+      'joined_at_gte', 'joined_at_lte', 'user_created_at_gte', 'user_created_at_lte', 'sort_by', 'sort_order',
+    ]);
+    for (const field of Object.keys(search)) {
+      if (!fields.has(field)) throw new TypeError(`Member searches do not support the ${field} field`);
+    }
     const { query = '', limit = 100, offset = 0, role_ids, join_source_type, source_invite_code } = search;
     if (typeof query !== 'string') throw new TypeError('A member search query must be a string');
     if ([role_ids, join_source_type, source_invite_code].some((values) => values !== undefined && !Array.isArray(values))) {
@@ -455,7 +469,7 @@ export class MicupGuilds {
     }
     for (const id of role_ids ?? []) snowflake(id, 'Role ID');
     for (const value of join_source_type ?? []) {
-      if (!Number.isSafeInteger(value) || value < 0) throw new TypeError('Member join source types must be nonnegative integers');
+      if (![0, 1, 2, 3, 4, 6].includes(value)) throw new TypeError('Member join source types must be supported source values');
     }
     for (const value of source_invite_code ?? []) {
       if (typeof value !== 'string' || !value) throw new TypeError('Member source invite codes must be nonempty strings');
@@ -469,11 +483,20 @@ export class MicupGuilds {
     })) {
       if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) throw new RangeError(name + ' must be a nonnegative integer timestamp');
     }
-    if (search.sort_by !== undefined && (typeof search.sort_by !== 'string' || !search.sort_by)) throw new TypeError('Member search sort_by must be a nonempty string');
+    if (search.sort_by !== undefined && search.sort_by !== 'joinedAt' && search.sort_by !== 'relevance') {
+      throw new TypeError('Member search sort_by must be joinedAt or relevance');
+    }
     if (search.sort_order !== undefined && search.sort_order !== 'asc' && search.sort_order !== 'desc') {
       throw new TypeError('Member search sort_order must be asc or desc');
     }
-    return this.rest.request('POST', guildPath(guildId) + '/members-search', { ...options, body: search, idempotent: true });
+    if (search.joined_at_gte !== undefined && search.joined_at_lte !== undefined && search.joined_at_gte > search.joined_at_lte) {
+      throw new RangeError('joined_at_gte cannot be later than joined_at_lte');
+    }
+    if (search.user_created_at_gte !== undefined && search.user_created_at_lte !== undefined && search.user_created_at_gte > search.user_created_at_lte) {
+      throw new RangeError('user_created_at_gte cannot be later than user_created_at_lte');
+    }
+    const body = Object.fromEntries(Object.entries(search).filter(([field]) => fields.has(field)));
+    return this.rest.request('POST', guildPath(guildId) + '/members-search', { ...options, body, idempotent: true });
   }
 
   moveChannels(guildId: string, positions: readonly ChannelPosition[], options?: MicupRequestOptions): Promise<void> {

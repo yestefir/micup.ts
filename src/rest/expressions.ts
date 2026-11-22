@@ -71,14 +71,25 @@ function stickerText(body: Omit<StickerInput, 'image'>): void {
 
 function createEmoji(item: EmojiInput): void {
   if (!item || typeof item !== 'object') throw new TypeError('An emoji input is required');
+  for (const field of Object.keys(item)) if (field !== 'name' && field !== 'image') throw new TypeError('Unsupported emoji field: ' + field);
   emojiName(item.name);
   if (typeof item.image !== 'string' || !item.image) throw new TypeError('An emoji image is required');
 }
 
 function createSticker(item: StickerInput): void {
   if (!item || typeof item !== 'object') throw new TypeError('A sticker input is required');
+  for (const field of Object.keys(item)) if (!['name', 'image', 'description', 'tags'].includes(field)) throw new TypeError('Unsupported sticker field: ' + field);
   stickerText(item);
   if (typeof item.image !== 'string' || !item.image) throw new TypeError('A sticker image is required');
+}
+
+function stickerPayload(item: StickerInput): StickerInput {
+  return {
+    name: item.name,
+    image: item.image,
+    ...(item.description !== undefined && { description: item.description }),
+    ...(item.tags !== undefined && { tags: item.tags }),
+  };
 }
 
 type Resource = 'emojis' | 'stickers';
@@ -106,26 +117,28 @@ export class MicupExpressions {
 
   createEmoji(guildId: string, body: EmojiInput, options?: AuditOptions): Promise<Emoji> {
     createEmoji(body);
-    return this.rest.request('POST', this.#path(guildId, 'emojis'), { ...options, body });
+    return this.rest.request('POST', this.#path(guildId, 'emojis'), { ...options, body: { name: body.name, image: body.image } });
   }
 
   createSticker(guildId: string, body: StickerInput, options?: AuditOptions): Promise<MicupSticker> {
     createSticker(body);
-    return this.rest.request('POST', this.#path(guildId, 'stickers'), { ...options, body });
+    return this.rest.request('POST', this.#path(guildId, 'stickers'), { ...options, body: stickerPayload(body) });
   }
 
   createEmojis(guildId: string, emojis: readonly EmojiInput[], options?: AuditOptions): Promise<ExpressionBulkResult<Emoji>> {
     if (!Array.isArray(emojis)) throw new TypeError('Bulk emojis must be an array');
     if (!emojis.length || emojis.length > 50) throw new RangeError('A bulk create takes up to 50 emojis');
     for (const emoji of emojis) createEmoji(emoji);
-    return this.rest.request('POST', this.#path(guildId, 'emojis') + '/bulk', { ...options, body: { emojis } });
+    return this.rest.request('POST', this.#path(guildId, 'emojis') + '/bulk', { ...options, body: { emojis: emojis.map(({ name, image }) => ({ name, image })) } });
   }
 
   createStickers(guildId: string, stickers: readonly StickerInput[], options?: AuditOptions): Promise<ExpressionBulkResult<MicupSticker>> {
     if (!Array.isArray(stickers)) throw new TypeError('Bulk stickers must be an array');
     if (!stickers.length || stickers.length > 50) throw new RangeError('A bulk create takes up to 50 stickers');
     for (const sticker of stickers) createSticker(sticker);
-    return this.rest.request('POST', this.#path(guildId, 'stickers') + '/bulk', { ...options, body: { stickers } });
+    return this.rest.request('POST', this.#path(guildId, 'stickers') + '/bulk', {
+      ...options, body: { stickers: stickers.map(stickerPayload) },
+    });
   }
 
   cloneEmoji(guildId: string, source: string, options?: AuditOptions): Promise<Emoji> {

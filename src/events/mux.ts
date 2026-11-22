@@ -20,7 +20,7 @@ export interface MicupEvents extends AdditionalGatewayEvents {
   VOICE_STATE_UPDATE: MicupVoiceState;
   GUILD_CREATE: MicupGuildCreate;
   GUILD_SYNC: MicupGuildCreate;
-  GUILD_UPDATE: Partial<MicupGuildCreate> & { guild_id?: string; content?: string | null; author_id?: string; member?: MicupMember };
+  GUILD_UPDATE: Partial<MicupGuildCreate> & Pick<MicupGuildCreate, 'id'> & { guild_id: string };
   GUILD_DELETE: { id: string; unavailable?: boolean };
   GUILD_ROLE_CREATE: { guild_id: string; role: MicupRole };
   GUILD_ROLE_UPDATE: { guild_id: string; role: MicupRole };

@@ -102,7 +102,9 @@ export class ShardManager {
   }
 
   get presence(): Presence {
-    return this.shards[0].presence;
+    const first = this.shards[0];
+    if (!first) throw new Error('This shard manager has no shards');
+    return first.presence;
   }
 
   async updatePresence(presence: Presence, options?: { signal?: AbortSignal }): Promise<void> {
@@ -168,8 +170,15 @@ export class ShardManager {
   async subscribe(subscriptions: Readonly<Record<string, GatewaySubscription>>, options?: { signal?: AbortSignal }): Promise<void> {
     validateSubscriptions(subscriptions);
     const groups = this.#groupGuilds(Object.keys(subscriptions));
-    await Promise.all([...groups].map(([shard, ids]) =>
-      shard.subscribe(Object.fromEntries(ids.map((id) => [id, subscriptions[id]])), options)));
+    await Promise.all([...groups].map(([shard, ids]) => {
+      const subset: Record<string, GatewaySubscription> = {};
+      for (const id of ids) {
+        const subscription = subscriptions[id];
+        if (!subscription) throw new Error('A validated guild subscription disappeared');
+        subset[id] = subscription;
+      }
+      return shard.subscribe(subset, options);
+    }));
   }
 
   #groupGuilds(guildIds: readonly string[]): Map<GatewaySession, string[]> {

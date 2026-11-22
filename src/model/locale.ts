@@ -40,7 +40,7 @@ export class MessageCatalog {
   resolve(locale: string | undefined): string | undefined {
     const normalized = normalizeLocale(locale ?? '');
     if (!normalized) return undefined;
-    const [language] = normalized.split('-');
+    const language = normalized.split('-')[0] ?? normalized;
     return this.#normalized.get(normalized) ?? this.#normalized.get(language) ??
       this.locales.find((candidate) => normalizeLocale(candidate).startsWith(language + '-'));
   }

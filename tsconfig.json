@@ -6,6 +6,7 @@
     "outDir": "dist",
     "declaration": true,
     "strict": true,
+    "noUncheckedIndexedAccess": true,
     "noEmitOnError": true
   },
   "include": [

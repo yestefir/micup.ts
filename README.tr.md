@@ -10,6 +10,8 @@ npm install micup.ts
 
 Node.js 20.3 veya üstü ve bir Micup bot token'ı gerekir (Zstandard Gateway sıkıştırması için 22.15). Üretimdeki botları çalıştıran Go kütüphanesi [micup.go](https://github.com/yestefir/micup.go) temel alınmıştır.
 
+Kullanıcı profili düzenlemek için bot token'ından ayrı olarak `MicupUserSession` ve kullanıcı oturumu token'ı kullanılır. Bot istemcisi kullanıcı oturumuna özel rotaları çağırmaz.
+
 ## Hızlı başlangıç
 
 Kolay istemci, çalışan bir bota giden en kısa yoldur. `MICUP_BOT_TOKEN` değişkenini ayarlayıp çalıştırın:

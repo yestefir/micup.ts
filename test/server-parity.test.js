@@ -127,13 +127,17 @@ test('runs a voice room stage and its effects', async (t) => {
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', style: 'plain' } }), TypeError);
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'video', url: 'https://youtube.com/watch?v=1', paused: 'false' } }), TypeError);
   assert.throws(() => bot.rooms.setStage('20', { host: { character: 'unknown' } }), TypeError);
+  assert.throws(() => bot.rooms.setStage('20', { host: { id: '99' } }), /Unsupported stage host field/);
+  assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', id: '99' } }), /Unsupported stage board field/);
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', scores: Array(11).fill({ name: 'a', value: 1 }) } }), RangeError);
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', scores: 'invalid' } }), TypeError);
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', scores: Array(1) } }), TypeError);
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', scores: [null] } }), TypeError);
   assert.throws(() => bot.rooms.stageEffect('20', { type: 'host_emote', emote: 'emoji' }), TypeError);
   assert.throws(() => bot.rooms.stageEffect('20', { type: 'host_emote', emote: 'emoji', emoji: 1 }), TypeError);
+  assert.throws(() => bot.rooms.stageEffect('20', { type: 'confetti', id: '99' }), /Unsupported stage effect field/);
   assert.throws(() => bot.rooms.stageEffect('20', { type: 'rain' }), TypeError);
+  assert.equal(calls.length, 6);
 });
 
 test('opens, orders, starts and cancels a room tournament', async (t) => {
@@ -163,11 +167,15 @@ test('opens, orders, starts and cancels a room tournament', async (t) => {
   assert.throws(() => bot.rooms.openTournament('20', { game: 'arm_wrestle', size: 4, table: { slot: 'T1', x: 1 } }), TypeError);
   assert.throws(() => bot.rooms.openTournament('20', { game: 'arm_wrestle', size: 4, table: { slot: 1 } }), TypeError);
   assert.throws(() => bot.rooms.openTournament('20', { game: 'arm_wrestle', size: 4, table: { x: 500, z: 0, yaw: 0 } }), RangeError);
+  assert.throws(() => bot.rooms.openTournament('20', { game: 'slap', size: 4, status: 'ended' }), /Unsupported tournament field/);
+  assert.throws(() => bot.rooms.openTournament('20', { game: 'slap', size: 4, table: { slot: 'T1', id: '99' } }), /Unsupported tournament table field/);
+  assert.throws(() => bot.rooms.openTournament('20', { game: 'slap', size: 4, table: null }), /table must be an object/);
   assert.throws(() => bot.rooms.reorderTournament('20', 2, ['1', '1']), RangeError);
   assert.throws(() => bot.rooms.reorderTournament('20', -1, ['1', '2']), RangeError);
   assert.throws(() => bot.rooms.reorderTournament('20', 2, ['1', , '2']), TypeError);
   assert.throws(() => bot.rooms.reorderTournament('20', 2, '12'), TypeError);
   assert.throws(() => bot.rooms.startTournament('20', -1), TypeError);
+  assert.equal(calls.length, 6);
 });
 
 test('covers member, ownership and message clean-up routes', async (t) => {
@@ -221,11 +229,11 @@ test('validates guild member search filters before making a request', async (t) 
   }));
   await bot.guilds.searchMembers('10', {
     query: 'Ada', limit: 20, offset: 5, role_ids: ['11'], join_source_type: [1], source_invite_code: ['club'],
-    is_bot: false, joined_at_gte: 100, user_created_at_lte: 200, sort_by: 'joined_at', sort_order: 'desc',
+    is_bot: false, joined_at_gte: 100, user_created_at_lte: 200, sort_by: 'joinedAt', sort_order: 'desc',
   });
   assert.deepEqual(calls[0].body, {
     query: 'Ada', limit: 20, offset: 5, role_ids: ['11'], join_source_type: [1], source_invite_code: ['club'],
-    is_bot: false, joined_at_gte: 100, user_created_at_lte: 200, sort_by: 'joined_at', sort_order: 'desc',
+    is_bot: false, joined_at_gte: 100, user_created_at_lte: 200, sort_by: 'joinedAt', sort_order: 'desc',
   });
   assert.throws(() => bot.guilds.searchMembers('10', { query: 3 }), TypeError);
   assert.throws(() => bot.guilds.searchMembers('10', { role_ids: '11' }), TypeError);
@@ -235,6 +243,10 @@ test('validates guild member search filters before making a request', async (t) 
   assert.throws(() => bot.guilds.searchMembers('10', { is_bot: 'true' }), TypeError);
   assert.throws(() => bot.guilds.searchMembers('10', { joined_at_gte: -1 }), RangeError);
   assert.throws(() => bot.guilds.searchMembers('10', { sort_order: 'sideways' }), TypeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { sort_by: 'joined_at' }), TypeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { join_source_type: [5] }), TypeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { joined_at_gte: 200, joined_at_lte: 100 }), RangeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { name_localized: 'response field' }), /do not support the name_localized field/);
   assert.equal(calls.length, 1);
 });
 
@@ -317,14 +329,14 @@ test('validates bulk message and forum thread ID arrays', async (t) => {
   assert.equal(calls.length, 2);
 });
 
-test('moves channels, clears commands and edits the bot profile', async (t) => {
+test('moves channels and clears commands', async (t) => {
   const { bot, calls } = await mockBot(t, (url, options) =>
     url.pathname === '/api/v1/users/@me' ? Response.json({ id: '77', username: 'yeni' }) : none());
 
   await bot.guilds.moveChannels('10', [{ id: '1', parent_id: null, position: 0 }, { id: '2', preceding_sibling_id: '1', lock_permissions: true }]);
   await bot.commands.clear();
   await bot.commands.clear({ guildId: '10' });
-  assert.equal((await bot.users.editCurrentUser({ username: 'yeni', avatar: null })).username, 'yeni');
+  await assert.rejects(bot.users.editCurrentUser({ username: 'yeni' }), /use MicupUserSession/);
   await bot.channels.archiveThread('44');
   await bot.channels.lockThread('44', false);
 
@@ -332,7 +344,6 @@ test('moves channels, clears commands and edits the bot profile', async (t) => {
     'PATCH /guilds/10/channels',
     'DELETE /applications/77/commands',
     'DELETE /applications/77/guilds/10/commands',
-    'PATCH /users/@me',
     'PATCH /channels/44',
     'PATCH /channels/44',
   ]);
@@ -340,19 +351,13 @@ test('moves channels, clears commands and edits the bot profile', async (t) => {
     { position: 0, id: '1', parent_id: null },
     { lock_permissions: true, id: '2', preceding_sibling_id: '1' },
   ]);
-  assert.deepEqual(calls[3].body, { username: 'yeni', avatar: null });
-  assert.deepEqual(calls[4].body, { archived: true });
-  assert.deepEqual(calls[5].body, { locked: false });
+  assert.deepEqual(calls[3].body, { archived: true });
+  assert.deepEqual(calls[4].body, { locked: false });
 
   assert.throws(() => bot.guilds.moveChannels('10', []), RangeError);
   assert.throws(() => bot.guilds.moveChannels('10', Array(1)), /Channel positions must be objects/);
   assert.throws(() => bot.guilds.moveChannels('10', '1'), /Channel positions must be an array/);
-  assert.throws(() => bot.users.editCurrentUser(null), /must be an object/);
-  assert.throws(() => bot.users.editCurrentUser({ username: 'bad name' }), TypeError);
-  assert.throws(() => bot.users.editCurrentUser({ username: 123 }), TypeError);
-  assert.throws(() => bot.users.editCurrentUser({ avatar: 123 }), /nonempty strings/);
-  assert.throws(() => bot.users.editCurrentUser({ banner: '' }), /nonempty strings/);
-  assert.equal(calls.length, 6);
+  assert.equal(calls.length, 5);
 });
 
 test('reads emoji, sticker and public application records', async (t) => {
@@ -418,8 +423,10 @@ test('validates and manages guild expressions across single and bulk routes', as
 
   assert.throws(() => bot.expressions.createEmoji('10', { name: 42, image: 'x' }), TypeError);
   assert.throws(() => bot.expressions.createEmoji('10', { name: 'ok', image: 42 }), TypeError);
+  assert.throws(() => bot.expressions.createEmoji('10', { name: 'ok', image: 'x', id: '21' }), /Unsupported emoji field/);
   assert.throws(() => bot.expressions.createSticker('10', { name: 'Ok', image: 'x', tags: ['ok', 1] }), TypeError);
   assert.throws(() => bot.expressions.createSticker('10', { name: 'Ok', image: 'x', tags: Array(1) }), TypeError);
+  assert.throws(() => bot.expressions.createSticker('10', { name: 'Ok', image: 'x', id: '22' }), /Unsupported sticker field/);
   assert.throws(() => bot.expressions.createStickers('10', Array(1)), TypeError);
   assert.throws(() => bot.expressions.createEmojis('10', 'wave'), TypeError);
   assert.throws(() => bot.expressions.editSticker('10', '22', { name: 'Ok', tags: 'wave' }), TypeError);
@@ -606,8 +613,13 @@ test('manages a guild discovery listing', async (t) => {
   assert.deepEqual(calls.map(({ method, path }) => method + ' ' + path), [
     'GET /guilds/10/discovery', 'POST /guilds/10/discovery', 'PATCH /guilds/10/discovery', 'DELETE /guilds/10/discovery',
   ]);
+  assert.deepEqual(calls[1].body, { description: 'A place to talk.', category_type: 4, custom_tags: ['rust'] });
+  assert.deepEqual(calls[2].body, { custom_tags: ['Türkçe & oyun'] });
   assert.throws(() => bot.discovery.apply('10', { description: 'short', category_type: 4 }), RangeError);
   assert.throws(() => bot.discovery.apply('10', { description: 'A place to talk.' }), TypeError);
+  assert.throws(() => bot.discovery.apply('10', { description: 'A place to talk.', category_type: 4, status: 'approved' }), /Unsupported discovery application field/);
+  assert.throws(() => bot.discovery.edit('10', { reviewed_at: '2026-01-01' }), /Unsupported discovery application field/);
+  assert.throws(() => bot.discovery.edit('10', {}), /at least one field/);
   assert.throws(() => bot.discovery.edit('10', { custom_tags: Array(11).fill('x') }), RangeError);
   assert.throws(() => bot.discovery.edit('10', { custom_tags: 'rust' }), TypeError);
   assert.throws(() => bot.discovery.edit('10', { custom_tags: Array(1) }), TypeError);
@@ -619,4 +631,5 @@ test('manages a guild discovery listing', async (t) => {
   assert.throws(() => bot.discovery.edit('10', { category_type: -1 }), RangeError);
   assert.throws(() => bot.discovery.edit('10', { primary_language: 4 }), TypeError);
   assert.throws(() => bot.discovery.edit('10', { primary_language: 'en' }), TypeError);
+  assert.equal(calls.length, 4);
 });

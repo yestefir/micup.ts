@@ -27,7 +27,8 @@ export class TypedEmitter<Events extends { [K in keyof Events]: unknown[] }> {
     const entries = this.#listeners.get(event);
     if (!entries) return this;
     for (let index = entries.length - 1; index >= 0; index--) {
-      if (entries[index].key === listener) {
+      const entry = entries[index];
+      if (entry?.key === listener) {
         entries.splice(index, 1);
         break;
       }

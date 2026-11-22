@@ -62,6 +62,7 @@ test('uses Micup role, member moderation, channel and reaction routes', async (t
 
   const bot = await MicupClient.connect({ origin, token: 'fixture' });
   assert.throws(() => bot.guilds.ban('10', '20', { ban_duration_seconds: 5 }), /Invalid/);
+  assert.throws(() => bot.guilds.ban('10', '20', { moderator_id: '99' }), /Unsupported Micup ban field/);
   assert.throws(() => bot.guilds.createRole('10', null), /must be an object/);
   assert.throws(() => bot.guilds.createRole('10', {}), /needs a nonempty name/);
   assert.throws(() => bot.guilds.createRole('10', { name: 'x'.repeat(101) }), RangeError);
@@ -129,6 +130,7 @@ test('validates invite options before sending a request', async (t) => {
   assert.throws(() => bot.channels.createInvite('30', { max_uses: 101 }), RangeError);
   assert.throws(() => bot.channels.createInvite('30', { temporary: 'yes' }), /must be booleans/);
   assert.throws(() => bot.channels.createInvite('30', { unique: 1 }), /must be booleans/);
+  assert.throws(() => bot.channels.createInvite('30', { inviter: '99' }), /Unsupported Micup invite field/);
   await bot.channels.createInvite('30', { max_age: 604_800, max_uses: 100, temporary: true, unique: false });
   assert.deepEqual(sent, [{
     path: '/api/v1/channels/30/invites', body: { max_age: 604_800, max_uses: 100, temporary: true, unique: false },

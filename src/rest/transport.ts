@@ -9,6 +9,8 @@ export interface MicupLogger {
   info?(message: string, fields?: Record<string, unknown>): void;
 }
 
+export type RestAuthentication = 'bot' | 'user';
+
 export interface MicupRequestOptions {
   signal?: AbortSignal;
 }
@@ -40,8 +42,8 @@ function routeKey(method: RestMethod, path: string): string {
   const parts = path.split('/');
   return method + ' ' + parts.map((part, index) => {
     if (parts[index - 1] === 'reactions') return '{emoji}';
-    if ((parts[index - 2] === 'webhooks' || parts[index - 2] === 'interactions') && snowflake.test(parts[index - 1])) return '{token}';
-    return snowflake.test(part) && !majorParameters.has(parts[index - 1]) ? '{id}' : part;
+    if (((parts[index - 2] ?? '') === 'webhooks' || (parts[index - 2] ?? '') === 'interactions') && snowflake.test(parts[index - 1] ?? '')) return '{token}';
+    return snowflake.test(part) && !majorParameters.has(parts[index - 1] ?? '') ? '{id}' : part;
   }).join('/');
 }
 
@@ -279,7 +281,7 @@ export class RestTransport {
 
   constructor(
     api: string, private readonly token: string, private readonly attempts = 5, private readonly logger?: MicupLogger,
-    private readonly rejectionLimit = 5,
+    private readonly rejectionLimit = 5, private readonly authentication: RestAuthentication = 'bot',
   ) {
     if (!Number.isSafeInteger(rejectionLimit) || rejectionLimit < 0) throw new RangeError('The rejected request limit must be a nonnegative integer');
     this.#api = new URL(api + '/');
@@ -360,7 +362,7 @@ export class RestTransport {
     if (query?.size) target.search = query.toString();
 
     const headers = new Headers({ 'User-Agent': 'micup.ts' });
-    if (!anonymous) headers.set('Authorization', 'Bot ' + this.token);
+    if (!anonymous) headers.set('Authorization', this.authentication === 'bot' ? 'Bot ' + this.token : this.token);
     const canRetry = idempotent || repeatable.has(method);
     if (reason !== undefined) {
       if (typeof reason !== 'string' || !reason.trim() || reason.length > 512 || /[\r\n]/.test(reason)) {

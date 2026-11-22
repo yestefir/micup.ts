@@ -1,5 +1,7 @@
 export { MicupClient } from './bot/client.js';
 export type { MicupClientOptions } from './bot/client.js';
+export { MicupUserSession } from './user/client.js';
+export type { MicupUserSessionOptions, UserProfileEdit } from './user/client.js';
 export { EventMux } from './events/mux.js';
 export type { MicupEvents } from './events/mux.js';
 export { GatewayCloseError, GatewayOpcode } from './gateway/protocol.js';
@@ -59,7 +61,7 @@ export { safeHandler } from './events/safe.js';
 export { background } from './events/background.js';
 export type { BackgroundOptions } from './events/background.js';
 export { tokenId } from './rest/identity.js';
-export type { MicupLogger } from './rest/transport.js';
+export type { MicupLogger, RestAuthentication } from './rest/transport.js';
 export type { SafeHandlerOptions } from './events/safe.js';
 export { onGuildTagChange } from './events/guild-tag.js';
 export type { GuildTagChange } from './events/guild-tag.js';

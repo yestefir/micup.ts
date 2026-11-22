@@ -11,8 +11,7 @@ export function background(task: (signal: AbortSignal) => void | Promise<void>, 
     throw new RangeError('Background task timeout must be a positive timer duration');
   }
   const deadline = new AbortController();
-  const signals = [parent, deadline.signal].filter((value): value is AbortSignal => value !== undefined);
-  const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
+  const signal = parent ? AbortSignal.any([parent, deadline.signal]) : deadline.signal;
   return new Promise<void>((resolve) => {
     setImmediate(() => {
       const timer = timeoutMs === undefined ? undefined : setTimeout(() => deadline.abort(new Error('Background task timed out')), timeoutMs);

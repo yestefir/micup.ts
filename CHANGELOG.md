@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Added a separate user-token REST session for current-user profile edits; the bot client's old profile method now rejects locally instead of sending a request that rejects bot credentials.
+- Discovery create and edit requests reject response-only fields and empty edits before sending.
+- Invite, ban and expression creation requests reject unsupported fields before sending.
+- Voice-room stage, effect and tournament requests validate and serialize supported nested fields only.
+- Easy client Gateway events no longer use unbounded event payload types; guild updates require both API identifiers.
+- TypeScript compilation enables unchecked indexed access across the main and voice packages.
+- Guild member search validates documented sort fields, source types and timestamp ranges before sending requests.
 - Command option validation checks booleans, numeric and string constraints, channel filters and nested response-only fields.
 - Live smoke checks read the bot's first guild, its channels, roles and current member when available.
 - Command edits validate partial command definitions and reject response-only fields.

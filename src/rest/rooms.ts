@@ -125,6 +125,11 @@ const colour = (value: number, label: string) => {
   return value;
 };
 
+function assertFields(value: object, fields: readonly string[], label: string): void {
+  const allowed = new Set(fields);
+  for (const field of Object.keys(value)) if (!allowed.has(field)) throw new TypeError('Unsupported ' + label + ' field: ' + field);
+}
+
 function plain(value: string | null | undefined, max: number, lines: number, label: string): void {
   if (value === undefined || value === null) return;
   if (typeof value !== 'string' || [...value].length > max || value.split('\n').length > lines || hasForbiddenText(value)) {
@@ -132,11 +137,15 @@ function plain(value: string | null | undefined, max: number, lines: number, lab
   }
 }
 
-function stageBody({ tv, host, ttl_seconds }: VoiceRoomStageInput): object {
+function stageBody(input: VoiceRoomStageInput): object {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('A voice room stage must be an object');
+  assertFields(input, ['tv', 'host', 'ttl_seconds'], 'stage');
+  const { tv, host, ttl_seconds } = input;
   if (ttl_seconds !== undefined && (!Number.isSafeInteger(ttl_seconds) || ttl_seconds < 60 || ttl_seconds > 21_600)) {
     throw new RangeError('A stage lasts 60 to 21600 seconds');
   }
   if (tv?.type === 'board') {
+    assertFields(tv, ['type', 'style', 'title', 'text', 'accent', 'scores', 'message_id'], 'stage board');
     if (tv.style !== undefined && !['neon', 'tahta', 'sade'].includes(tv.style)) throw new TypeError('Invalid stage board style');
     plain(tv.title, 60, 1, 'Stage title');
     plain(tv.text, 280, 4, 'Stage text');
@@ -145,12 +154,14 @@ function stageBody({ tv, host, ttl_seconds }: VoiceRoomStageInput): object {
     if ((tv.scores?.length ?? 0) > 10) throw new RangeError('A stage board takes up to 10 scores');
     for (const score of tv.scores ?? []) {
       if (!score || typeof score !== 'object') throw new TypeError('A stage score must be an object');
+      assertFields(score, ['name', 'value', 'user_id'], 'stage score');
       plain(score.name, 32, 1, 'Score name');
       if (!score.name || !Number.isSafeInteger(score.value) || Math.abs(score.value) > 1_000_000_000) throw new RangeError('Invalid stage score');
-      if (score.user_id) snowflake(score.user_id, 'Score user ID');
+      if (score.user_id !== undefined && score.user_id !== null) snowflake(score.user_id, 'Score user ID');
     }
     if (tv.message_id !== undefined) snowflake(tv.message_id, 'Message ID');
   } else if (tv?.type === 'video') {
+    assertFields(tv, ['type', 'url', 'position_ms', 'paused'], 'stage video');
     if (typeof tv.url !== 'string' || !tv.url || tv.url.length > 2048) throw new TypeError('A stage video needs a URL of up to 2048 characters');
     if (tv.paused !== undefined && typeof tv.paused !== 'boolean') throw new TypeError('A stage video pause state must be a boolean');
     if (tv.position_ms !== undefined && (!Number.isSafeInteger(tv.position_ms) || tv.position_ms < 0 || tv.position_ms > 86_400_000)) {
@@ -162,27 +173,67 @@ function stageBody({ tv, host, ttl_seconds }: VoiceRoomStageInput): object {
   if (host?.character !== undefined && !['ithp-gunluk', 'ithp-ceketli', 'ithp-gozluk', 'ithp-kulaklik', 'ithp-rahat', 'ithp-sapkali', 'ithp-sehirli', 'ithp-yazlik'].includes(host.character)) {
     throw new TypeError('Invalid host character');
   }
+  if (host !== undefined && host !== null) {
+    if (typeof host !== 'object' || Array.isArray(host)) throw new TypeError('A stage host must be an object or null');
+    assertFields(host, ['character', 'shirt'], 'stage host');
+  }
   if (host?.shirt !== undefined) colour(host.shirt, 'Host shirt');
-  return { tv: tv ?? null, host: host ?? null, ...(ttl_seconds !== undefined && { ttl_seconds }) };
+  let tvPayload: object | null = null;
+  if (tv?.type === 'board') {
+    tvPayload = {
+      type: tv.type,
+      ...(tv.style !== undefined && { style: tv.style }),
+      ...(tv.title !== undefined && { title: tv.title }),
+      ...(tv.text !== undefined && { text: tv.text }),
+      ...(tv.accent !== undefined && { accent: tv.accent }),
+      ...(tv.scores !== undefined && { scores: tv.scores.map((score) => ({ name: score.name, value: score.value, ...(score.user_id !== undefined && { user_id: score.user_id }) })) }),
+      ...(tv.message_id !== undefined && { message_id: tv.message_id }),
+    };
+  } else if (tv?.type === 'video') {
+    tvPayload = {
+      type: tv.type,
+      url: tv.url,
+      ...(tv.position_ms !== undefined && { position_ms: tv.position_ms }),
+      ...(tv.paused !== undefined && { paused: tv.paused }),
+    };
+  }
+  const hostPayload = host === undefined || host === null ? null : {
+    ...(host.character !== undefined && { character: host.character }),
+    ...(host.shirt !== undefined && { shirt: host.shirt }),
+  };
+  return { tv: tvPayload, host: hostPayload, ...(ttl_seconds !== undefined && { ttl_seconds }) };
 }
 
 function effectBody(effect: StageEffect): object {
-  if (effect.type === 'spotlight') snowflake(effect.user_id, 'User ID');
+  if (!effect || typeof effect !== 'object' || Array.isArray(effect)) throw new TypeError('A stage effect must be an object');
+  if (effect.type === 'spotlight') {
+    assertFields(effect, ['type', 'user_id'], 'stage effect');
+    snowflake(effect.user_id, 'User ID');
+    return { type: effect.type, user_id: effect.user_id };
+  }
   else if (effect.type === 'host_emote') {
+    assertFields(effect, effect.emote === 'emoji' ? ['type', 'emote', 'emoji'] : ['type', 'emote'], 'stage effect');
     if (!['wave', 'dance', 'jump', 'emoji'].includes(effect.emote)) throw new TypeError('Invalid host emote');
     if (effect.emote === 'emoji' && !('emoji' in effect && typeof effect.emoji === 'string' && effect.emoji && [...effect.emoji].length <= 16)) {
       throw new TypeError('An emoji emote needs one emoji');
     }
+    return effect.emote === 'emoji' ? { type: effect.type, emote: effect.emote, emoji: effect.emoji } : { type: effect.type, emote: effect.emote };
   } else if (effect.type !== 'confetti') {
     throw new TypeError('Invalid stage effect');
   }
-  return effect;
+  assertFields(effect, ['type'], 'stage effect');
+  return { type: effect.type };
 }
 
-function tournamentBody({ game, size, table }: TournamentInput): object {
+function tournamentBody(input: TournamentInput): object {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('A room tournament must be an object');
+  assertFields(input, ['game', 'size', 'table'], 'tournament');
+  const { game, size, table } = input;
   if (game !== 'slap' && game !== 'arm_wrestle') throw new TypeError('A room tournament is slap or arm_wrestle');
   if (![4, 8, 16, 32].includes(size)) throw new RangeError('A room tournament takes 4, 8, 16 or 32 entrants');
-  if (table) {
+  if (table !== undefined) {
+    if (!table || typeof table !== 'object' || Array.isArray(table)) throw new TypeError('A tournament table must be an object');
+    assertFields(table, ['slot', 'x', 'z', 'yaw'], 'tournament table');
     const point = table.x !== undefined || table.z !== undefined || table.yaw !== undefined;
     if (table.slot !== undefined === point) throw new TypeError('A tournament table is a slot or a floor point');
     if (table.slot !== undefined && (typeof table.slot !== 'string' || !table.slot)) throw new TypeError('A tournament table slot must be a nonempty string');
@@ -191,7 +242,11 @@ function tournamentBody({ game, size, table }: TournamentInput): object {
       throw new RangeError('A floor point takes x and z within 100 metres and a yaw within pi');
     }
   }
-  return { game, size, ...(table && { table: table.slot !== undefined ? { slot: table.slot } : table }) };
+  return {
+    game,
+    size,
+    ...(table !== undefined && { table: table.slot !== undefined ? { slot: table.slot } : { x: table.x, z: table.z, yaw: table.yaw } }),
+  };
 }
 
 function roomPath(channelId: string): string {
