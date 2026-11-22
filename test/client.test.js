@@ -169,6 +169,54 @@ test('preserves the original REST connection failure as the error cause', async 
   });
 });
 
+test('reports malformed successful REST JSON with its parse error as the cause', async (t) => {
+  const fetch = t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url) === origin + '/.well-known/fluxer') {
+      return Response.json({ endpoints: { api_public: origin + '/api' } });
+    }
+    if (String(url) === origin + '/api/v1/users/@me') return Response.json(bot);
+    return new Response('<html>not JSON</html>', { status: 200 });
+  });
+  const client = await MicupClient.connect({ token: 'fixture', origin });
+
+  await assert.rejects(client.request('GET', '/malformed'), (error) => {
+    assert.equal(error.message, 'Micup API returned invalid JSON');
+    assert.ok(error.cause instanceof SyntaxError);
+    return true;
+  });
+  assert.equal(fetch.mock.callCount(), 3);
+});
+
+test('preserves the abort reason while reading a successful REST response', async (t) => {
+  let markBodyWaiting;
+  const bodyWaiting = new Promise((resolve) => { markBodyWaiting = resolve; });
+  const fetch = t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (String(url) === origin + '/.well-known/fluxer') {
+      return Response.json({ endpoints: { api_public: origin + '/api' } });
+    }
+    if (String(url) === origin + '/api/v1/users/@me') return Response.json(bot);
+    let streamController;
+    const body = new ReadableStream({
+      start(controller) {
+        streamController = controller;
+        controller.enqueue(new TextEncoder().encode('{"partial":'));
+      },
+      pull: () => markBodyWaiting(),
+    });
+    options.signal.addEventListener('abort', () => streamController.error(new Error('reader stopped')), { once: true });
+    return new Response(body, { headers: { 'Content-Type': 'application/json' } });
+  });
+  const client = await MicupClient.connect({ token: 'fixture', origin });
+  const controller = new AbortController();
+  const reason = new Error('request cancelled');
+  const request = client.request('GET', '/slow', { signal: controller.signal });
+  await bodyWaiting;
+  controller.abort(reason);
+
+  await assert.rejects(request, (error) => error === reason);
+  assert.equal(fetch.mock.callCount(), 3);
+});
+
 test('retries an explicit rate limit, preserves file metadata, and never retries an ambiguous POST', async (t) => {
   let attempts = 0;
   const fetch = t.mock.method(globalThis, 'fetch', async (url, options) => {

@@ -217,6 +217,21 @@ test('routes snowflakes and shuts down all local shards on a fatal close', { tim
   assert.equal(manager.ready, false);
 });
 
+test('rejects shard IDs outside the configured shard range', () => {
+  const create = (shardIds) => new ShardManager({ endpoint: 'ws://localhost', token: 'fixture' }, {
+    shardCount: 3,
+    shardIds,
+    session: { handler: () => {} },
+  });
+
+  assert.throws(() => create([-1]), /within the shard count/);
+  assert.throws(() => create([3]), /within the shard count/);
+  assert.throws(() => create([1.5]), /within the shard count/);
+  assert.throws(() => create([Number.MAX_SAFE_INTEGER + 1]), /within the shard count/);
+  assert.throws(() => create([]), /At least one shard ID/);
+  assert.deepEqual(create([2, 0]).shards.map((shard) => shard.shardId), [0, 2]);
+});
+
 test('completes a voice join while a Gateway event handler waits for the grant', { timeout: 5000 }, async (t) => {
   const { server, endpoint } = await createGateway(t);
   const controller = new AbortController();

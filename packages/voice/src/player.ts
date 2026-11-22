@@ -72,8 +72,14 @@ export class Player {
     }
     const controller = new AbortController();
     signal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
-    signal.throwIfAborted();
-    const iterator = pcm[Symbol.asyncIterator]();
+    let iterator: AsyncIterator<Uint8Array>;
+    try {
+      signal.throwIfAborted();
+      iterator = pcm[Symbol.asyncIterator]();
+    } catch (error) {
+      await Promise.resolve().then(() => pcm.close?.()).catch(() => {});
+      throw error;
+    }
     this.#active = { controller };
     let exhausted = false;
     let used = 0;
@@ -116,6 +122,7 @@ export class Player {
         exhausted = result.done === true;
         if (exhausted) break;
         const chunk = result.value;
+        if (!(chunk instanceof Uint8Array)) throw new TypeError('PCM input must yield Uint8Array chunks');
         for (let index = 0; index < chunk.length;) {
           const size = Math.min(frame.length - used, chunk.length - index);
           frame.set(chunk.subarray(index, index + size), used);

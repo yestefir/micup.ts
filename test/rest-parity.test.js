@@ -73,6 +73,21 @@ test('validates every signed upload URL before writing any part', async (t) => {
   assert.equal(fetch.mock.callCount(), 3);
 });
 
+test('rejects malformed upload plans before sending attachment data', async (t) => {
+  const plans = [
+    { attachments: { length: 1, 0: { upload_filename: 'uploads/example', upload_mode: 'singlepart', upload_url: 'https://storage.example/upload' } } },
+    { attachments: [{ upload_filename: 'uploads/example', upload_mode: 'multipart', upload_id: 'fixture', part_size: 2, parts: [null] }] },
+  ];
+  const { bot, fetch } = await mockBot(t, (url) => {
+    assert.equal(url.pathname, '/api/v1/channels/20/attachments');
+    return Response.json(plans.shift());
+  });
+
+  await assert.rejects(bot.attachments.upload('20', { name: 'sample', data: new Blob(['1234']) }), /invalid upload plan/);
+  await assert.rejects(bot.attachments.upload('20', { name: 'sample', data: new Blob(['1234']) }), /invalid multipart upload plan/);
+  assert.equal(fetch.mock.callCount(), 4);
+});
+
 test('rejects public cleartext upload URLs before sending attachment data', async (t) => {
   const { bot, fetch } = await mockBot(t, (url) => {
     assert.equal(url.pathname, '/api/v1/channels/20/attachments');
@@ -122,6 +137,73 @@ test('uses token-only webhook requests, forwards messages and searches in contex
   assert.equal((await bot.searchMessages({ context_guild_id: '10', pinned: false, page: 1 })).total, 1);
   assert.equal((await bot.forwardMessage('30', { channel_id: '20', message_id: '90', attachment_ids: ['80'] })).id, '92');
   assert.equal(fetch.mock.callCount(), 5);
+});
+
+test('covers webhook management, thread options and token-authenticated message routes', async (t) => {
+  const calls = [];
+  const { bot } = await mockBot(t, async (url, options) => {
+    calls.push({
+      method: options.method,
+      path: url.pathname,
+      query: url.search,
+      authorization: options.headers.get('Authorization'),
+      reason: options.headers.get('X-Audit-Log-Reason'),
+      body: typeof options.body === 'string' ? JSON.parse(options.body) : undefined,
+    });
+    return options.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json({ id: '60' });
+  });
+
+  await bot.webhooks.channel('20');
+  await bot.webhooks.guild('10');
+  await bot.webhooks.create('20', 'fixture', { avatar: 'data:image/png;base64,AA==', reason: 'test' });
+  await bot.webhooks.get('60');
+  await bot.webhooks.get('60', { token: 'webhook/token' });
+  await bot.webhooks.edit('60', { name: 'renamed', channel_id: '21' }, { reason: 'move' });
+  await bot.webhooks.edit('60', { avatar: null }, { token: 'webhook/token' });
+  await bot.webhooks.delete('60', { reason: 'remove' });
+  await bot.webhooks.delete('60', { token: 'webhook/token' });
+  await bot.webhooks.execute('60', 'webhook/token', { content: 'forum', files: [] }, {
+    threadName: 'Fixture thread', appliedTags: ['40'], username: 'speaker', avatarURL: 'https://cdn.example/avatar.png',
+  });
+  await bot.webhooks.message('60', 'webhook/token', '70', { threadId: '30' });
+  await bot.webhooks.editMessage('60', 'webhook/token', '70', { content: 'edited' });
+  await bot.webhooks.deleteMessage('60', 'webhook/token', '70');
+
+  assert.deepEqual(calls.map(({ method, path }) => [method, path]), [
+    ['GET', '/api/v1/channels/20/webhooks'],
+    ['GET', '/api/v1/guilds/10/webhooks'],
+    ['POST', '/api/v1/channels/20/webhooks'],
+    ['GET', '/api/v1/webhooks/60'],
+    ['GET', '/api/v1/webhooks/60/webhook%2Ftoken'],
+    ['PATCH', '/api/v1/webhooks/60'],
+    ['PATCH', '/api/v1/webhooks/60/webhook%2Ftoken'],
+    ['DELETE', '/api/v1/webhooks/60'],
+    ['DELETE', '/api/v1/webhooks/60/webhook%2Ftoken'],
+    ['POST', '/api/v1/webhooks/60/webhook%2Ftoken'],
+    ['GET', '/api/v1/webhooks/60/webhook%2Ftoken/messages/70'],
+    ['PATCH', '/api/v1/webhooks/60/webhook%2Ftoken/messages/70'],
+    ['DELETE', '/api/v1/webhooks/60/webhook%2Ftoken/messages/70'],
+  ]);
+  assert.equal(calls[2].authorization, 'Bot fixture');
+  assert.equal(calls[2].reason, 'test');
+  assert.deepEqual(calls[5].body, { name: 'renamed', channel_id: '21' });
+  assert.equal(calls[6].authorization, null);
+  assert.deepEqual(calls[9].body, {
+    content: 'forum', username: 'speaker', avatar_url: 'https://cdn.example/avatar.png',
+    thread_name: 'Fixture thread', applied_tags: ['40'],
+  });
+  assert.equal(calls[9].authorization, null);
+  assert.equal(calls[9].query, '');
+  assert.equal(calls[10].query, '?thread_id=30');
+
+  assert.throws(() => bot.webhooks.get('60', { token: '..' }), /webhook token/);
+  assert.throws(() => bot.webhooks.edit('60', {}, {}), /need a change/);
+  assert.throws(() => bot.webhooks.edit('60', { channel_id: '21' }, { token: 'webhook/token' }), /must move/);
+  assert.throws(() => bot.webhooks.execute('60', 'token', ''), /needs content/);
+  assert.throws(() => bot.webhooks.execute('60', 'token', { content: 'x', components: [{}] }), /cannot carry components/);
+  assert.throws(() => bot.webhooks.execute('60', 'token', 'x', { threadId: '30', threadName: 'new' }), /either an existing thread/);
+  assert.throws(() => bot.webhooks.execute('60', 'token', 'x', { appliedTags: ['40'] }), /up to five tags/);
+  assert.throws(() => bot.webhooks.editMessage('60', 'token', '70', {}), /need a change/);
 });
 
 test('keeps forum message attachments inside the starter message payload', async (t) => {

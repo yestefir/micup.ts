@@ -35,6 +35,17 @@ test('plays full and short frames split across input chunks', async () => {
   assert.equal(drained, true);
 });
 
+test('rejects non-byte PCM chunks and leaves the player reusable', async () => {
+  const written = [];
+  const player = new Player({ async write(frame) { written.push(frame); } });
+  const invalid = (async function* () { yield { length: 0 }; })();
+  await assert.rejects(player.play(invalid), /PCM input must yield Uint8Array chunks/);
+  assert.equal(player.playing, false);
+
+  await player.play((async function* () { yield pcm([1, 2]); })());
+  assert.equal(written.length, 1);
+});
+
 test('skip wakes a paused player and leaves it available for reuse', async () => {
   const written = [];
   const player = new Player({ async write(frame) { written.push(frame); } });
@@ -48,6 +59,36 @@ test('skip wakes a paused player and leaves it available for reuse', async () =>
   assert.equal(written.length, 0);
   await player.play(source());
   assert.equal(written.length, 1);
+});
+
+test('closes the PCM source when playback is cancelled before iteration starts', async () => {
+  const player = new Player({ async write() {} });
+  const controller = new AbortController();
+  const reason = new Error('cancelled before playback');
+  let closed = 0;
+  const source = {
+    [Symbol.asyncIterator]() { assert.fail('an aborted source must not be iterated'); },
+    close() { closed++; },
+  };
+  controller.abort(reason);
+
+  await assert.rejects(player.play(source, { signal: controller.signal }), (error) => error === reason);
+  assert.equal(closed, 1);
+  assert.equal(player.playing, false);
+});
+
+test('closes the PCM source when iterator creation fails', async () => {
+  const player = new Player({ async write() {} });
+  const reason = new Error('iterator creation failed');
+  let closed = 0;
+  const source = {
+    [Symbol.asyncIterator]() { throw reason; },
+    close() { closed++; },
+  };
+
+  await assert.rejects(player.play(source), (error) => error === reason);
+  assert.equal(closed, 1);
+  assert.equal(player.playing, false);
 });
 
 test('skipping a stalled input closes the source and clears queued audio before playback ends', async () => {

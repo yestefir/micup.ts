@@ -261,7 +261,12 @@ async function readJson(response: Response, limit: number): Promise<unknown> {
   } finally {
     reader.releaseLock();
   }
-  return size ? JSON.parse(Buffer.concat(chunks, size).toString('utf8')) : undefined;
+  if (!size) return undefined;
+  try {
+    return JSON.parse(Buffer.concat(chunks, size).toString('utf8'));
+  } catch (cause) {
+    throw new Error('Micup API returned invalid JSON', { cause });
+  }
 }
 
 export class RestTransport {
@@ -396,7 +401,14 @@ export class RestTransport {
       if (response.ok) {
         this.#rejected.delete(guardKey);
         if (authenticated) this.#unauthorized.count = 0;
-        return await readJson(response, 2 * 1024 * 1024) as T;
+        try {
+          const result = await readJson(response, 2 * 1024 * 1024);
+          signal?.throwIfAborted();
+          return result as T;
+        } catch (error) {
+          signal?.throwIfAborted();
+          throw error;
+        }
       }
 
       const errorBody = await readJson(response, 64 * 1024).catch(() => undefined);

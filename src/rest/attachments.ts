@@ -71,8 +71,10 @@ export class MicupAttachments {
       body: { attachments: [{ id: 0, filename: name, file_size: data.size, content_type: type }] },
     });
 
-    const item = plan?.attachments?.[0];
-    if (plan?.attachments?.length !== 1 || typeof item?.upload_filename !== 'string' || !item.upload_filename) {
+    const attachments = plan?.attachments;
+    const item = Array.isArray(attachments) ? attachments[0] : undefined;
+    if (!Array.isArray(attachments) || attachments.length !== 1 || typeof item?.upload_filename !== 'string' ||
+        !item.upload_filename || item.content_type !== undefined && typeof item.content_type !== 'string') {
       throw new Error('Micup returned an invalid upload plan');
     }
     const contentType = item.content_type || type;
@@ -80,12 +82,18 @@ export class MicupAttachments {
       await put(uploadURL(item.upload_url), data, signal, contentType);
     } else if (item.upload_mode === 'multipart') {
       const size = item.part_size;
-      if (!size || !Number.isSafeInteger(size) || size < 1 || !item.upload_id ||
+      if (!size || !Number.isSafeInteger(size) || size < 1 || typeof item.upload_id !== 'string' || !item.upload_id ||
           !Array.isArray(item.parts) || item.parts.length !== Math.ceil(data.size / size)) {
         throw new Error('Micup returned an invalid multipart upload plan');
       }
+      if (item.parts.some((part) => !part || typeof part !== 'object' ||
+          !Number.isSafeInteger(part.part_number) || typeof part.upload_url !== 'string')) {
+        throw new Error('Micup returned an invalid multipart upload plan');
+      }
       const urls = [...item.parts].sort((a, b) => a.part_number - b.part_number).map((part, index) => {
-        if (part.part_number !== index + 1) throw new Error('Micup returned an invalid multipart upload plan');
+        if (part.part_number !== index + 1) {
+          throw new Error('Micup returned an invalid multipart upload plan');
+        }
         return uploadURL(part.upload_url);
       });
       for (const [index, url] of urls.entries()) {

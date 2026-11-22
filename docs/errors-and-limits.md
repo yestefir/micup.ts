@@ -32,7 +32,7 @@ try {
 
 `MicupErrorCode` names the codes the SDK knows, including `NEW_DM_RATE_LIMITED` (the bot messaged too many new people) and `SPAM_BLOCKED`. A request can also fail with `FEATURE_TEMPORARILY_DISABLED` when the service has a feature switched off.
 
-Other errors: `GatewayCloseError` (the Gateway closed; `fatal` says whether the SDK stops), `GatewayRequestError` (a member or count request failed), `VoiceRefusedError` (the channel is full or a voice option is unavailable), and REST, Gateway or attachment-upload connection `Error` objects with the original network error in `cause`. Invalid arguments raise `TypeError` or `RangeError`. The SDK checks arguments before it sends a request.
+Other errors: REST responses with malformed JSON have `Micup API returned invalid JSON` with the parse error in `cause`; `GatewayCloseError` (the Gateway closed; `fatal` says whether the SDK stops), `GatewayRequestError` (a member or count request failed), `VoiceRefusedError` (the channel is full or a voice option is unavailable), and REST, Gateway or attachment-upload connection `Error` objects with the original network error in `cause`. Invalid arguments raise `TypeError` or `RangeError`. The SDK checks arguments before it sends a request.
 
 ## Rate limits and retries
 
@@ -49,7 +49,7 @@ Repeated rejected requests can get an address blocked, so do not loop on a faili
 
 ## Cancellation
 
-Pass `{ signal }` to any method. `AbortSignal.timeout(ms)` gives a deadline. Gateway handlers receive a signal that aborts when the connection or session is replaced; pass it on to your requests.
+Pass `{ signal }` to any method. REST requests preserve the signal's abort reason even when cancellation interrupts response-body reading. `AbortSignal.timeout(ms)` gives a deadline. Gateway handlers receive a signal that aborts when the connection or session is replaced; pass it on to your requests.
 
 ## Permission warnings
 

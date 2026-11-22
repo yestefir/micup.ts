@@ -6,7 +6,10 @@
 
 - REST and Gateway connection errors retain their original causes; attachment upload and LiveKit connection failures do the same. FFmpeg startup and input stream errors retain their underlying causes, and stream listeners are removed when the process closes.
 - REST accepts HTTP-date `Retry-After` values, rejects dot-segment paths, discards malformed API field errors, bounds learned route and bucket tables, and masks webhook and interaction tokens in permission logs.
+- REST preserves the caller's abort reason when cancellation interrupts a successful response body.
+- Malformed successful REST responses report an SDK error with the JSON parse failure in `cause`.
 - Attachment data is sent only to HTTPS upload URLs, except loopback HTTP endpoints used for local testing.
+- Attachment upload plans are validated before any signed upload URL receives file data.
 - Discovery rejects malformed endpoint documents and URLs before sending the bot token to the API.
 - Aborted application metadata lookups do not cancel requests from other callers.
 - Client login rejects bot identity responses without a numeric bot ID.
@@ -16,6 +19,8 @@
 - `background()` contains failures from synchronous and asynchronous error reporters.
 - Easy Client falls back to its generic interaction reply when a custom error formatter throws.
 - Gateway voice grants, FFmpeg executables, readable audio inputs and player PCM sources are validated before use. Abort listener setup is consistent across REST, Gateway and interaction waits.
+- Voice players close PCM sources when cancellation or iterator creation prevents playback from starting.
+- Voice players reject PCM sources that yield non-byte chunks instead of silently skipping them.
 - Voice event emitters contain synchronous listener throws and asynchronous listener rejections, forwarding failures to registered `error` listeners.
 
 ### Compatibility
