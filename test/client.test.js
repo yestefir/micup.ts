@@ -47,7 +47,14 @@ test('exposes HTTP rate limit details', async (t) => {
     if (String(url) === origin + '/.well-known/fluxer') {
       return Response.json({ endpoints: { api_public: origin + '/api' } });
     }
-    return Response.json({ message: 'Slow down' }, {
+    return Response.json({
+      message: 'Slow down',
+      errors: [
+        { path: 'content', code: 'EMPTY', message: 'Content is empty' },
+        null,
+        { path: 4, code: 'INVALID', message: 'Malformed field error' },
+      ],
+    }, {
       status: 429,
       headers: { 'Retry-After': '2' },
     });
@@ -57,6 +64,40 @@ test('exposes HTTP rate limit details', async (t) => {
     assert.ok(error instanceof MicupAPIError);
     assert.equal(error.status, 429);
     assert.equal(error.retryAfter, '2');
+    assert.deepEqual(error.errors, [{ path: 'content', code: 'EMPTY', message: 'Content is empty' }]);
+    return true;
+  });
+});
+
+test('parses an HTTP-date Retry-After header', async (t) => {
+  const retryAt = new Date(Date.now() + 10_000).toUTCString();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url) === origin + '/.well-known/fluxer') {
+      return Response.json({ endpoints: { api_public: origin + '/api' } });
+    }
+    return Response.json({ message: 'Slow down' }, { status: 429, headers: { 'Retry-After': retryAt } });
+  });
+
+  await assert.rejects(MicupClient.connect({ token: 'fixture', origin, maxRestAttempts: 1 }), (error) => {
+    assert.ok(error instanceof MicupAPIError);
+    assert.equal(error.retryAfter, retryAt);
+    assert.ok(error.retryAfterMs > 0 && error.retryAfterMs <= 10_000);
+    return true;
+  });
+});
+
+test('preserves the original REST connection failure as the error cause', async (t) => {
+  const cause = new TypeError('fixture socket failure');
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url) === origin + '/.well-known/fluxer') {
+      return Response.json({ endpoints: { api_public: origin + '/api' } });
+    }
+    throw cause;
+  });
+
+  await assert.rejects(MicupClient.connect({ token: 'fixture', origin, maxRestAttempts: 1 }), (error) => {
+    assert.equal(error.message, 'Micup API connection failed');
+    assert.equal(error.cause, cause);
     return true;
   });
 });

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Reliability and security
+
+- REST and Gateway connection errors retain their original causes; attachment upload and LiveKit connection failures do the same. FFmpeg startup and input stream errors retain their underlying causes, and stream listeners are removed when the process closes.
+- REST accepts HTTP-date `Retry-After` values, discards malformed API field errors, bounds learned route and bucket tables, and masks webhook and interaction tokens in permission logs.
+- Gateway voice grants, FFmpeg executables, readable audio inputs and player PCM sources are validated before use. Abort listener setup is consistent across REST, Gateway and interaction waits.
+- Voice event emitters contain synchronous listener throws and asynchronous listener rejections, forwarding failures to registered `error` listeners.
+
+### Compatibility
+
+- CI exercises Node.js 20.20 alongside 22 and 24 on Linux, Windows and macOS.
+
 ## 1.3.0 - 2026-11-22
 
 ### Compatibility and packaging

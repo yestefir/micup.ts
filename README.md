@@ -159,7 +159,7 @@ Your code still decides whom the bot messages and what it says; the SDK never wo
 
 ## Reliability
 
-The test suite runs the SDK against mocked servers and a local LiveKit room. Releases are also checked end to end against the Micup service with a live bot: commands, autocomplete, buttons, select menus, modals, deferred and private replies, REST resources and voice playback.
+The test suite runs the SDK against mocked servers and a local LiveKit room. Run `npm run test:live` with `MICUP_TEST_BOT_TOKEN` set for read-only checks of bot identity, application access and the Gateway handshake. It does not create or edit server data and does not accept a user token. The `Live smoke` workflow can run these checks weekly after `MICUP_TEST_BOT_TOKEN` is added as a repository secret; set `MICUP_TEST_ORIGIN` as a repository variable for a non-production sandbox.
 
 Run `npm ci` once, then `npm test` to verify both workspaces locally.
 

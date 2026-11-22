@@ -148,13 +148,18 @@ export class SessionVoice {
   }
 
   #receiveGrant(packet: Partial<VoiceServerUpdate> | null): void {
-    if (!packet?.guild_id) return;
+    if (!packet || typeof packet.guild_id !== 'string' || !validId(packet.guild_id)) return;
     const guildId = packet.guild_id;
     const join = this.#joins.get(guildId);
     const previous = this.#grants.get(guildId);
     const channel = packet.channel_id || join?.channelId || previous?.channel_id;
-    if (!packet.endpoint || !packet.token || !packet.connection_id || !channel) {
-      if (join) this.#fail(join, new Error('Micup returned an incomplete voice grant'));
+    if (typeof packet.endpoint !== 'string' || !packet.endpoint.trim() ||
+        typeof packet.token !== 'string' || !packet.token.trim() ||
+        typeof packet.connection_id !== 'string' || !packet.connection_id.trim() ||
+        typeof channel !== 'string' || !validId(channel) ||
+        (packet.p2p !== undefined && typeof packet.p2p !== 'boolean') ||
+        (packet.e2ee_key !== undefined && packet.e2ee_key !== null && typeof packet.e2ee_key !== 'string')) {
+      if (join) this.#fail(join, new Error('Micup returned an invalid voice grant'));
       if (previous) this.#lose(previous);
       return;
     }

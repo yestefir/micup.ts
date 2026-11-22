@@ -1,0 +1,26 @@
+name: Live smoke
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Run live checks
+        env:
+          MICUP_TEST_BOT_TOKEN: ${{ secrets.MICUP_TEST_BOT_TOKEN }}
+          MICUP_TEST_ORIGIN: ${{ vars.MICUP_TEST_ORIGIN }}
+        run: |
+          if [[ -z "$MICUP_TEST_BOT_TOKEN" ]]; then
+            echo 'Configure the MICUP_TEST_BOT_TOKEN repository secret to enable live checks.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            npm run test:live
+          fi

@@ -45,6 +45,13 @@ function routeKey(method: RestMethod, path: string): string {
   }).join('/');
 }
 
+function redactSensitivePath(path: string): string {
+  const parts = path.split('/');
+  return parts.map((part, index) =>
+    part && (parts[index - 2] === 'webhooks' || parts[index - 2] === 'interactions') ? '{token}' : part,
+  ).join('/');
+}
+
 interface Bucket {
   known: boolean;
   limit: number;
@@ -78,15 +85,21 @@ class RateLimits {
     let bucket = this.#buckets.get(key);
     if (!bucket) {
       bucket = { known: false, limit: Infinity, tokens: Infinity, at: 0, rate: 0, inFlight: 0, blockedUntil: 0, waiters: new Set(), fifo: [] };
-      this.#buckets.set(key, bucket);
-      if (this.#buckets.size > bucketTableLimit) {
-        for (const [stored, candidate] of this.#buckets) {
-          if (!candidate.inFlight && !candidate.waiters.size && candidate !== bucket) this.#buckets.delete(stored);
-          if (this.#buckets.size <= bucketTableLimit / 2) break;
-        }
-      }
+      this.#storeBucket(key, bucket);
     }
     return bucket;
+  }
+
+  #storeBucket(key: string, bucket: Bucket): void {
+    this.#buckets.set(key, bucket);
+    if (this.#buckets.size <= bucketTableLimit) return;
+    for (const [stored, candidate] of this.#buckets) {
+      if (stored !== key && !candidate.inFlight && !candidate.waiters.size) {
+        this.#buckets.delete(stored);
+        for (const [route, id] of this.#routes) if (id === stored) this.#routes.delete(route);
+      }
+      if (this.#buckets.size <= bucketTableLimit / 2) break;
+    }
   }
 
   async acquire(route: string, signal?: AbortSignal): Promise<Lease> {
@@ -149,7 +162,7 @@ class RateLimits {
     if (id) {
       const shared = this.#buckets.get(id);
       if (shared) bucket = shared;
-      else this.#buckets.set(id, leased);
+      else this.#storeBucket(id, leased);
       this.#routes.delete(route);
       this.#routes.set(route, id);
       if (this.#routes.size > routeTableLimit) {
@@ -284,7 +297,8 @@ export class RestTransport {
     const guildId = /^\/guilds\/(\d+)/.exec(path)?.[1];
     try {
       this.logger.warn('bot lacks permission for this request', {
-        method, path, code: error.code, ...(guildId && { guild: guildId }), ...(error.message && { message: error.message }),
+        method, path: redactSensitivePath(path), code: error.code,
+        ...(guildId && { guild: guildId }), ...(error.message && { message: error.message }),
       });
     } catch {}
   }

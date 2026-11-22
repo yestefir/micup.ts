@@ -74,7 +74,7 @@ Wait until the session is ready before you connect. The bot needs `Connect` and 
 | `disconnect` | the connection closed; the argument is the reason, if any |
 | `error` | a source failed; the promise of `play()` rejects as well |
 
-A dropped LiveKit room closes the connection, leaves the channel and emits `disconnect`. Events never throw: `error` is only emitted when you listen for it.
+A dropped LiveKit room closes the connection, leaves the channel and emits `disconnect`. Listener exceptions never escape `emit()`; synchronous throws and rejected listener promises are sent to `error` listeners when present. The `error` event is only emitted when you listen for it.
 
 When the bot is moved, the Gateway sends a new grant to `onVoiceGrant`. `regrant()` stops the current track, closes the old room and connects to the new one.
 

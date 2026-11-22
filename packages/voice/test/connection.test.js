@@ -192,3 +192,21 @@ test('the typed emitter supports once, off and listener counts without Node type
   emitter.removeAllListeners();
   assert.equal(emitter.listenerCount('a'), 0);
 });
+
+test('the typed emitter contains sync and async listener failures', async () => {
+  const { TypedEmitter } = await import('@micup.ts/voice');
+  const emitter = new TypedEmitter();
+  const seen = [];
+  emitter.on('error', (error) => seen.push(error.message));
+  emitter.on('tick', () => { throw new Error('sync failure'); });
+  emitter.on('tick', async () => { throw new Error('async failure'); });
+  emitter.on('tick', (value) => seen.push('tick:' + value));
+
+  assert.doesNotThrow(() => emitter.emit('tick', 1));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(seen, ['sync failure', 'tick:1', 'async failure']);
+
+  const withoutErrorListener = new TypedEmitter();
+  withoutErrorListener.on('tick', () => { throw new Error('contained failure'); });
+  assert.doesNotThrow(() => withoutErrorListener.emit('tick'));
+});

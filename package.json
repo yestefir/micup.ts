@@ -66,6 +66,7 @@
   "scripts": {
     "build": "tsc",
     "test": "npm run build && node --test \"test/*.test.js\" && npm run test --workspaces && tsc -p test/tsconfig.json",
+    "test:live": "npm run build && node scripts/live-smoke.js",
     "prepack": "npm run build"
   },
   "dependencies": {

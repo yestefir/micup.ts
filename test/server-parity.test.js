@@ -327,6 +327,29 @@ test('warns once a minute when the bot lacks a permission', async (t) => {
   });
 });
 
+test('masks webhook and interaction tokens in permission logs', async (t) => {
+  const warnings = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url) === origin + '/.well-known/fluxer') return Response.json({ endpoints: { api_public: origin + '/api' } });
+    if (String(url) === origin + '/api/v1/users/@me') return Response.json({ id: '77', bot: true });
+    return Response.json({ code: 'MISSING_ACCESS', message: 'Missing Access' }, { status: 403 });
+  });
+  const bot = await MicupClient.connect({
+    origin,
+    token: 'fixture',
+    logger: { warn: (message, fields) => warnings.push({ message, fields }) },
+  });
+
+  await assert.rejects(bot.webhooks.execute('60', 'webhook-secret', 'hello'));
+  await assert.rejects(bot.interactions.respond({ id: '70', token: 'interaction-secret' }, 'hello'));
+  assert.deepEqual(warnings.map(({ fields }) => fields.path), [
+    '/webhooks/60/{token}',
+    '/interactions/70/{token}/callback',
+  ]);
+  assert.equal(JSON.stringify(warnings).includes('webhook-secret'), false);
+  assert.equal(JSON.stringify(warnings).includes('interaction-secret'), false);
+});
+
 test('runs background work without blocking or crashing the caller', async () => {
   const errors = [];
   let ran = false;
