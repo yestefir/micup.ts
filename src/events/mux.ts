@@ -46,7 +46,7 @@ type EventHandler<Data = unknown> = (
   data: Data,
   event: GatewayDispatch,
   signal: AbortSignal,
-) => void | Promise<void>;
+) => unknown;
 
 export class EventMux<Events = MicupEvents> {
   readonly #handlers = new Map<string, Set<EventHandler>>();

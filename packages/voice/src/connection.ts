@@ -14,7 +14,7 @@ export interface VoiceConnectionGrant extends VoiceGrant {
 
 export interface VoiceSessionLike {
   joinVoice(guildId: string, channelId: string, options?: { selfMute?: boolean; selfDeaf?: boolean; signal?: AbortSignal }): Promise<VoiceConnectionGrant>;
-  leaveVoice(guildId: string, connectionId: string, signal?: AbortSignal): Promise<void>;
+  leaveVoice(guildId: string, connectionId: string, options?: { signal?: AbortSignal }): Promise<void>;
 }
 
 export interface RoomLike extends PCMTrack {

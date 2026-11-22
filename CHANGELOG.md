@@ -4,6 +4,8 @@
 
 - `client.newSession()` and the shard manager accept a `logger` option that reports Gateway readiness, resumes, invalidated sessions and disconnects (close code, whether it reconnects) with the shard number. This matches `SessionOptions.Logger` of micup.go.
 - `MicupLogger` has an optional `info` method next to `warn`.
+- Fixed: `EventMux` handlers can return any value, so `(interaction, event, signal) => router.handle(interaction, signal)` type-checks.
+- Fixed: `GatewaySession` can be passed to `VoiceConnection.connect()` in TypeScript (the `leaveVoice` signature of `VoiceSessionLike` matched the wrong shape).
 - Package metadata: `main` and `types` fallbacks, `sideEffects: false` and a bug tracker URL.
 - `@micup.ts/voice` 1.1.1: a rewritten README with the full API of `VoiceConnection` and the lower-level exports, and the same metadata.
 
