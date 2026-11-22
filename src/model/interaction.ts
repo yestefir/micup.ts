@@ -14,6 +14,7 @@ export interface CommandChoice {
   name: string;
   value: string | number;
   name_localizations?: Localizations;
+  name_localized?: string;
 }
 
 export interface CommandOption {
@@ -22,6 +23,8 @@ export interface CommandOption {
   description: string;
   name_localizations?: Localizations;
   description_localizations?: Localizations;
+  name_localized?: string;
+  description_localized?: string;
   required?: boolean;
   choices?: readonly CommandChoice[];
   options?: readonly CommandOption[];
@@ -39,6 +42,8 @@ export interface CommandDefinition {
   description?: string;
   name_localizations?: Localizations;
   description_localizations?: Localizations;
+  name_localized?: string;
+  description_localized?: string;
   options?: readonly CommandOption[];
   default_member_permissions?: string | null;
   dm_permission?: boolean;

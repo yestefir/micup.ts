@@ -42,6 +42,8 @@ const client = new Client({
 | `registerCommands` | `false` turns automatic registration off; `{ guildId, prune }` scopes it (default: global commands, no pruning) |
 | `errorReply` | the private message sent when a routed handler fails before answering: a string, a function `(error, interaction) => string`, or `false` for none |
 | `sequential` | `true` waits for each listener before the next event (default: listeners run concurrently) |
+| `catalog` | a `MessageCatalog`: commands are translated from it at login and `interaction.t()` answers in the user's language, see [Localization](localization.md) |
+| `localizeCommands`, `strictLocalization` | `false` skips translating commands; `true` checks that default texts match the catalog |
 | `readyTimeoutMs` | how long to wait for the initial servers before `ready` (default 15 s) |
 
 `await client.destroy()` stops the Gateway and clears the session. `client.ready`, `client.user`, `client.readyAt`, `client.uptime`, `client.latency` and `client.guildCount` report state.
@@ -125,7 +127,8 @@ Common to all: `user`, `member`, `guild`, `channel`, `guildId`, `channelId`, `lo
 | `deferReply({ ephemeral })` | answer later within 15 minutes |
 | `editReply(content)`, `fetchReply()`, `deleteReply()` | work on the first answer |
 | `followUp(content)` | send more messages, also with files |
-| `text(catalog, key, ...values)` | translate with a `MessageCatalog` in the user's locale |
+| `t(key, ...values)` | translate with the client's `catalog` in the user's locale |
+| `text(catalog, key, ...values)` | the same with another `MessageCatalog` |
 
 A second `reply()` throws `InteractionRepliedError` with a hint, and `editReply()` or `followUp()` before an answer does too. Answer within three seconds or defer.
 

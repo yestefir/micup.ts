@@ -37,6 +37,7 @@ export interface MicupClientOptions {
   origin?: string;
   maxRestAttempts?: number;
   logger?: MicupLogger;
+  rejectedRequestLimit?: number;
 }
 
 export class MicupClient {
@@ -61,12 +62,12 @@ export class MicupClient {
   readonly inviteBase: string;
   readonly #origin: string;
 
-  private constructor(key: typeof connection, token: string, api: string, endpoints: { gateway?: string; media?: string; invite?: string }, maxAttempts?: number, logger?: MicupLogger) {
+  private constructor(key: typeof connection, token: string, api: string, endpoints: { gateway?: string; media?: string; invite?: string }, maxAttempts?: number, logger?: MicupLogger, rejectionLimit?: number) {
     if (key !== connection) {
       throw new TypeError('Use MicupClient.connect() to create a client');
     }
     this.#token = token;
-    this.#rest = new RestTransport(api, token, maxAttempts, logger);
+    this.#rest = new RestTransport(api, token, maxAttempts, logger, rejectionLimit);
     this.interactions = new MicupInteractions(this.#rest);
     this.guilds = new MicupGuilds(this.#rest);
     this.channels = new MicupChannels(this.#rest);
@@ -84,7 +85,7 @@ export class MicupClient {
   }
 
   static async connect(
-    { token, origin = defaultOrigin, maxRestAttempts, logger }: MicupClientOptions,
+    { token, origin = defaultOrigin, maxRestAttempts, logger, rejectedRequestLimit }: MicupClientOptions,
     { signal }: MicupRequestOptions = {},
   ): Promise<MicupClient> {
     if (typeof token !== 'string' || !/^[\x21-\x7E]+$/.test(token)) {
@@ -125,7 +126,7 @@ export class MicupClient {
         throw new Error('Micup discovery returned an invalid Gateway endpoint');
       }
     }
-    const client = new MicupClient(connection, token, `${api.href.replace(/\/+$/, '')}/v1`, { ...discovery.endpoints, gateway }, maxRestAttempts, logger);
+    const client = new MicupClient(connection, token, `${api.href.replace(/\/+$/, '')}/v1`, { ...discovery.endpoints, gateway }, maxRestAttempts, logger, rejectedRequestLimit);
     const user = await client.getCurrentUser({ signal });
     if (user?.bot !== true) {
       throw new Error('The credential must belong to a Micup bot');

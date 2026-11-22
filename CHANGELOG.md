@@ -10,6 +10,22 @@
 - `CHANGELOG.md` is published with the package.
 - `@micup.ts/voice` 1.1.2: a missing FFmpeg now fails with a message that explains how to install it or set `FFMPEG_PATH`; the README has installation commands for every system; Node.js 20.3 or later.
 
+### Rate limits and verified bots
+
+- REST requests are paced to at most 45 per second (Micup's global bucket is 50); webhook token requests and interaction callbacks are not counted, as on the server.
+- A rejected request guard: 5 rejections (`401`, `403`, `404`) of the same method and path within a minute stop that request for a minute, and 3 rejections of the token block all authenticated requests for a minute, so a bot cannot get an address blocked by repeating rejected requests. `rejectedRequestLimit` changes it (`0` turns it off).
+- Gateway: member and count requests are limited to 3 in flight (the server drops sized commands above 4), member requests to 10 per account and 35 per guild per 10 seconds, and a second full member list for a guild within 30 seconds is refused locally with `GatewayRequestError` instead of being sent and dropped.
+- A DM compliance suite: a quota that clears within 30 seconds is waited out, a longer one is returned at once, and a spam block is never retried and sends no message.
+- A verified bots guide (`docs/verified-bots.md`) that lists every limit and how the SDK handles it.
+
+### Localization
+
+- `localizeCommand(command, catalog, { prefix, strict })` and `localizeCommands()` fill the name, description, option and choice translations of a command from catalog keys (`play.name`, `play.query.description`, `play.mode.choice.loop`, ...). Explicit translations win and the input is not modified.
+- `MessageCatalog#resolve(locale)` and `MessageCatalog#has(key)`.
+- Command validation names the command, option or choice with a bad translation, drops empty translation maps, and `commands.set()` refuses names that collide once translated. `name_localized` and `description_localized` are typed on the command, option and choice types.
+- The easy client takes a `catalog`: it translates commands at login (and edits them when the catalog changes), `interaction.t(key, ...values)` answers in the language of the user, `client.text(locale, key)` and `SlashCommand#localize(catalog)` are available, and the catalog message `error.generic` becomes the private error reply.
+- A localization guide (`docs/localization.md`). The SDK checks that locale keys look like language tags and does not list language codes; Micup decides which codes it accepts.
+
 ### The easy client
 
 - `micup.ts/easy`: a discord.js-style `Client` on top of the SDK. `new Client()` reads `MICUP_BOT_TOKEN`; `login()` connects, waits for the Gateway and the initial servers, registers commands and emits `ready`. REST-only mode with `gateway: false`; `shards: 'auto'` or a number for sharding.

@@ -42,6 +42,8 @@ The SDK waits for rate-limit windows and retries on its own:
 - `423` retries after at least one second.
 - `5xx` and network errors retry with exponential backoff for requests that are safe to repeat (`GET`, `PUT`, `DELETE`, and `POST` calls marked idempotent).
 - `maxRestAttempts` (1 to 5, default 5) limits the tries.
+- Requests are paced to at most 45 per second so the global bucket of Micup (50 per second) is not hit; webhook token requests and interaction callbacks are not counted.
+- After 5 rejections (`401`, `403`, `404`) of the same method and path within a minute, the SDK stops sending that request for a minute and throws the last error; 3 rejections of the token (`401`) block all authenticated requests for a minute. `rejectedRequestLimit` changes the limit and `0` turns the guard off. See [Verified bots](verified-bots.md).
 
 Repeated rejected requests can get an address blocked, so do not loop on a failing call: a deleted webhook, a revoked token or a missing permission.
 

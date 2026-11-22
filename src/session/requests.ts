@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { GatewayOpcode, type GatewayDispatch } from '../gateway/protocol.js';
 import type { MicupMember, MicupMembersChunk } from '../model/guild.js';
+import { CommandWindow } from '../gateway/window.js';
 import { snowflake } from '../rest/messages.js';
 
 export interface GuildCount {
@@ -46,6 +47,8 @@ function unique(ids: readonly string[], max: number, label: string): string[] {
   return values;
 }
 
+const fullListInterval = 30_000;
+
 class Slots {
   readonly #waiters = new Set<() => void>();
   #active = 0;
@@ -80,8 +83,11 @@ class Slots {
 
 export class SessionRequests {
   readonly #pending = new Map<string, Pending>();
-  readonly #members = new Slots(2);
-  readonly #counts = new Slots(8);
+  readonly #members = new Slots(1);
+  readonly #counts = new Slots(2);
+  readonly #accountMembers = new CommandWindow(10, 10_000);
+  readonly #guildMembers = new Map<string, CommandWindow>();
+  readonly #fullLists = new Map<string, number>();
   #epoch = new AbortController();
 
   constructor(private readonly send: Send) {}
@@ -112,7 +118,24 @@ export class SessionRequests {
       guild_id: guildId, query, limit, presences: presences ?? false,
       ...(userIds?.length ? { user_ids: unique(userIds, 100, 'User ID') } : {}),
     };
+    const fullList = !query && limit === 0 && !userIds?.length;
+    if (fullList) {
+      const wait = fullListInterval - (performance.now() - (this.#fullLists.get(guildId) ?? -Infinity));
+      if (wait > 0) return Promise.reject(new GatewayRequestError(GatewayOpcode.RequestGuildMembers, Math.ceil(wait / 1000)));
+      this.#fullLists.set(guildId, performance.now());
+      if (this.#fullLists.size > 1024) this.#fullLists.delete(this.#fullLists.keys().next().value as string);
+    }
     const chunks = new Map<number, MicupMember[]>();
+    const pace = async (pacing: AbortSignal) => {
+      let window = this.#guildMembers.get(guildId);
+      if (!window) {
+        window = new CommandWindow(35, 10_000);
+        this.#guildMembers.set(guildId, window);
+        if (this.#guildMembers.size > 1024) this.#guildMembers.delete(this.#guildMembers.keys().next().value as string);
+      }
+      await this.#accountMembers.acquire(pacing);
+      await window.acquire(pacing);
+    };
     return this.#request(GatewayOpcode.RequestGuildMembers, 'GUILD_MEMBERS_CHUNK', body, this.#members, signal, (value, resolve, reject) => {
       const chunk = value as MicupMembersChunk;
       if (chunk.guild_id !== guildId) return;
@@ -126,7 +149,7 @@ export class SessionRequests {
       if (chunks.size === chunk.chunk_count) {
         resolve([...chunks].sort(([a], [b]) => a - b).flatMap(([, members]) => members));
       }
-    });
+    }, pace);
   }
 
   receive(event: GatewayDispatch): void {
@@ -150,11 +173,18 @@ export class SessionRequests {
   async #request<T>(
     opcode: number, name: string, body: object, slots: Slots, caller: AbortSignal | undefined,
     accept: (data: unknown, resolve: (value: T) => void, reject: (error: unknown) => void) => void,
+    pace?: (signal: AbortSignal) => Promise<void>,
   ): Promise<T> {
     const signals = [this.#epoch.signal, AbortSignal.timeout(12_000)];
     if (caller) signals.push(caller);
     const signal = AbortSignal.any(signals);
     const release = await slots.acquire(signal);
+    try {
+      await pace?.(signal);
+    } catch (error) {
+      release();
+      throw error;
+    }
 
     const nonce = randomBytes(12).toString('hex');
     let pending!: Pending;

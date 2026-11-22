@@ -22,7 +22,7 @@ export async function typedWiring(client: ConsumerClient): Promise<void> {
 }
 
 import {
-  Client as EasyClient, paginate as easyPaginate, SlashCommand as EasySlashCommand, Permission as EasyPermission, primaryButton as easyButton, actionRow as easyRow,
+  Client as EasyClient, MessageCatalog as EasyCatalog, localizeCommand as easyLocalize, paginate as easyPaginate, SlashCommand as EasySlashCommand, Permission as EasyPermission, primaryButton as easyButton, actionRow as easyRow,
   type CommandInteraction as EasyCommandInteraction, type Message as EasyMessage,
 } from 'micup.ts/easy';
 
@@ -46,6 +46,14 @@ export async function easyUsage(): Promise<void> {
   client.autocomplete('tool echo', (interaction) => interaction.respond(['a', { name: 'B', value: 'b' }]));
   client.command('pages', (interaction) => easyPaginate(interaction, ['a', { content: 'b', embeds: [] }], { jumpButtons: true, timeoutMs: 1000 }).then((outcome) => void outcome.reason));
   client.command('lazy', (interaction) => easyPaginate(interaction, { count: 3, page: async (index: number) => 'page ' + index }));
+  const catalog = new EasyCatalog('en-US', { 'en-US': { 'tool.name': 'tool', hi: 'Hi %s' }, tr: { 'tool.name': 'arac', hi: 'Selam %s' } });
+  const localized = easyLocalize(new EasySlashCommand('tool', 'Tools').toJSON(), catalog, { strict: true });
+  void localized.name_localizations?.tr;
+  const translated = new EasyClient({ catalog, localizeCommands: true, strictLocalization: false });
+  translated.command(new EasySlashCommand('hello', 'Hello').localize(catalog, { prefix: 'tool' }), (interaction) => interaction.reply(interaction.t('hi', interaction.user.displayName)));
+  void catalog.resolve('tr_TR');
+  void catalog.has('hi');
+  void translated.text('tr', 'hi', 'x');
   const result = await client.registerCommands({ prune: false });
   void result.created.length;
   await client.login();

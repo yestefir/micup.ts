@@ -80,6 +80,7 @@ await client.newSession({ handler: events.handle }).run({ signal: stop.signal })
 | Ses odaları | 3D oda sahnesi (oda TV'sinde pano veya video, host, efektler) ve oda turnuvaları | `client.rooms` |
 | Keşif | Sunucu keşif kaydını okuma, başvuru, düzenleme ve geri çekme | `client.discovery` |
 | Olaylar | Tipli Gateway olay kataloğu, olay çoklayıcı ve işleyici sarmalayıcıları | `EventMux`, `knownGatewayEvents`, `safeHandler()` |
+| Yerelleştirme | Her kullanıcıya kendi dilinde yanıt veren ve komut adlarını, açıklamalarını, seçeneklerini ve seçimlerini aynı katalogdan çeviren mesaj kataloğu (`localizeCommand()`, `Client({ catalog })`, `interaction.t()`) | [Yerelleştirme](docs/localization.md) (İngilizce) |
 | Yardımcılar | Sabit grupları, buton ve seçim menüsü oluşturucular, komut seçeneği okuyucuları, izin yardımcıları, etiketleme, zaman damgası, snowflake, yerelleştirilmiş mesaj kataloğu | `ChannelType`, `primaryButton()`, `optionString()`, `permissionNames()` |
 | Ses çalma | FFmpeg çözmeli LiveKit sesi, PCM oynatıcı ve olay yayan bağlantı nesnesi | [`@micup.ts/voice`](packages/voice) |
 
@@ -131,10 +132,24 @@ const client = await MicupClient.connect({
 
 [`@micup.ts/voice`](packages/voice) sesi LiveKit üzerinden ses kanalına yayınlar. `VoiceConnection` kanala girer; dosya, URL, akış veya ham PCM çalar ve `start`, `finish`, `status`, `memberJoin`, `memberLeave`, `disconnect`, `error` olaylarını yayar. `npm install @micup.ts/voice` ile kurun; dosya ve akışları çözmek için FFmpeg kurun.
 
+## Onaylı bot
+
+Micup'ta onaylı bot olmak için üç zorunlu şart vardır ve bunların üçü de modül tarafından yerine getirilmiştir: rate-limit kurallarına tamamen uygundur, DM spam kurallarına tamamen uygundur, komut yerelleştirme kurallarına tamamen uygundur.
+
+| Şart | micup.ts ne yapar |
+| --- | --- |
+| Rate-limit | REST isteklerini Micup'un gönderdiği başlık ve gövdelere göre hızlandırır ve yeniden dener (rota kovaları, `retry_after`, genel kova), her Gateway komutunu bütçesi içinde tutar ve Micup'un reddettiği istekleri tekrarlamayı bırakır |
+| DM spam | kendiliğinden hiç DM göndermez, DM kotasını yalnızca 30 saniye içinde açılıyorsa bekler ve spam engelini asla yeniden denemez (`NEW_DM_RATE_LIMITED`, `SPAM_BLOCKED`) |
+| Komut yerelleştirme | komut adlarını, açıklamalarını, seçeneklerini ve seçimlerini tek katalogdan çevirir ve her etkileşime kullanıcının dilinde yanıt verir |
+
+Botun kime mesaj atacağına ve ne yazacağına yine sizin kodunuz karar verir; SDK hiçbir sınırı aşmaya çalışmaz. Her sınır ve nasıl ele alındığı için [Onaylı botlar](docs/verified-bots.md) (İngilizce) sayfasına bakın.
+
 ## Dokümantasyon
 
 - [Kolay istemci](docs/easy-client.md) (İngilizce): `micup.ts/easy`, olaylar, nesneler, komutlar, etkileşimler ve hatalar
 - [Başlangıç](docs/getting-started.md): token, davet bağlantısı, ilk bot, proje düzeni
+- [Onaylı botlar](docs/verified-bots.md) (İngilizce): rate-limit, DM spam ve yerelleştirme şartlarının nasıl karşılandığı
+- [Yerelleştirme](docs/localization.md) (İngilizce): komutları ve yanıtları her kullanıcının diline çevirme
 - [Komutlar ve etkileşimler](docs/commands-and-interactions.md)
 - [Gateway ve shard](docs/gateway-and-sharding.md)
 - [REST başvurusu](docs/rest-reference.md)

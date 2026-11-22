@@ -43,6 +43,8 @@ export { TimestampStyle, compareSnowflakes, escapeMarkdown, formatEmoji, formatT
 export type { Emoji } from './model/format.js';
 export { MessageCatalog } from './model/locale.js';
 export type { LocalizedMessages } from './model/locale.js';
+export { localizeCommand, localizeCommands } from './model/localize.js';
+export type { LocalizeOptions } from './model/localize.js';
 export { EmbedBuilder, attachmentURL, validateEmbed } from './model/embed.js';
 export { knownGatewayEvents } from './events/names.js';
 export type { AdditionalGatewayEvents, MessageReaction, PresenceUpdate, ThreadMember } from './events/catalog.js';

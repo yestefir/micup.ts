@@ -128,6 +128,12 @@ export class Interaction {
     return catalog.text(this.raw, key, ...values);
   }
 
+  t(key: string, ...values: unknown[]): string {
+    const catalog = this.client.catalog;
+    if (!catalog) throw new Error('Pass a catalog to the client options to use interaction.t()');
+    return catalog.text(this.raw, key, ...values);
+  }
+
   async reply(content: InteractionContent, options?: ReplyOptions): Promise<void> {
     this.#assertFresh('reply');
     const { message, ephemeral, signal } = split(content, options);

@@ -1,6 +1,8 @@
 import type { GatewayDispatch } from '../gateway/protocol.js';
 import { MicupClient } from '../bot/client.js';
 import type { MicupEvents } from '../events/mux.js';
+import type { MessageCatalog } from '../model/locale.js';
+import { localizeCommand } from '../model/localize.js';
 import type { MicupGuild, MicupVoiceState } from '../model/guild.js';
 import type { MicupMessage, MicupUser } from '../model/entities.js';
 import type { CommandDefinition, MicupCommand, MicupInteraction } from '../model/interaction.js';
@@ -127,6 +129,9 @@ export interface ClientOptions {
   readyTimeoutMs?: number;
   errorReply?: string | false | ((error: unknown, interaction: Interaction) => string | undefined);
   registerCommands?: boolean | RegisterCommandsOptions;
+  catalog?: MessageCatalog;
+  localizeCommands?: boolean;
+  strictLocalization?: boolean;
 }
 
 export interface AwaitInteractionOptions<T extends Interaction = Interaction> {
@@ -159,7 +164,7 @@ function strip(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(strip);
   if (value && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([key]) => key !== 'name_localizations' && key !== 'description_localizations')
+      .filter(([key]) => key !== 'name_localized' && key !== 'description_localized')
       .map(([key, item]) => [key, strip(item)] as const)
       .filter(([, item]) => item !== undefined && item !== null && item !== false && item !== '' && !(Array.isArray(item) && !item.length));
     return Object.fromEntries(entries.sort(([a], [b]) => a < b ? -1 : 1));
@@ -170,6 +175,8 @@ function strip(value: unknown): unknown {
 function sameCommand(existing: MicupCommand, wanted: CommandDefinition): boolean {
   const pick = (command: CommandDefinition) => strip({
     description: command.description ?? '',
+    name_localizations: command.name_localizations,
+    description_localizations: command.description_localizations,
     options: command.options,
     default_member_permissions: command.default_member_permissions,
     dm_permission: command.dm_permission === true ? undefined : command.dm_permission,
@@ -336,7 +343,22 @@ export class Client {
   }
 
   get commandDefinitions(): readonly CommandDefinition[] {
-    return [...this.#definitions];
+    return this.#localized();
+  }
+
+  get catalog(): MessageCatalog | undefined {
+    return this.options.catalog;
+  }
+
+  text(locale: string | undefined, key: string, ...values: unknown[]): string {
+    if (!this.options.catalog) throw new Error('Pass a catalog to the client options to translate messages');
+    return this.options.catalog.textIn(locale, key, ...values);
+  }
+
+  #localized(): CommandDefinition[] {
+    const catalog = this.options.catalog;
+    if (!catalog || this.options.localizeCommands === false) return [...this.#definitions];
+    return this.#definitions.map((definition) => localizeCommand(definition, catalog, { strict: this.options.strictLocalization }));
   }
 
   async login(token?: string): Promise<this> {
@@ -412,7 +434,8 @@ export class Client {
     const existing = await this.rest.commands.list(scope);
     const key = (command: { name: string; type?: number }) => (command.type ?? 1) + ':' + command.name;
     const known = new Map(existing.map((command) => [key(command), command]));
-    for (const definition of this.#definitions) {
+    const wanted = this.#localized();
+    for (const definition of wanted) {
       const found = known.get(key(definition));
       if (!found) {
         await this.rest.commands.create(definition, scope);
@@ -425,9 +448,9 @@ export class Client {
       }
     }
     if (options.prune) {
-      const wanted = new Set(this.#definitions.map(key));
+      const kept = new Set(wanted.map(key));
       for (const command of existing) {
-        if (wanted.has(key(command))) continue;
+        if (kept.has(key(command))) continue;
         await this.rest.commands.delete(command.id, scope);
         result.deleted.push(command.name);
       }
@@ -698,7 +721,8 @@ export class Client {
   async #replyWithError(error: unknown, interaction: Interaction): Promise<void> {
     const setting = this.options.errorReply;
     if (setting === false || interaction.replied || interaction.deferred || interaction.isAutocomplete()) return;
-    const content = typeof setting === 'function' ? setting(error, interaction) : setting ?? defaultErrorReply;
+    const translated = this.options.catalog?.has('error.generic') ? this.options.catalog.text(interaction.raw, 'error.generic') : undefined;
+    const content = typeof setting === 'function' ? setting(error, interaction) : setting ?? translated ?? defaultErrorReply;
     if (!content) return;
     try {
       await interaction.reply({ content, ephemeral: true });

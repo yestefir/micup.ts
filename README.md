@@ -80,6 +80,7 @@ await client.newSession({ handler: events.handle }).run({ signal: stop.signal })
 | Voice rooms | The 3D room stage (board or video on the room TV, host, effects) and room tournaments | `client.rooms` |
 | Discovery | Read, apply for, edit and withdraw a server discovery listing | `client.discovery` |
 | Events | A typed catalog of Gateway events, an event mux and handler wrappers | `EventMux`, `knownGatewayEvents`, `safeHandler()` |
+| Localization | A message catalog that answers in each user's language and translates command names, descriptions, options and choices from the same catalog (`localizeCommand()`, `Client({ catalog })`, `interaction.t()`) | [Localization](docs/localization.md) |
 | Helpers | Constant groups, button and select builders, command option readers, permission helpers, mentions, timestamps, snowflakes, localized message catalogs | `ChannelType`, `primaryButton()`, `optionString()`, `permissionNames()` |
 | Voice playback | LiveKit audio with FFmpeg decoding, PCM player and a connection object with events | [`@micup.ts/voice`](packages/voice) |
 
@@ -131,10 +132,24 @@ const client = await MicupClient.connect({
 
 [`@micup.ts/voice`](packages/voice) publishes audio to a voice channel through LiveKit. `VoiceConnection` joins the channel, plays files, URLs, streams or raw PCM, and emits `start`, `finish`, `status`, `memberJoin`, `memberLeave`, `disconnect` and `error`. Install it with `npm install @micup.ts/voice` and install FFmpeg to decode files and streams.
 
+## Verified bots
+
+Applying for Micup's verified status has three mandatory requirements, and micup.ts takes care of all three: it is fully compliant with the rate-limit rules, the DM spam rules and the command localization rules.
+
+| Requirement | What micup.ts does |
+| --- | --- |
+| Rate limits | paces and retries REST requests by the headers and bodies Micup sends (route buckets, `retry_after`, the global bucket), keeps every Gateway command inside its budget, and stops repeating requests Micup rejects |
+| DM spam rules | never sends a DM on its own, waits out a DM quota only when it clears within 30 seconds, and never retries a spam block (`NEW_DM_RATE_LIMITED`, `SPAM_BLOCKED`) |
+| Command localization | translates command names, descriptions, options and choices from one catalog and answers each interaction in the language of the user |
+
+Your code still decides whom the bot messages and what it says; the SDK never works around a limit. See [Verified bots](docs/verified-bots.md) for every limit and how it is handled.
+
 ## Documentation
 
 - [The easy client](docs/easy-client.md): `micup.ts/easy`, events, objects, commands, interactions and errors
 - [Getting started](docs/getting-started.md): token, invite link, first bot, project layout
+- [Verified bots](docs/verified-bots.md): how the SDK meets the rate-limit, DM spam and localization requirements
+- [Localization](docs/localization.md): translate commands and replies into the language of each user
 - [Commands and interactions](docs/commands-and-interactions.md): commands, options, buttons, selects, modals, autocomplete, private replies
 - [Gateway and sharding](docs/gateway-and-sharding.md): sessions, resume, presence, shards, state cache, events
 - [REST reference](docs/rest-reference.md): every resource and method

@@ -33,6 +33,18 @@ export class MessageCatalog {
     this.#fallback = baseLocale;
   }
 
+  has(key: string): boolean {
+    return this.#byLocale.get(this.#fallback)?.has(key) ?? false;
+  }
+
+  resolve(locale: string | undefined): string | undefined {
+    const normalized = normalizeLocale(locale ?? '');
+    if (!normalized) return undefined;
+    const [language] = normalized.split('-');
+    return this.#normalized.get(normalized) ?? this.#normalized.get(language) ??
+      this.locales.find((candidate) => normalizeLocale(candidate).startsWith(language + '-'));
+  }
+
   get fallback(): string {
     return this.#fallback;
   }
@@ -42,10 +54,7 @@ export class MessageCatalog {
   }
 
   textIn(locale: string | undefined, key: string, ...values: unknown[]): string {
-    const normalized = normalizeLocale(locale ?? '');
-    const [language] = normalized.split('-');
-    const preferred = this.#normalized.get(normalized) ?? this.#normalized.get(language) ??
-      this.locales.find((locale) => normalizeLocale(locale).startsWith(language + '-'));
+    const preferred = this.resolve(locale);
     const text = this.#byLocale.get(preferred ?? '')?.get(key) ?? this.#byLocale.get(this.#fallback)?.get(key) ?? key;
     return values.length ? format(text, ...values) : text;
   }

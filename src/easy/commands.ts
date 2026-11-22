@@ -2,6 +2,8 @@ import { CommandOptionType, CommandType, type CommandChoice, type CommandDefinit
 import { modalRows } from '../model/components.js';
 import type { TextInput } from '../model/components.js';
 import type { MicupModal } from '../rest/interactions.js';
+import type { MessageCatalog } from '../model/locale.js';
+import { localizeCommand, type LocalizeOptions } from '../model/localize.js';
 
 type Localizations = Readonly<Record<string, string>>;
 
@@ -143,6 +145,7 @@ export class SlashCommand extends OptionList {
   #descriptionLocalizations?: Localizations;
   #permissions?: bigint;
   #dm?: boolean;
+  #localization?: { catalog: MessageCatalog; options: LocalizeOptions };
 
   constructor(readonly name: string, readonly description: string) {
     super();
@@ -155,6 +158,11 @@ export class SlashCommand extends OptionList {
 
   setDescriptionLocalizations(localizations: Localizations): this {
     this.#descriptionLocalizations = localizations;
+    return this;
+  }
+
+  localize(catalog: MessageCatalog, options: LocalizeOptions = {}): this {
+    this.#localization = { catalog, options };
     return this;
   }
 
@@ -186,7 +194,7 @@ export class SlashCommand extends OptionList {
     const direct = this.buildOptions();
     if (direct.length && this.#children.length) throw new TypeError('A command takes options or subcommands, not both: ' + this.name);
     const options = this.#children.length ? this.#children.map((child) => child.toJSON()) : direct;
-    return {
+    const definition: CommandDefinition = {
       name: this.name,
       description: this.description,
       type: CommandType.ChatInput,
@@ -196,6 +204,7 @@ export class SlashCommand extends OptionList {
       ...(this.#permissions !== undefined && { default_member_permissions: String(this.#permissions) }),
       ...(this.#dm !== undefined && { dm_permission: this.#dm }),
     };
+    return this.#localization ? localizeCommand(definition, this.#localization.catalog, this.#localization.options) : definition;
   }
 }
 

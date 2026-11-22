@@ -6,9 +6,29 @@ import type { MicupRequestOptions, RestTransport } from './transport.js';
 const chatName = /^[-_\p{Ll}\p{Lo}\p{N}]{1,32}$/u;
 const lengthWithin = (value: string | undefined, limit: number) => Boolean(value && [...value].length <= limit);
 
-function validateLocalizations(values: Readonly<Record<string, string>> | undefined, validate: (text: string) => boolean): void {
+function validateLocalizations(values: Readonly<Record<string, string>> | undefined, validate: (text: string) => boolean, what: string): void {
   for (const [locale, text] of Object.entries(values ?? {})) {
-    if (!isLocaleTag(locale) || !validate(text)) throw new TypeError('Invalid command localization: ' + locale);
+    if (!isLocaleTag(locale)) throw new TypeError('"' + locale + '" in ' + what + ' is not a language tag such as tr or en-US');
+    if (typeof text !== 'string' || !validate(text)) throw new TypeError('Invalid translation "' + String(text) + '" in ' + what + ' for the locale ' + locale);
+  }
+}
+
+function nonEmpty(values: Readonly<Record<string, string>> | undefined): Readonly<Record<string, string>> | undefined {
+  return values && Object.keys(values).length ? values : undefined;
+}
+
+function shownNames(command: CommandDefinition): string[] {
+  return [command.name, ...Object.values(command.name_localizations ?? {})];
+}
+
+export function assertUniqueCommandNames(commands: readonly CommandDefinition[]): void {
+  const seen = new Set<string>();
+  for (const command of commands) {
+    for (const name of new Set(shownNames(command))) {
+      const key = (command.type ?? CommandType.ChatInput) + ':' + name;
+      if (seen.has(key)) throw new TypeError('Duplicate command name "' + name + '" (translated names count too)');
+      seen.add(key);
+    }
   }
 }
 
@@ -23,8 +43,8 @@ function validateOptions(options: readonly CommandOption[], depth: number, group
       throw new TypeError('Invalid or duplicate Micup command option: ' + option.name);
     }
     names.add(option.name);
-    validateLocalizations(option.name_localizations, (name) => chatName.test(name));
-    validateLocalizations(option.description_localizations, (text) => lengthWithin(text, 100));
+    validateLocalizations(option.name_localizations, (name) => chatName.test(name), 'the name of option "' + option.name + '"');
+    validateLocalizations(option.description_localizations, (text) => lengthWithin(text, 100), 'the description of option "' + option.name + '"');
     if (!Number.isInteger(option.type) || option.type < 1 || option.type > 11 ||
         (nested && !structural) || (group && option.type !== 1)) {
       throw new TypeError('Invalid Micup option structure');
@@ -46,7 +66,7 @@ function validateOptions(options: readonly CommandOption[], depth: number, group
           ? typeof choice.value === 'string' && lengthWithin(choice.value, 100)
           : typeof choice.value === 'number' && Number.isFinite(choice.value) &&
             (option.type !== 4 || Number.isSafeInteger(choice.value));
-        validateLocalizations(choice.name_localizations, (text) => lengthWithin(text, 100));
+        validateLocalizations(choice.name_localizations, (text) => lengthWithin(text, 100), 'the choice "' + choice.name + '" of option "' + option.name + '"');
         if (!lengthWithin(choice.name, 100) || !validValue) throw new TypeError('Invalid Micup command choice');
       }
     }
@@ -59,15 +79,18 @@ function commandBody(command: CommandDefinition): CommandDefinition {
   const { name, description, options, name_localizations, description_localizations, default_member_permissions, dm_permission } = command;
   if (type === CommandType.ChatInput) {
     if (!chatName.test(name) || !lengthWithin(description, 100)) throw new TypeError('Invalid Micup command name or description');
-    validateLocalizations(name_localizations, (text) => chatName.test(text));
-    validateLocalizations(description_localizations, (text) => lengthWithin(text, 100));
+    validateLocalizations(name_localizations, (text) => chatName.test(text), 'the name of command "' + name + '"');
+    validateLocalizations(description_localizations, (text) => lengthWithin(text, 100), 'the description of command "' + name + '"');
     validateOptions(options ?? [], 0);
   } else if ((type !== CommandType.User && type !== CommandType.Message) ||
       !lengthWithin(name, 32) || description || options?.length) {
     throw new TypeError('Invalid Micup context menu command');
   }
-  if (type !== CommandType.ChatInput) validateLocalizations(name_localizations, (text) => lengthWithin(text, 32));
-  return { type, name, description, options, name_localizations, description_localizations, default_member_permissions, dm_permission };
+  if (type !== CommandType.ChatInput) validateLocalizations(name_localizations, (text) => lengthWithin(text, 32), 'the name of command "' + name + '"');
+  return {
+    type, name, description, options, name_localizations: nonEmpty(name_localizations), description_localizations: nonEmpty(description_localizations),
+    default_member_permissions, dm_permission,
+  };
 }
 
 export interface CommandScope extends MicupRequestOptions {
@@ -110,6 +133,8 @@ export class MicupCommands {
 
   set(commands: readonly CommandDefinition[], scope: CommandScope = {}): Promise<MicupCommand[]> {
     if (commands.length > 100) throw new RangeError('Micup accepts up to 100 commands per scope');
-    return this.rest.request('PUT', this.#path(scope), { ...scope, body: commands.map(commandBody) });
+    const body = commands.map(commandBody);
+    assertUniqueCommandNames(body);
+    return this.rest.request('PUT', this.#path(scope), { ...scope, body });
   }
 }

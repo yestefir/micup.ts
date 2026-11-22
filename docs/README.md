@@ -4,6 +4,8 @@
 | --- | --- |
 | [The easy client](easy-client.md) | write a bot with `micup.ts/easy`: events, `message.reply()`, commands, buttons, modals and error handling |
 | [Getting started](getting-started.md) | install the SDK, get a token, invite the bot and run a first bot |
+| [Verified bots](verified-bots.md) | see how the SDK meets the rate-limit, DM spam and localization requirements of a verified bot |
+| [Localization](localization.md) | translate commands and replies into the language of each user with a message catalog |
 | [Commands and interactions](commands-and-interactions.md) | register slash commands and answer commands, buttons, select menus and modals |
 | [Gateway and sharding](gateway-and-sharding.md) | keep a bot connected, handle events, read cached state and run several shards |
 | [REST reference](rest-reference.md) | find the method for a guild, channel, member, message, webhook or other resource |
