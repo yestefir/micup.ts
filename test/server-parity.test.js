@@ -283,6 +283,39 @@ test('stops paginated iterators when service cursors stop advancing', async (t) 
   ]));
 });
 
+test('stops reaction user pagination when its cursor regresses', async (t) => {
+  const { bot, calls } = await mockBot(t, (url) => {
+    const after = url.searchParams.get('after');
+    return Response.json({
+      items: [{ id: after === null ? '100' : '99', username: 'fixture' }],
+      has_more: true,
+      next_after: after === null ? '100' : '99',
+    });
+  });
+  const ids = [];
+  for await (const user of bot.channels.iterateReactionUsers('20', '30', '👍')) ids.push(user.id);
+  assert.deepEqual(ids, ['100', '99']);
+  assert.equal(calls.length, 2);
+});
+
+test('validates bulk message and forum thread ID arrays', async (t) => {
+  const { bot, calls } = await mockBot(t, (url, options) => {
+    if (url.pathname.endsWith('/post-data')) return Response.json({ threads: {} });
+    return new Response(null, { status: 204 });
+  });
+  await bot.bulkDeleteMessages('20', ['10', '10', '11']);
+  await bot.channels.forumPostData('20', ['30', '31']);
+  assert.deepEqual(calls.map(({ path, body }) => [path, body]), [
+    ['/channels/20/messages/bulk-delete', { message_ids: ['10', '11'] }],
+    ['/channels/20/post-data', { thread_ids: ['30', '31'] }],
+  ]);
+  assert.throws(() => bot.bulkDeleteMessages('20', Array(1)), TypeError);
+  assert.throws(() => bot.bulkDeleteMessages('20', '10'), TypeError);
+  await assert.rejects(bot.channels.forumPostData('20', Array(1)), TypeError);
+  await assert.rejects(bot.channels.forumPostData('20', '30'), TypeError);
+  assert.equal(calls.length, 2);
+});
+
 test('moves channels, clears commands and edits the bot profile', async (t) => {
   const { bot, calls } = await mockBot(t, (url, options) =>
     url.pathname === '/api/v1/users/@me' ? Response.json({ id: '77', username: 'yeni' }) : none());

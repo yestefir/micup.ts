@@ -285,8 +285,11 @@ export class MicupChannels {
     while (true) {
       const page = await this.reactionUsers(id, messageId, emoji, query, options);
       yield* page.items;
-      if (!page.has_more || !page.next_after || page.next_after === query.get('after')) return;
-      query.set('after', page.next_after);
+      if (!page.has_more || !page.next_after) return;
+      const next = snowflake(page.next_after, 'Reaction user cursor');
+      const current = query.get('after');
+      if (current !== null && compareSnowflakes(next, current) <= 0) return;
+      query.set('after', next);
     }
   }
 
@@ -334,7 +337,8 @@ export class MicupChannels {
   async forumPostData(
     channelId: string, threadIds: readonly string[], options?: MicupRequestOptions,
   ): Promise<Record<string, { owner?: MicupMember | null; first_message?: MicupMessage | null }>> {
-    const ids = [...new Set(threadIds.map((id) => snowflake(id, 'Thread ID')))];
+    if (!Array.isArray(threadIds)) throw new TypeError('Forum post thread IDs must be an array');
+    const ids = [...new Set(Array.from(threadIds, (id) => snowflake(id, 'Thread ID')))];
     if (!ids.length || ids.length > 100) throw new RangeError('Forum post data accepts 1 to 100 thread IDs');
     const result = await this.rest.request<{ threads: Record<string, { owner?: MicupMember | null; first_message?: MicupMessage | null }> }>(
       'POST', channelPath(channelId) + '/post-data', { ...options, body: { thread_ids: ids }, idempotent: true },

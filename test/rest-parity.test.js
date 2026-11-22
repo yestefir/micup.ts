@@ -114,6 +114,24 @@ test('allows loopback HTTP upload URLs for local testing', async (t) => {
   assert.equal(uploaded.upload_filename, 'uploads/example');
 });
 
+test('validates attachment URL refresh requests and responses', async (t) => {
+  const original = 'https://cdn.example/attachments/1/file.png';
+  const { bot, fetch } = await mockBot(t, (url, options) => {
+    assert.equal(url.pathname, '/api/v1/attachments/refresh-urls');
+    assert.deepEqual(JSON.parse(options.body), { attachment_urls: [original] });
+    return Response.json({ refreshed_urls: [{ original, refreshed: original + '?fresh=1' }] });
+  });
+  assert.deepEqual(await bot.attachments.refresh([original]), [{ original, refreshed: original + '?fresh=1' }]);
+  await assert.rejects(bot.attachments.refresh('invalid'), TypeError);
+  await assert.rejects(bot.attachments.refresh([null]), TypeError);
+  assert.equal(fetch.mock.callCount(), 3);
+
+  const malformed = await mockBot(t, () => Response.json({ refreshed_urls: [null] }));
+  await assert.rejects(malformed.bot.attachments.refresh([original]), /invalid attachment refresh response/);
+  const sparse = await mockBot(t, () => Response.json({ refreshed_urls: Array(1) }));
+  await assert.rejects(sparse.bot.attachments.refresh([original]), /invalid attachment refresh response/);
+});
+
 test('uses token-only webhook requests, forwards messages and searches in context', async (t) => {
   const { bot, fetch } = await mockBot(t, (url, options) => {
     if (url.pathname.startsWith('/api/v1/webhooks/60/')) {
@@ -136,6 +154,8 @@ test('uses token-only webhook requests, forwards messages and searches in contex
   assert.equal((await bot.webhooks.execute('60', 'test/token', 'hello', { threadId: '30', wait: true, username: 'fixture' })).id, '91');
   assert.equal((await bot.searchMessages({ context_guild_id: '10', pinned: false, page: 1 })).total, 1);
   assert.equal((await bot.forwardMessage('30', { channel_id: '20', message_id: '90', attachment_ids: ['80'] })).id, '92');
+  assert.throws(() => bot.forwardMessage('30', { channel_id: '20', message_id: '90', attachment_ids: Array(1) }), TypeError);
+  assert.throws(() => bot.forwardMessage('30', { channel_id: '20', message_id: '90', embed_indices: Array(1) }), RangeError);
   assert.equal(fetch.mock.callCount(), 5);
 });
 

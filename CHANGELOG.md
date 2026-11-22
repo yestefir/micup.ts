@@ -7,9 +7,13 @@
 - REST and Gateway connection errors retain their original causes; attachment upload and LiveKit connection failures do the same. FFmpeg startup and input stream errors retain their underlying causes, and stream listeners are removed when the process closes.
 - REST accepts HTTP-date `Retry-After` values, rejects dot-segment paths, discards malformed API field errors, bounds learned route and bucket tables, and masks webhook and interaction tokens in permission logs.
 - REST preserves the caller's abort reason when cancellation interrupts a successful response body.
+- REST validates forum tag IDs, archived thread kinds, reaction-user cursors, message mention rules, sticker IDs and attachment references before sending requests.
+- Bulk deletion, forum thread-data, OAuth invite and message-forward arrays reject malformed and sparse values before sending requests.
+- Message file arrays, including sparse arrays, and uploads supplied to `sendMessage`, interaction replies or webhook execution are checked for complete, well-formed metadata before their payload is built.
 - Malformed successful REST responses report an SDK error with the JSON parse failure in `cause`.
 - Attachment data is sent only to HTTPS upload URLs, except loopback HTTP endpoints used for local testing.
 - Attachment upload plans are validated before any signed upload URL receives file data.
+- Attachment URL refresh requests and responses are checked for valid array shapes and string values.
 - Discovery rejects malformed endpoint documents and URLs before sending the bot token to the API.
 - Aborted application metadata lookups do not cancel requests from other callers.
 - Client login rejects bot identity responses without a numeric bot ID.

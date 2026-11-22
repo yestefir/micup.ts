@@ -29,8 +29,22 @@ test('discovers the API, authenticates the bot and sends replies', async (t) => 
 
   const client = await MicupClient.connect({ token: 'fixture', origin });
   assert.deepEqual(await client.getCurrentUser(), bot);
+  assert.match(client.botInviteURL({ scopes: ['bot', 'applications.commands'] }), /scope=bot\+applications.commands/);
+  assert.throws(() => client.botInviteURL({ scopes: Array(1) }), TypeError);
   assert.deepEqual(await client.sendMessage('202', 'Merhaba!', { replyTo: '303' }), message);
   assert.throws(() => client.sendMessage('..', 'test'), /Channel ID/);
+  assert.throws(() => client.sendMessage('202', { content: 'test', sticker_ids: '12' }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', sticker_ids: ['invalid'] }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', allowed_mentions: { parse: ['unknown'] } }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', allowed_mentions: { users: ['invalid'] } }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', allowed_mentions: { replied_user: 'yes' } }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', uploads: [{}] }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', uploads: 'invalid' }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', files: Array(1) }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', files: [null] }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', attachments: 'invalid' }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', attachments: [{ id: 'invalid' }] }), TypeError);
+  assert.throws(() => client.sendMessage('202', { content: 'test', attachments: [{ id: '12' }, { id: '12' }] }), TypeError);
   assert.equal(fetch.mock.callCount(), 4);
 });
 

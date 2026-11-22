@@ -109,10 +109,24 @@ export class MicupAttachments {
   }
 
   async refresh(urls: readonly string[], options?: MicupRequestOptions): Promise<RefreshedAttachmentURL[]> {
+    if (!Array.isArray(urls)) throw new TypeError('Attachment refresh URLs must be an array');
     if (!urls.length || urls.length > 50) throw new RangeError('An attachment refresh takes 1 to 50 URLs');
+    for (const url of urls) {
+      if (typeof url !== 'string' || !url) throw new TypeError('Attachment refresh URLs must be nonempty strings');
+    }
     const result = await this.rest.request<{ refreshed_urls: RefreshedAttachmentURL[] }>('POST', '/attachments/refresh-urls', {
       ...options, body: { attachment_urls: urls }, idempotent: true,
     });
-    return result.refreshed_urls;
+    const refreshed = result?.refreshed_urls;
+    if (!Array.isArray(refreshed) || refreshed.length !== urls.length) {
+      throw new Error('Micup returned an invalid attachment refresh response');
+    }
+    for (const item of refreshed) {
+      if (!item || typeof item !== 'object' || typeof item.original !== 'string' || !item.original ||
+          typeof item.refreshed !== 'string' || !item.refreshed) {
+        throw new Error('Micup returned an invalid attachment refresh response');
+      }
+    }
+    return refreshed;
   }
 }

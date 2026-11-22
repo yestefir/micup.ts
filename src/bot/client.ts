@@ -231,7 +231,9 @@ export class MicupClient {
 
   botInviteURL({ scopes = ['bot'], permissions, guildId }: { scopes?: readonly string[]; permissions?: bigint; guildId?: string } = {}): string {
     if (!this.#botId) throw new Error('Micup did not return the bot ID');
-    if (!scopes.length || scopes.some((scope) => !scope || /\s/.test(scope))) throw new TypeError('OAuth scopes must be nonempty words');
+    if (!Array.isArray(scopes) || !scopes.length || Array.from(scopes).some((scope) => typeof scope !== 'string' || !scope || /\s/.test(scope))) {
+      throw new TypeError('OAuth scopes must be nonempty words');
+    }
     if (permissions !== undefined && (typeof permissions !== 'bigint' || permissions < 0n)) throw new TypeError('Invalid OAuth permissions');
     const url = new URL('/oauth2/authorize', this.#origin);
     url.searchParams.set('client_id', this.#botId);
@@ -326,17 +328,25 @@ export class MicupClient {
     channelId: string, forward: MessageForward,
     { signal, nonce, flags }: MicupRequestOptions & Pick<MessageInput, 'nonce' | 'flags'> = {},
   ): Promise<MicupMessage> {
-    if ((forward.attachment_ids?.length ?? 0) > 10 || (forward.embed_indices?.length ?? 0) > 10 ||
-        forward.embed_indices?.some((index) => !Number.isSafeInteger(index) || index < 0)) {
+    if (forward.attachment_ids !== undefined && !Array.isArray(forward.attachment_ids) ||
+        forward.embed_indices !== undefined && !Array.isArray(forward.embed_indices)) {
+      throw new TypeError('Forward attachment IDs and embed indices must be arrays');
+    }
+    if ((forward.attachment_ids?.length ?? 0) > 10 || (forward.embed_indices?.length ?? 0) > 10) {
       throw new RangeError('Invalid Micup forward attachment or embed selection');
     }
+    const attachmentIds = Array.from(forward.attachment_ids ?? [], (id) => snowflake(id, 'Attachment ID'));
+    const embedIndices = Array.from(forward.embed_indices ?? [], (index) => {
+      if (!Number.isSafeInteger(index) || index < 0) throw new RangeError('Invalid Micup forward attachment or embed selection');
+      return index;
+    });
     const reference = {
       type: 1,
       channel_id: snowflake(forward.channel_id, 'Source channel ID'),
       message_id: snowflake(forward.message_id, 'Source message ID'),
       guild_id: forward.guild_id === undefined ? undefined : snowflake(forward.guild_id, 'Source guild ID'),
-      attachment_ids: forward.attachment_ids?.map((id) => snowflake(id, 'Attachment ID')),
-      embed_indices: forward.embed_indices,
+      attachment_ids: forward.attachment_ids === undefined ? undefined : attachmentIds,
+      embed_indices: forward.embed_indices === undefined ? undefined : embedIndices,
     };
     return this.request('POST', messagesPath(channelId), {
       body: { message_reference: reference, nonce, flags }, signal, idempotent: Boolean(nonce),
@@ -348,7 +358,8 @@ export class MicupClient {
   }
 
   bulkDeleteMessages(channelId: string, messageIds: readonly string[], options?: MicupRequestOptions & { reason?: string }): Promise<void> {
-    const ids = [...new Set(messageIds.map((id) => snowflake(id, 'Message ID')))];
+    if (!Array.isArray(messageIds)) throw new TypeError('Bulk deletion message IDs must be an array');
+    const ids = [...new Set(Array.from(messageIds, (id) => snowflake(id, 'Message ID')))];
     if (!ids.length || ids.length > 100) throw new RangeError('Bulk deletion takes 1 to 100 unique message IDs');
     return this.request('POST', messagesPath(channelId) + '/bulk-delete', { ...options, body: { message_ids: ids } });
   }
