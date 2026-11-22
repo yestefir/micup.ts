@@ -1,4 +1,4 @@
-import type { MicupChannel, PermissionOverwrite } from '../model/guild.js';
+import type { MicupChannel, MicupMember, PermissionOverwrite, ThreadMember } from '../model/guild.js';
 import type { MicupMessage, MicupUser } from '../model/entities.js';
 import { guildPath, type AuditOptions } from './guilds.js';
 import { messageBody, messagesPath, snowflake, type MessageInput } from './messages.js';
@@ -86,6 +86,11 @@ export interface ReactionUsersPage {
   items: MicupUser[];
   has_more: boolean;
   next_after?: string | null;
+}
+
+function invitePath(code: string): string {
+  if (!code || code === '.' || code === '..') throw new TypeError('A Micup invite code is required');
+  return '/invites/' + encodeURIComponent(code);
 }
 
 function channelPath(channelId: string): string {
@@ -239,6 +244,48 @@ export class MicupChannels {
     if (userId !== undefined && emoji === undefined) throw new TypeError('A user reaction needs an emoji');
     const path = emoji === undefined ? messagesPath(id, messageId) + '/reactions' : reactionPath(id, messageId, emoji);
     return this.rest.request('DELETE', path + (userId === undefined ? '' : '/' + snowflake(userId, 'User ID')), options);
+  }
+
+  follow(announcementId: string, targetId: string, options?: AuditOptions): Promise<{ channel_id: string; webhook_id: string }> {
+    return this.rest.request('POST', channelPath(announcementId) + '/followers', {
+      ...options, body: { webhook_channel_id: snowflake(targetId, 'Target channel ID') },
+    });
+  }
+
+  followerStats(announcementId: string, options?: MicupRequestOptions): Promise<{ channel_count: number; guild_count: number }> {
+    return this.rest.request('GET', channelPath(announcementId) + '/follower-stats', options);
+  }
+
+  async forumPostData(
+    channelId: string, threadIds: readonly string[], options?: MicupRequestOptions,
+  ): Promise<Record<string, { owner?: MicupMember | null; first_message?: MicupMessage | null }>> {
+    const ids = [...new Set(threadIds.map((id) => snowflake(id, 'Thread ID')))];
+    if (!ids.length || ids.length > 100) throw new RangeError('Forum post data accepts 1 to 100 thread IDs');
+    const result = await this.rest.request<{ threads: Record<string, { owner?: MicupMember | null; first_message?: MicupMessage | null }> }>(
+      'POST', channelPath(channelId) + '/post-data', { ...options, body: { thread_ids: ids }, idempotent: true },
+    );
+    return result.threads;
+  }
+
+  threadMembers(threadId: string, query?: URLSearchParams, options?: MicupRequestOptions): Promise<ThreadMember[]> {
+    return this.rest.request('GET', channelPath(threadId) + '/thread-members', { ...options, query });
+  }
+
+  threadMember(threadId: string, userId: string, withMember = false, options?: MicupRequestOptions): Promise<ThreadMember> {
+    const query = withMember ? new URLSearchParams({ with_member: 'true' }) : undefined;
+    return this.rest.request('GET', channelPath(threadId) + '/thread-members/' + snowflake(userId, 'User ID'), { ...options, query });
+  }
+
+  guildInvites(guildId: string, options?: MicupRequestOptions): Promise<MicupInvite[]> {
+    return this.rest.request('GET', guildPath(guildId) + '/invites', options);
+  }
+
+  getInvite(code: string, options?: MicupRequestOptions): Promise<MicupInvite> {
+    return this.rest.request('GET', invitePath(code), options);
+  }
+
+  deleteInvite(code: string, options?: AuditOptions): Promise<void> {
+    return this.rest.request('DELETE', invitePath(code), options);
   }
 
   invites(channelId: string, options?: MicupRequestOptions): Promise<MicupInvite[]> {

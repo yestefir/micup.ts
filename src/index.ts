@@ -52,3 +52,4 @@ export { safeHandler } from './events/safe.js';
 export type { SafeHandlerOptions } from './events/safe.js';
 export { onGuildTagChange } from './events/guild-tag.js';
 export type { GuildTagChange } from './events/guild-tag.js';
+export type { GuildMemberSearch, GuildMemberSearchPage } from './rest/guilds.js';

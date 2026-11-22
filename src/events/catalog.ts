@@ -1,6 +1,6 @@
 import type { MicupUser } from '../model/entities.js';
 import type { Emoji } from '../model/format.js';
-import type { MicupMember, MicupVoiceState } from '../model/guild.js';
+import type { MicupMember, MicupVoiceState, ThreadMember } from '../model/guild.js';
 import type { Presence } from '../model/presence.js';
 import type { MicupInvite } from '../rest/channels.js';
 import type { ChannelMemberCount, GuildCount } from '../session/requests.js';
@@ -20,14 +20,6 @@ export interface MessageReaction {
   burst?: boolean;
   type?: number;
   session_id?: string;
-}
-
-export interface ThreadMember {
-  id?: string;
-  user_id?: string;
-  join_timestamp?: string;
-  flags?: number;
-  member?: MicupMember;
 }
 
 type ThreadMemberPresence = ThreadMember & { presence?: PresenceUpdate };
@@ -91,3 +83,5 @@ export interface AdditionalGatewayEvents {
   RELATIONSHIP_UPDATE: Relationship;
   RELATIONSHIP_REMOVE: { id: string };
 }
+
+export type { ThreadMember } from '../model/guild.js';

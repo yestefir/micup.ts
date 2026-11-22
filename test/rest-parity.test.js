@@ -124,3 +124,24 @@ test('keeps forum message attachments inside the starter message payload', async
   });
   assert.equal(thread.message.id, '31');
 });
+
+test('sends timed moderation and announcement follower requests through resource APIs', async (t) => {
+  const { bot } = await mockBot(t, (url, options) => {
+    const body = JSON.parse(options.body);
+    if (url.pathname.endsWith('/followers')) {
+      assert.equal(options.method, 'POST');
+      assert.deepEqual(body, { webhook_channel_id: '32' });
+      return Response.json({ channel_id: '32', webhook_id: '62' });
+    }
+    assert.equal(url.pathname, '/api/v1/guilds/10/members/33');
+    assert.equal(options.method, 'PATCH');
+    if (body.communication_disabled_until) {
+      assert.ok(Date.parse(body.communication_disabled_until) > Date.now());
+      assert.equal(body.timeout_reason, 'fixture');
+    } else assert.deepEqual(body, { communication_disabled_until: null });
+    return Response.json({ roles: [] });
+  });
+  await bot.guilds.timeout('10', '33', 60000, { timeoutReason: 'fixture' });
+  await bot.guilds.clearTimeout('10', '33');
+  assert.equal((await bot.channels.follow('31', '32')).webhook_id, '62');
+});

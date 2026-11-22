@@ -53,6 +53,35 @@ export interface GuildAuditLog {
   webhooks?: { id: string; name?: string }[];
 }
 
+
+export interface GuildMemberSearch {
+  query?: string;
+  limit?: number;
+  offset?: number;
+  role_ids?: readonly string[];
+  join_source_type?: readonly number[];
+  source_invite_code?: readonly string[];
+  is_bot?: boolean;
+  joined_at_gte?: number;
+  joined_at_lte?: number;
+  user_created_at_gte?: number;
+  user_created_at_lte?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+}
+
+export interface GuildMemberSearchPage {
+  guild_id: string;
+  members: {
+    id: string; guild_id: string; user_id: string; username: string; global_name?: string | null;
+    nickname?: string | null; role_ids: string[]; joined_at: number; is_bot: boolean;
+    supplemental?: { join_source_type?: number | null; source_invite_code?: string | null; inviter_id?: string | null };
+  }[];
+  page_result_count: number;
+  total_result_count: number;
+  indexing: boolean;
+}
+
 export function guildPath(id: string): string {
   return '/guilds/' + snowflake(id, 'Guild ID');
 }
@@ -171,6 +200,32 @@ export class MicupGuilds {
 
   unban(guildId: string, userId: string, options?: AuditOptions): Promise<void> {
     return this.rest.request('DELETE', guildPath(guildId) + '/bans/' + snowflake(userId, 'User ID'), options);
+  }
+
+  timeout(guildId: string, userId: string, durationMs: number, options: AuditOptions & { timeoutReason?: string } = {}): Promise<MicupMember> {
+    const { timeoutReason, ...audit } = options;
+    if (!Number.isSafeInteger(durationMs) || durationMs <= 0 || durationMs > 365 * 24 * 60 * 60 * 1000) {
+      throw new RangeError('A Micup member timeout must be longer than zero and at most 365 days');
+    }
+    if (timeoutReason && [...timeoutReason].length > 512) throw new RangeError('A timeout reason must contain at most 512 characters');
+    return this.editMember(guildId, userId, {
+      communication_disabled_until: new Date(Date.now() + durationMs).toISOString(), timeout_reason: timeoutReason,
+    }, audit);
+  }
+
+  clearTimeout(guildId: string, userId: string, options?: AuditOptions): Promise<MicupMember> {
+    return this.editMember(guildId, userId, { communication_disabled_until: null }, options);
+  }
+
+  searchMembers(guildId: string, search: GuildMemberSearch, options?: MicupRequestOptions): Promise<GuildMemberSearchPage> {
+    const { query = '', limit = 100, offset = 0, role_ids, join_source_type, source_invite_code } = search;
+    if ([...query].length > 100 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100 ||
+        !Number.isSafeInteger(offset) || offset < 0 ||
+        [role_ids, join_source_type, source_invite_code].some((values) => (values?.length ?? 0) > 10)) {
+      throw new RangeError('Invalid member search limit, offset, query or filters');
+    }
+    role_ids?.forEach((id) => snowflake(id, 'Role ID'));
+    return this.rest.request('POST', guildPath(guildId) + '/members-search', { ...options, body: search, idempotent: true });
   }
 
   auditLog(guildId: string, query?: URLSearchParams, options?: MicupRequestOptions): Promise<GuildAuditLog> {

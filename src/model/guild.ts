@@ -75,3 +75,11 @@ export interface MicupMembersChunk {
   not_found?: string[];
   nonce?: string;
 }
+
+export interface ThreadMember {
+  id?: string;
+  user_id?: string;
+  join_timestamp?: string;
+  flags?: number;
+  member?: MicupMember;
+}
