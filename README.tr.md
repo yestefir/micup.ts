@@ -75,7 +75,7 @@ await client.newSession({ handler: events.handle }).run({ signal: stop.signal })
 | Komutlar ve etkileşimler | Slash ve bağlam menüsü komutları, otomatik tamamlama, butonlar, seçim menüleri, modallar, ertelenmiş ve gizli yanıtlar, takip mesajları, isme göre yönlendirme | `client.commands`, `client.interactions`, `InteractionRouter` |
 | Mesajlar | Gönderme, düzenleme, yanıt, iletme, yayınlama, arama, toplu silme, embed, doğrudan yükleme, embed gizleme, tepki, sabitleme | `client.sendMessage()`, `client.channels`, `client.attachments` |
 | Sunucu yönetimi | Sunucu, üye, rol, ban, zaman aşımı, denetim kaydı, özel davet adresi, kanal düzeni, davetler, thread ve forum, webhook | `client.guilds`, `client.channels`, `client.webhooks` |
-| İfadeler | Emoji ve çıkartma listeleme, oluşturma, kopyalama, toplu oluşturma | `client.expressions` |
+| İfadeler | Emoji ve çıkartma listeleme, oluşturma, kopyalama, toplu oluşturma, düzenleme, silme ve metadata | `client.expressions` |
 | Ses efektleri | Soundboard sesleri, ses kanalında çalma, sunucu ve kanal bildirim sesleri | `client.sounds` |
 | Ses odaları | 3D oda sahnesi (oda TV'sinde pano veya video, host, efektler) ve oda turnuvaları | `client.rooms` |
 | Keşif | Sunucu keşif kaydını okuma, başvuru, düzenleme ve geri çekme | `client.discovery` |
@@ -161,7 +161,7 @@ Dokümanlar İngilizcedir.
 
 ## Güvenilirlik
 
-Test paketi SDK'yı sahte sunucular ve yerel bir LiveKit odasına karşı çalıştırır. `MICUP_TEST_BOT_TOKEN` ayarlıyken `npm run test:live`, bot kimliğini, uygulama erişimini ve Gateway el sıkışmasını salt okunur biçimde denetler; sunucu verisi oluşturmaz veya değiştirmez ve kullanıcı token'ı kabul etmez. `MICUP_TEST_BOT_TOKEN` GitHub deposuna gizli değişken olarak eklendikten sonra `Live smoke` iş akışı bu denetimleri haftalık çalıştırabilir. Üretim dışı sandbox için `MICUP_TEST_ORIGIN` depo değişkenini ayarlayın.
+Test paketi SDK'yı sahte sunucular ve yerel bir LiveKit odasına karşı çalıştırır. `MICUP_TEST_BOT_TOKEN` ayarlıyken `npm run test:live`, bot kimliğini, uygulama erişimini, sunucu listesini, shard önerisini ve Gateway el sıkışmasını salt okunur biçimde denetler; sunucu verisi oluşturmaz veya değiştirmez ve kullanıcı token'ı kabul etmez. `MICUP_TEST_BOT_TOKEN` GitHub deposuna gizli değişken olarak eklendikten sonra `Live smoke` iş akışı bu denetimleri haftalık çalıştırabilir. Üretim dışı sandbox için `MICUP_TEST_ORIGIN` depo değişkenini ayarlayın.
 
 İki çalışma alanını yerelde doğrulamak için bir kez `npm ci`, ardından `npm test` çalıştırın.
 

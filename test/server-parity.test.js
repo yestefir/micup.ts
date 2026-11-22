@@ -124,8 +124,12 @@ test('runs a voice room stage and its effects', async (t) => {
   assert.throws(() => bot.rooms.setStage('20', { ttl_seconds: 10 }), RangeError);
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', title: 'x'.repeat(61) } }), RangeError);
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', text: 'a‮b' } }), RangeError);
+  assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', style: 'plain' } }), TypeError);
+  assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'video', url: 'https://youtube.com/watch?v=1', paused: 'false' } }), TypeError);
+  assert.throws(() => bot.rooms.setStage('20', { host: { character: 'unknown' } }), TypeError);
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', scores: Array(11).fill({ name: 'a', value: 1 }) } }), RangeError);
   assert.throws(() => bot.rooms.stageEffect('20', { type: 'host_emote', emote: 'emoji' }), TypeError);
+  assert.throws(() => bot.rooms.stageEffect('20', { type: 'host_emote', emote: 'emoji', emoji: 1 }), TypeError);
   assert.throws(() => bot.rooms.stageEffect('20', { type: 'rain' }), TypeError);
 });
 
@@ -154,8 +158,12 @@ test('opens, orders, starts and cancels a room tournament', async (t) => {
   assert.throws(() => bot.rooms.openTournament('20', { game: 'chess', size: 4 }), TypeError);
   assert.throws(() => bot.rooms.openTournament('20', { game: 'slap', size: 5 }), RangeError);
   assert.throws(() => bot.rooms.openTournament('20', { game: 'arm_wrestle', size: 4, table: { slot: 'T1', x: 1 } }), TypeError);
+  assert.throws(() => bot.rooms.openTournament('20', { game: 'arm_wrestle', size: 4, table: { slot: 1 } }), TypeError);
   assert.throws(() => bot.rooms.openTournament('20', { game: 'arm_wrestle', size: 4, table: { x: 500, z: 0, yaw: 0 } }), RangeError);
   assert.throws(() => bot.rooms.reorderTournament('20', 2, ['1', '1']), RangeError);
+  assert.throws(() => bot.rooms.reorderTournament('20', -1, ['1', '2']), RangeError);
+  assert.throws(() => bot.rooms.reorderTournament('20', 2, '12'), RangeError);
+  assert.throws(() => bot.rooms.startTournament('20', -1), TypeError);
 });
 
 test('covers member, ownership and message clean-up routes', async (t) => {
@@ -253,6 +261,57 @@ test('reads emoji, sticker and public application records', async (t) => {
   ]);
   assert.equal(calls[4].headers.get('Authorization'), null);
   assert.equal(calls[0].headers.get('Authorization'), 'Bot fixture');
+});
+
+test('validates and manages guild expressions across single and bulk routes', async (t) => {
+  const { bot, calls } = await mockBot(t, (url, options) =>
+    options.method === 'DELETE' ? none() : Response.json({ id: '1', name: 'wave' }));
+  const emoji = { name: 'wave', image: 'data:image/png;base64,AA==' };
+  const sticker = { name: 'Wave sticker', image: 'data:image/png;base64,AA==', tags: ['wave'] };
+
+  await bot.expressions.listEmojis('10');
+  await bot.expressions.listStickers('10');
+  await bot.expressions.createEmoji('10', emoji);
+  await bot.expressions.createSticker('10', sticker);
+  await bot.expressions.createEmojis('10', [emoji]);
+  await bot.expressions.createStickers('10', [sticker]);
+  await bot.expressions.cloneEmoji('10', '21');
+  await bot.expressions.cloneSticker('10', '22');
+  await bot.expressions.renameEmoji('10', '21', 'wave_new');
+  await bot.expressions.editSticker('10', '22', { name: 'Wave sticker' });
+  await bot.expressions.delete('10', 'emojis', '21', { purge: true });
+  await bot.expressions.delete('10', 'stickers', '22');
+  await bot.expressions.metadata('emojis', '21');
+  await bot.expressions.metadata('stickers', '22');
+
+  assert.deepEqual(calls.map(({ method, path }) => method + ' ' + path), [
+    'GET /guilds/10/emojis',
+    'GET /guilds/10/stickers',
+    'POST /guilds/10/emojis',
+    'POST /guilds/10/stickers',
+    'POST /guilds/10/emojis/bulk',
+    'POST /guilds/10/stickers/bulk',
+    'POST /guilds/10/emojis/clone',
+    'POST /guilds/10/stickers/clone',
+    'PATCH /guilds/10/emojis/21',
+    'PATCH /guilds/10/stickers/22',
+    'DELETE /guilds/10/emojis/21',
+    'DELETE /guilds/10/stickers/22',
+    'GET /emojis/21/metadata',
+    'GET /stickers/22/metadata',
+  ]);
+  assert.equal(calls[10].query, '?purge=true');
+  assert.deepEqual(calls[9].body, { tags: [], name: 'Wave sticker' });
+
+  assert.throws(() => bot.expressions.createEmoji('10', { name: 42, image: 'x' }), TypeError);
+  assert.throws(() => bot.expressions.createEmoji('10', { name: 'ok', image: 42 }), TypeError);
+  assert.throws(() => bot.expressions.createSticker('10', { name: 'Ok', image: 'x', tags: ['ok', 1] }), TypeError);
+  assert.throws(() => bot.expressions.createStickers('10', Array(1)), TypeError);
+  assert.throws(() => bot.expressions.createEmojis('10', 'wave'), TypeError);
+  assert.throws(() => bot.expressions.editSticker('10', '22', { name: 'Ok', tags: 'wave' }), TypeError);
+  assert.throws(() => bot.expressions.source('users', '21'), TypeError);
+  assert.throws(() => bot.expressions.delete('10', 'users', '21'), TypeError);
+  assert.equal(calls.length, 14);
 });
 
 test('exposes error codes, status helpers and new Gateway events', () => {
@@ -433,4 +492,7 @@ test('manages a guild discovery listing', async (t) => {
   assert.throws(() => bot.discovery.apply('10', { description: 'short', category_type: 4 }), RangeError);
   assert.throws(() => bot.discovery.apply('10', { description: 'A place to talk.' }), TypeError);
   assert.throws(() => bot.discovery.edit('10', { custom_tags: Array(11).fill('x') }), RangeError);
+  assert.throws(() => bot.discovery.edit('10', { custom_tags: 'rust' }), TypeError);
+  assert.throws(() => bot.discovery.edit('10', { custom_tags: ['rust', 4] }), TypeError);
+  assert.throws(() => bot.discovery.edit('10', { primary_language: 4 }), TypeError);
 });

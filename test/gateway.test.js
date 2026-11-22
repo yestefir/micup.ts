@@ -476,3 +476,58 @@ test('logs readiness, invalidation and disconnects with the shard', { timeout: 5
   await assert.rejects(quiet.run({ signal: controller.signal }), GatewayCloseError);
   assert.ok(warned.includes('gateway ready'));
 });
+
+test('contains synchronous and asynchronous lifecycle hook failures', { timeout: 5000 }, async (t) => {
+  const { server, endpoint } = await createGateway(t);
+  const failures = [];
+  t.mock.method(console, 'error', (...args) => failures.push(args));
+  server.on('connection', (socket) => {
+    send(socket, op.Hello, { heartbeat_interval: 100 });
+    socket.on('message', (raw) => {
+      const packet = JSON.parse(raw);
+      if (packet.op === op.Identify) {
+        send(socket, op.Dispatch, { session_id: 'hooks' }, 'READY', 1);
+        setTimeout(() => socket.close(4004, 'fixture fatal close'), 20);
+      }
+    });
+  });
+
+  const session = new GatewaySession({ endpoint, token: 'fixture' }, {
+    handler: () => {},
+    onReady: async () => { throw new Error('ready hook failure'); },
+    onDisconnect: () => { throw new Error('disconnect hook failure'); },
+  });
+  await assert.rejects(session.runOnce(), (error) => error instanceof GatewayCloseError && error.code === 4004);
+  assert.deepEqual(failures.map(([message]) => message), [
+    'gateway onReady hook failed',
+    'gateway onDisconnect hook failed',
+  ]);
+});
+
+test('contains rejected asynchronous voice hooks without disconnecting', { timeout: 5000 }, async (t) => {
+  const { server, endpoint } = await createGateway(t);
+  const failures = [];
+  t.mock.method(console, 'error', (...args) => failures.push(args));
+  let connections = 0;
+  server.on('connection', (socket) => {
+    connections++;
+    send(socket, op.Hello, { heartbeat_interval: 100 });
+    socket.on('message', (raw) => {
+      const packet = JSON.parse(raw);
+      if (packet.op !== op.Identify) return;
+      send(socket, op.Dispatch, { session_id: 'voice-hooks', user: { id: '1' }, guilds: [{ id: '10' }] }, 'READY', 1);
+      setTimeout(() => send(socket, op.Dispatch, { guild_id: '10', user_id: '1', channel_id: '20' }, 'VOICE_STATE_UPDATE', 2), 5);
+      setTimeout(() => send(socket, op.Dispatch, { guild_id: '10', user_id: '2', channel_id: '20' }, 'VOICE_STATE_UPDATE', 3), 10);
+      setTimeout(() => send(socket, op.Dispatch, { guild_id: '10', user_id: '2', channel_id: null }, 'VOICE_STATE_UPDATE', 4), 15);
+      setTimeout(() => socket.close(4004, 'fixture fatal close'), 100);
+    });
+  });
+
+  const session = new GatewaySession({ endpoint, token: 'fixture', botId: '1' }, {
+    handler: () => {},
+    onVoiceEmpty: async () => { throw new Error('voice empty hook failure'); },
+  });
+  await assert.rejects(session.runOnce(), (error) => error instanceof GatewayCloseError && error.code === 4004);
+  assert.equal(connections, 1);
+  assert.deepEqual(failures.map(([message]) => message), ['gateway onVoiceEmpty hook failed']);
+});

@@ -38,9 +38,9 @@ export interface GatewaySessionOptions extends VoiceSessionOptions {
   readonly presence?: Presence;
   readonly minBackoffMs?: number;
   readonly maxBackoffMs?: number;
-  readonly onReady?: (resumed: boolean) => void;
-  readonly onDisconnect?: (error: unknown) => void;
-  readonly onGatewayError?: (data: unknown) => void;
+  readonly onReady?: (resumed: boolean) => void | Promise<void>;
+  readonly onDisconnect?: (error: unknown) => void | Promise<void>;
+  readonly onGatewayError?: (data: unknown) => void | Promise<void>;
   readonly beforeIdentify?: (signal: AbortSignal) => Promise<void>;
   readonly logger?: MicupLogger;
 }
@@ -90,7 +90,11 @@ export class GatewaySession {
     this.#shard = [id, count];
     if (typeof options?.handler !== 'function') throw new TypeError('A Gateway event handler is required');
     this.#options = { ...options };
-    this.#voice = new SessionVoice(config.botId, this.send.bind(this), this.#options);
+    this.#voice = new SessionVoice(config.botId, this.send.bind(this), {
+      ...this.#options,
+      onVoiceLost: (guildId, connectionId) => this.#callHook('onVoiceLost', this.#options.onVoiceLost, guildId, connectionId),
+      onVoiceGrant: (grant) => this.#callHook('onVoiceGrant', this.#options.onVoiceGrant, grant),
+    });
     this.#requests = new SessionRequests(this.send.bind(this));
     this.#presence = options.presence && normalizePresence(options.presence);
     this.#ignoredEvents = [...(options.ignoredEvents ?? [])];
@@ -207,7 +211,7 @@ export class GatewaySession {
     if (guild && user && previous && user !== this.#botId && previous !== voice?.channel_id &&
         this.#botId && this.state.voiceChannel(guild, this.#botId) === previous &&
         this.state.voiceMembers(guild, previous).every((id) => id === this.#botId)) {
-      this.#options.onVoiceEmpty?.(guild, previous);
+      this.#callHook('onVoiceEmpty', this.#options.onVoiceEmpty, guild, previous);
     }
   }
 
@@ -225,6 +229,21 @@ export class GatewaySession {
     try {
       (logger[level] ?? logger.warn).call(logger, message, { shard: this.#shard[0], ...fields });
     } catch {}
+  }
+
+  #callHook<T extends unknown[]>(name: string, hook: ((...args: T) => void | Promise<void>) | undefined, ...args: T): void {
+    if (!hook) return;
+    const report = (error: unknown) => {
+      const message = 'gateway ' + name + ' hook failed';
+      if (this.#options.logger) this.#log('warn', message, { error: error instanceof Error ? error.message : String(error) });
+      else console.error(message, error);
+    };
+    try {
+      const result = hook(...args);
+      if (result && typeof result.then === 'function') void Promise.resolve(result).catch(report);
+    } catch (error) {
+      report(error);
+    }
   }
 
   async #run(reconnect: boolean, { signal = new AbortController().signal }: { signal?: AbortSignal } = {}): Promise<void> {
@@ -258,7 +277,7 @@ export class GatewaySession {
             },
             onGatewayError: (data) => {
               this.#voice.refuse(data);
-              this.#options.onGatewayError?.(data);
+              this.#callHook('onGatewayError', this.#options.onGatewayError, data);
             },
             onInvalidate: () => {
               this.#log('info', 'gateway session invalidated');
@@ -272,7 +291,7 @@ export class GatewaySession {
               this.#ready = true;
               backoff = this.#minBackoff;
               this.#log('info', resumed ? 'gateway resumed' : 'gateway ready');
-              this.#options.onReady?.(resumed);
+              this.#callHook('onReady', this.#options.onReady, resumed);
             },
           }, signal, (connection) => { this.#connection = connection; });
         } catch (error) {
@@ -294,7 +313,7 @@ export class GatewaySession {
             reconnecting: !stopping,
             ...(!stopping && { retryInMs: backoff }),
           });
-          this.#options.onDisconnect?.(error);
+          this.#callHook('onDisconnect', this.#options.onDisconnect, error);
           if (!reconnect || error instanceof GatewayCloseError && error.fatal) throw error;
           await delay(backoff, undefined, { signal }).catch((cause) => {
             if (!signal.aborted) throw cause;

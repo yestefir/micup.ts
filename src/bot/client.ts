@@ -31,6 +31,7 @@ import { discoverPublicBase, MicupMedia } from '../model/media.js';
 
 const defaultOrigin = 'https://micup.gg';
 const connection = Symbol('Micup connection');
+const targetGuildsPerShard = 2000;
 
 export interface MicupClientOptions {
   token: string;
@@ -225,7 +226,7 @@ export class MicupClient {
     } catch {
       options?.signal?.throwIfAborted();
     }
-    return Math.max(1, Math.ceil(count / 2000), recommended);
+    return Math.max(1, Math.ceil(count / targetGuildsPerShard), recommended);
   }
 
   botInviteURL({ scopes = ['bot'], permissions, guildId }: { scopes?: readonly string[]; permissions?: bigint; guildId?: string } = {}): string {

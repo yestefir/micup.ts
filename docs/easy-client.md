@@ -36,7 +36,7 @@ const client = new Client({
 | `origin`, `maxRestAttempts` | passed to `MicupClient.connect()` |
 | `rest` | an already connected `MicupClient` to reuse |
 | `gateway` | `false` runs REST only: `login()` connects, registers commands and emits `ready` without a Gateway session |
-| `shards` | a number or `'auto'` (one shard for each 1,000 servers); more than one shard uses the shard manager |
+| `shards` | a number or `'auto'` (uses the Gateway recommendation, falling back to one shard per 2,000 servers); more than one shard uses the shard manager |
 | `compress`, `trackMembers`, `presence`, `ignoredEvents`, `flags`, `minBackoffMs`, `maxBackoffMs` | Gateway session options, see [Gateway and sharding](gateway-and-sharding.md) |
 | `logger` | `{ warn, info? }` for permission warnings and Gateway lifecycle |
 | `registerCommands` | `false` turns automatic registration off; `{ guildId, prune }` scopes it (default: global commands, no pruning) |

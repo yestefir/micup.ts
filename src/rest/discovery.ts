@@ -32,11 +32,15 @@ export interface DiscoveryApplicationInput {
 
 export type DiscoveryApplicationEdit = Partial<DiscoveryApplicationInput>;
 
-function check({ description, category_type, custom_tags }: DiscoveryApplicationEdit): void {
+function check({ description, category_type, primary_language, custom_tags }: DiscoveryApplicationEdit): void {
   if (description !== undefined && (typeof description !== 'string' || [...description].length < 10 || [...description].length > 300)) {
     throw new RangeError('A discovery description takes 10 to 300 characters');
   }
   if (category_type !== undefined && !Number.isSafeInteger(category_type)) throw new TypeError('A discovery category is an integer');
+  if (primary_language !== undefined && typeof primary_language !== 'string') throw new TypeError('A discovery language must be a string');
+  if (custom_tags !== undefined && (!Array.isArray(custom_tags) || custom_tags.some((tag: unknown) => typeof tag !== 'string'))) {
+    throw new TypeError('Discovery custom tags must be an array of strings');
+  }
   if (custom_tags !== undefined && custom_tags.length > 10) throw new RangeError('A discovery listing takes up to 10 custom tags');
 }
 

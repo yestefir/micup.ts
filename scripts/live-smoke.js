@@ -19,6 +19,10 @@ assert.equal(typeof application.id, 'string');
 assert.ok(application.id.length > 0);
 process.stdout.write('REST application check passed\n');
 
+const shardCount = await client.recommendedShards();
+assert.ok(Number.isSafeInteger(shardCount) && shardCount >= 1, 'the API must recommend at least one shard');
+process.stdout.write('Guild listing and shard recommendation check passed\n');
+
 const stop = new AbortController();
 const deadline = AbortSignal.timeout(20_000);
 let gatewayReady = false;

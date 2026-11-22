@@ -29,6 +29,8 @@ await session.run({ signal: stop.signal });
 | `logger` | `{ info?, warn }`; receives gateway lifecycle events and member inventory sync failures (with the guild ID and error) and the shard number |
 | `onVoiceLost`, `onVoiceEmpty`, `onVoiceGrant` | voice hooks, see [Voice](voice.md) |
 
+Lifecycle and voice hooks may return promises. Their thrown errors and rejected promises are reported through the configured logger, or `console.error` when no logger is configured; they do not stop the Gateway session.
+
 A handler that throws is retried with the same event, so keep side effects safe to repeat. Wrap handlers with `safeHandler()` to log failures, time out slow work or replay only selected errors.
 
 ## Events
@@ -90,7 +92,7 @@ Also available: `member`, `channels`, `threads`, `highestRole` and `guildForChan
 
 ## Sharding
 
-Micup recommends one shard for each 1,000 servers. `await client.recommendedShards()` counts the servers and asks the service.
+`await client.recommendedShards()` counts the bot's servers and uses the service's Gateway recommendation when available. If that endpoint is unavailable, the SDK targets one shard per 2,000 servers and always returns at least one.
 
 ```js
 const manager = client.newShardManager({

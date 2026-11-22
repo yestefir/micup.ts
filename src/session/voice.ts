@@ -17,9 +17,9 @@ export interface VoiceJoinOptions {
 }
 
 export interface VoiceSessionOptions {
-  onVoiceLost?: (guildId: string, connectionId: string) => void;
-  onVoiceEmpty?: (guildId: string, channelId: string) => void;
-  onVoiceGrant?: (grant: VoiceServerUpdate) => void;
+  onVoiceLost?: (guildId: string, connectionId: string) => void | Promise<void>;
+  onVoiceEmpty?: (guildId: string, channelId: string) => void | Promise<void>;
+  onVoiceGrant?: (grant: VoiceServerUpdate) => void | Promise<void>;
 }
 
 export class VoiceRefusedError extends Error {

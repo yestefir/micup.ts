@@ -75,7 +75,7 @@ await client.newSession({ handler: events.handle }).run({ signal: stop.signal })
 | Commands and interactions | Slash and context menu commands, autocomplete, buttons, select menus, modals, deferred and private replies, follow-ups, routing by name | `client.commands`, `client.interactions`, `InteractionRouter` |
 | Messages | Send, edit, reply, forward, crosspost, search, bulk delete, embeds, direct uploads, embed suppression, reactions, pins | `client.sendMessage()`, `client.channels`, `client.attachments` |
 | Servers | Guild, member, role, ban, timeout, audit log, vanity URL, channel layout, invites, threads and forums, webhooks | `client.guilds`, `client.channels`, `client.webhooks` |
-| Expressions | Emoji and sticker listing, creation, cloning, bulk creation | `client.expressions` |
+| Expressions | Emoji and sticker listing, creation, cloning, bulk creation, editing, deletion and metadata | `client.expressions` |
 | Sound | Soundboard sounds, playback in a voice channel, guild and channel notification sounds | `client.sounds` |
 | Voice rooms | The 3D room stage (board or video on the room TV, host, effects) and room tournaments | `client.rooms` |
 | Discovery | Read, apply for, edit and withdraw a server discovery listing | `client.discovery` |
@@ -159,7 +159,7 @@ Your code still decides whom the bot messages and what it says; the SDK never wo
 
 ## Reliability
 
-The test suite runs the SDK against mocked servers and a local LiveKit room. Run `npm run test:live` with `MICUP_TEST_BOT_TOKEN` set for read-only checks of bot identity, application access and the Gateway handshake. It does not create or edit server data and does not accept a user token. The `Live smoke` workflow can run these checks weekly after `MICUP_TEST_BOT_TOKEN` is added as a repository secret; set `MICUP_TEST_ORIGIN` as a repository variable for a non-production sandbox.
+The test suite runs the SDK against mocked servers and a local LiveKit room. Run `npm run test:live` with `MICUP_TEST_BOT_TOKEN` set for read-only checks of bot identity, application access, guild listing, shard recommendation and the Gateway handshake. It does not create or edit server data and does not accept a user token. The `Live smoke` workflow can run these checks weekly after `MICUP_TEST_BOT_TOKEN` is added as a repository secret; set `MICUP_TEST_ORIGIN` as a repository variable for a non-production sandbox.
 
 Run `npm ci` once, then `npm test` to verify both workspaces locally.
 

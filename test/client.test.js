@@ -63,6 +63,40 @@ test('an aborted application lookup does not cancel an uncancelled lookup', asyn
   assert.equal(fetch.mock.callCount(), 4);
 });
 
+test('recommends shards from service limits and guild count', async (t) => {
+  let guildIds = ['1'];
+  let serviceShards = 4;
+  let failGateway = false;
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (String(url) === origin + '/.well-known/fluxer') return Response.json({ endpoints: { api_public: origin + '/api' } });
+    if (String(url) === origin + '/api/v1/users/@me') return Response.json(bot);
+    const target = new URL(url);
+    calls.push(target.pathname + target.search);
+    if (target.pathname === '/api/v1/users/@me/guilds') {
+      const after = target.searchParams.get('after');
+      const offset = after === null ? 0 : guildIds.indexOf(after) + 1;
+      return Response.json(guildIds.slice(offset, offset + 200).map((id) => ({ id })));
+    }
+    if (target.pathname === '/api/v1/gateway/bot') {
+      if (failGateway) return Response.json({ message: 'Unavailable' }, { status: 503 });
+      return Response.json({ shards: serviceShards });
+    }
+    assert.fail('Unexpected request: ' + options.method + ' ' + target.pathname);
+  });
+
+  const client = await MicupClient.connect({ token: 'fixture', origin, maxRestAttempts: 1 });
+  assert.equal(await client.recommendedShards(), 4);
+  guildIds = Array.from({ length: 2001 }, (_, index) => String(index + 1));
+  serviceShards = 1;
+  assert.equal(await client.recommendedShards(), 2);
+  guildIds = [];
+  failGateway = true;
+  assert.equal(await client.recommendedShards(), 1);
+  assert.ok(calls.includes('/api/v1/users/@me/guilds?limit=200&after=200'));
+  assert.equal(calls.filter((path) => path.startsWith('/api/v1/gateway/bot')).length, 3);
+});
+
 test('rejects discovery on a different origin before sending the token', async (t) => {
   const fetch = t.mock.method(globalThis, 'fetch', async () =>
     Response.json({ endpoints: { api_public: 'https://other.example/api' } }),

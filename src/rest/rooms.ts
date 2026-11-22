@@ -137,6 +137,7 @@ function stageBody({ tv, host, ttl_seconds }: VoiceRoomStageInput): object {
     throw new RangeError('A stage lasts 60 to 21600 seconds');
   }
   if (tv?.type === 'board') {
+    if (tv.style !== undefined && !['neon', 'tahta', 'sade'].includes(tv.style)) throw new TypeError('Invalid stage board style');
     plain(tv.title, 60, 1, 'Stage title');
     plain(tv.text, 280, 4, 'Stage text');
     if (tv.accent !== undefined) colour(tv.accent, 'Stage accent');
@@ -149,11 +150,15 @@ function stageBody({ tv, host, ttl_seconds }: VoiceRoomStageInput): object {
     if (tv.message_id !== undefined) snowflake(tv.message_id, 'Message ID');
   } else if (tv?.type === 'video') {
     if (typeof tv.url !== 'string' || !tv.url || tv.url.length > 2048) throw new TypeError('A stage video needs a URL of up to 2048 characters');
+    if (tv.paused !== undefined && typeof tv.paused !== 'boolean') throw new TypeError('A stage video pause state must be a boolean');
     if (tv.position_ms !== undefined && (!Number.isSafeInteger(tv.position_ms) || tv.position_ms < 0 || tv.position_ms > 86_400_000)) {
       throw new RangeError('A stage video position takes 0 to 86400000 milliseconds');
     }
   } else if (tv) {
     throw new TypeError('A stage TV shows a board or a video');
+  }
+  if (host?.character !== undefined && !['ithp-gunluk', 'ithp-ceketli', 'ithp-gozluk', 'ithp-kulaklik', 'ithp-rahat', 'ithp-sapkali', 'ithp-sehirli', 'ithp-yazlik'].includes(host.character)) {
+    throw new TypeError('Invalid host character');
   }
   if (host?.shirt !== undefined) colour(host.shirt, 'Host shirt');
   return { tv: tv ?? null, host: host ?? null, ...(ttl_seconds !== undefined && { ttl_seconds }) };
@@ -163,7 +168,7 @@ function effectBody(effect: StageEffect): object {
   if (effect.type === 'spotlight') snowflake(effect.user_id, 'User ID');
   else if (effect.type === 'host_emote') {
     if (!['wave', 'dance', 'jump', 'emoji'].includes(effect.emote)) throw new TypeError('Invalid host emote');
-    if (effect.emote === 'emoji' && !('emoji' in effect && effect.emoji && [...effect.emoji].length <= 16)) {
+    if (effect.emote === 'emoji' && !('emoji' in effect && typeof effect.emoji === 'string' && effect.emoji && [...effect.emoji].length <= 16)) {
       throw new TypeError('An emoji emote needs one emoji');
     }
   } else if (effect.type !== 'confetti') {
@@ -178,6 +183,7 @@ function tournamentBody({ game, size, table }: TournamentInput): object {
   if (table) {
     const point = table.x !== undefined || table.z !== undefined || table.yaw !== undefined;
     if (table.slot !== undefined === point) throw new TypeError('A tournament table is a slot or a floor point');
+    if (table.slot !== undefined && (typeof table.slot !== 'string' || !table.slot)) throw new TypeError('A tournament table slot must be a nonempty string');
     if (point && (![table.x, table.z].every((value) => Number.isFinite(value) && Math.abs(value!) <= 100) ||
         !Number.isFinite(table.yaw) || Math.abs(table.yaw!) > Math.PI)) {
       throw new RangeError('A floor point takes x and z within 100 metres and a yaw within pi');
@@ -225,7 +231,7 @@ export class MicupVoiceRooms {
   }
 
   reorderTournament(channelId: string, version: number, userIds: readonly string[], options?: MicupRequestOptions): Promise<RoomTournament> {
-    if (!Number.isSafeInteger(version) || userIds.length < 2 || userIds.length > 32 || new Set(userIds).size !== userIds.length) {
+    if (!Number.isSafeInteger(version) || version < 0 || !Array.isArray(userIds) || userIds.length < 2 || userIds.length > 32 || new Set(userIds).size !== userIds.length) {
       throw new RangeError('A tournament order lists 2 to 32 distinct entrants for one version');
     }
     return this.rest.request('PUT', roomPath(channelId) + '/tournament/order', {
@@ -234,7 +240,7 @@ export class MicupVoiceRooms {
   }
 
   startTournament(channelId: string, version: number, options?: MicupRequestOptions): Promise<RoomTournament> {
-    if (!Number.isSafeInteger(version)) throw new TypeError('A tournament start needs the tournament version');
+    if (!Number.isSafeInteger(version) || version < 0) throw new TypeError('A tournament start needs a nonnegative tournament version');
     return this.rest.request('POST', roomPath(channelId) + '/tournament/start', { ...options, body: { version } });
   }
 }

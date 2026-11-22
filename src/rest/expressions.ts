@@ -45,28 +45,35 @@ export interface ExpressionBulkResult<T> {
 }
 
 function emojiName(name: string): void {
-  if (!/^[A-Za-z0-9_]{2,32}$/.test(name)) throw new TypeError('Emoji names need 2 to 32 ASCII letters, digits or underscores');
+  if (typeof name !== 'string' || !/^[A-Za-z0-9_]{2,32}$/.test(name)) throw new TypeError('Emoji names need 2 to 32 ASCII letters, digits or underscores');
 }
 
 function stickerText({ name, description, tags }: Omit<StickerInput, 'image'>): void {
-  if (![...name].length || [...name].length < 2 || [...name].length > 30 ||
-      (description !== undefined && [...description].length > 500) ||
-      (tags !== undefined && (tags.length > 10 || tags.some((tag) => !tag || [...tag].length > 30)))) {
+  if (typeof name !== 'string' || [...name].length < 2 || [...name].length > 30 ||
+      (description !== undefined && (typeof description !== 'string' || [...description].length > 500)) ||
+      (tags !== undefined && (!Array.isArray(tags) || tags.length > 10 || tags.some((tag: unknown) => typeof tag !== 'string' || !tag || [...tag].length > 30)))) {
     throw new TypeError('Invalid Micup sticker name, description or tags');
   }
 }
 
 function createEmoji(item: EmojiInput): void {
+  if (!item || typeof item !== 'object') throw new TypeError('An emoji input is required');
   emojiName(item.name);
-  if (!item.image) throw new TypeError('An emoji image is required');
+  if (typeof item.image !== 'string' || !item.image) throw new TypeError('An emoji image is required');
 }
 
 function createSticker(item: StickerInput): void {
+  if (!item || typeof item !== 'object') throw new TypeError('A sticker input is required');
   stickerText(item);
-  if (!item.image) throw new TypeError('A sticker image is required');
+  if (typeof item.image !== 'string' || !item.image) throw new TypeError('A sticker image is required');
 }
 
 type Resource = 'emojis' | 'stickers';
+
+function resourceKind(kind: Resource): Resource {
+  if (kind !== 'emojis' && kind !== 'stickers') throw new TypeError('Expression type must be emojis or stickers');
+  return kind;
+}
 
 export class MicupExpressions {
   constructor(private readonly rest: RestTransport) {}
@@ -95,14 +102,16 @@ export class MicupExpressions {
   }
 
   createEmojis(guildId: string, emojis: readonly EmojiInput[], options?: AuditOptions): Promise<ExpressionBulkResult<Emoji>> {
+    if (!Array.isArray(emojis)) throw new TypeError('Bulk emojis must be an array');
     if (!emojis.length || emojis.length > 50) throw new RangeError('A bulk create takes up to 50 emojis');
-    emojis.forEach(createEmoji);
+    for (const emoji of emojis) createEmoji(emoji);
     return this.rest.request('POST', this.#path(guildId, 'emojis') + '/bulk', { ...options, body: { emojis } });
   }
 
   createStickers(guildId: string, stickers: readonly StickerInput[], options?: AuditOptions): Promise<ExpressionBulkResult<MicupSticker>> {
+    if (!Array.isArray(stickers)) throw new TypeError('Bulk stickers must be an array');
     if (!stickers.length || stickers.length > 50) throw new RangeError('A bulk create takes up to 50 stickers');
-    stickers.forEach(createSticker);
+    for (const sticker of stickers) createSticker(sticker);
     return this.rest.request('POST', this.#path(guildId, 'stickers') + '/bulk', { ...options, body: { stickers } });
   }
 
@@ -125,6 +134,7 @@ export class MicupExpressions {
   }
 
   delete(guildId: string, kind: Resource, id: string, { purge, ...options }: AuditOptions & { purge?: boolean } = {}): Promise<void> {
+    resourceKind(kind);
     const query = purge ? new URLSearchParams({ purge: 'true' }) : undefined;
     return this.rest.request('DELETE', this.#path(guildId, kind, id), { ...options, query });
   }
@@ -138,10 +148,12 @@ export class MicupExpressions {
   }
 
   source(kind: Resource, id: string, options?: MicupRequestOptions): Promise<ExpressionSourceGuild> {
+    resourceKind(kind);
     return this.rest.request('GET', '/' + kind + '/' + snowflake(id, 'Expression ID') + '/source', options);
   }
 
   metadata(kind: Resource, id: string, options?: MicupRequestOptions): Promise<ExpressionMetadata> {
+    resourceKind(kind);
     return this.rest.request('GET', '/' + kind + '/' + snowflake(id, 'Expression ID') + '/metadata', options);
   }
 }
