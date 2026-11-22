@@ -323,6 +323,20 @@ test('lets you customize or disable the error reply', async (t) => {
   assert.equal(silent.calls.filter((call) => call.path.endsWith('/callback')).length, 0);
 });
 
+test('uses a generic error reply when the custom formatter throws', async (t) => {
+  const { client, calls } = await setup(t, undefined, { errorReply: () => { throw new Error('formatter failed'); } });
+  const reported = [];
+  client.on('error', (error) => reported.push(error.message));
+  client.command('boom', () => { throw new Error('handler failed'); });
+
+  await dispatch(client, 'INTERACTION_CREATE', { ...base, type: 2, data: commandData('boom') });
+  await settle();
+
+  assert.deepEqual(reported, ['handler failed', 'formatter failed']);
+  assert.equal(calls.find((call) => call.path.endsWith('/callback')).body.data.content,
+    'Something went wrong while running this command.');
+});
+
 test('still emits interactionCreate for unrouted interactions', async (t) => {
   const { client } = await setup(t);
   const seen = [];

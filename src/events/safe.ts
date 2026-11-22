@@ -2,7 +2,7 @@ import type { GatewayDispatch } from '../gateway/protocol.js';
 
 export interface SafeHandlerOptions {
   timeoutMs?: number;
-  onError?: (error: unknown, event: GatewayDispatch) => void;
+  onError?: (error: unknown, event: GatewayDispatch) => void | Promise<void>;
   retry?: (error: unknown, event: GatewayDispatch) => boolean;
 }
 
@@ -31,7 +31,9 @@ export function safeHandler(handler: Handler, options: SafeHandlerOptions = {}):
       });
     } catch (error) {
       if (parent.aborted || retry?.(error, event)) throw error;
-      onError?.(error, event);
+      try {
+        void Promise.resolve(onError?.(error, event)).catch(() => {});
+      } catch {}
     }
   };
 }

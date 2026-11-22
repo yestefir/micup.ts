@@ -2,7 +2,7 @@ export interface BackgroundOptions {
   signal?: AbortSignal;
   timeoutMs?: number;
   name?: string;
-  onError?: (error: unknown, name: string) => void;
+  onError?: (error: unknown, name: string) => void | Promise<void>;
 }
 
 export function background(task: (signal: AbortSignal) => void | Promise<void>, options: BackgroundOptions = {}): Promise<void> {
@@ -17,11 +17,14 @@ export function background(task: (signal: AbortSignal) => void | Promise<void>, 
     setImmediate(() => {
       const timer = timeoutMs === undefined ? undefined : setTimeout(() => deadline.abort(new Error('Background task timed out')), timeoutMs);
       void Promise.resolve()
-        .then(() => task(signal))
+        .then(() => {
+          signal.throwIfAborted();
+          return task(signal);
+        })
         .catch((error) => {
           if (parent?.aborted) return;
           try {
-            onError(error, name);
+            void Promise.resolve(onError(error, name)).catch(() => {});
           } catch {}
         })
         .finally(() => {

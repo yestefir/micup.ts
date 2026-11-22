@@ -358,9 +358,20 @@ test('runs background work without blocking or crashing the caller', async () =>
   await pending;
   assert.deepEqual(errors, [['boom', 'search']]);
 
+  const alreadyStopped = new AbortController();
+  alreadyStopped.abort();
+  let startedAfterAbort = false;
+  await background(() => { startedAfterAbort = true; }, { signal: alreadyStopped.signal });
+  assert.equal(startedAfterAbort, false);
+
   let aborted = false;
   await background((signal) => new Promise((resolve) => signal.addEventListener('abort', () => { aborted = true; resolve(); })), { timeoutMs: 5 });
   assert.equal(aborted, true);
+
+  await background(() => { throw new Error('background failure'); }, {
+    onError: async () => { throw new Error('reporter failure'); },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
 
   const controller = new AbortController();
   const silent = [];

@@ -723,7 +723,13 @@ export class Client {
     const setting = this.options.errorReply;
     if (setting === false || interaction.replied || interaction.deferred || interaction.isAutocomplete()) return;
     const translated = this.options.catalog?.has('error.generic') ? this.options.catalog.text(interaction.raw, 'error.generic') : undefined;
-    const content = typeof setting === 'function' ? setting(error, interaction) : setting ?? translated ?? defaultErrorReply;
+    let content: string | undefined;
+    try {
+      content = typeof setting === 'function' ? setting(error, interaction) : setting ?? translated ?? defaultErrorReply;
+    } catch (cause) {
+      this.#report(cause, { event: 'INTERACTION_CREATE', interaction });
+      content = defaultErrorReply;
+    }
     if (!content) return;
     try {
       await interaction.reply({ content, ephemeral: true });

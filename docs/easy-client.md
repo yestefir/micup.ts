@@ -187,7 +187,7 @@ client.command('delete-all', async (interaction) => {
 
 ## Errors
 
-When a routed handler throws, the client emits `error` with the interaction in the context and, if the interaction was not answered yet, replies privately with a short message so the user is not left with "interaction failed". Change the text with `errorReply`, or turn it off with `errorReply: false`.
+When a routed handler throws, the client emits `error` with the interaction in the context and, if the interaction was not answered yet, replies privately with a short message so the user is not left with "interaction failed". Change the text with `errorReply`, or turn it off with `errorReply: false`. If a custom formatter throws, the error is reported and the generic reply is used.
 
 ```js
 client.on('error', (error, { event, interaction }) => {

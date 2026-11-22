@@ -36,7 +36,8 @@ interface UploadPlanItem {
 function uploadURL(address?: string): URL {
   if (!address || !URL.canParse(address)) throw new Error('Micup returned an invalid upload URL');
   const url = new URL(address);
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash) {
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if ((url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) || url.username || url.password || url.hash) {
     throw new Error('Micup returned an invalid upload URL');
   }
   return url;

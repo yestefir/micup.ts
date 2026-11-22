@@ -26,7 +26,7 @@ await session.run({ signal: stop.signal });
 | `minBackoffMs`, `maxBackoffMs` | reconnect delay bounds (1 s and 15 s by default) |
 | `flags` | Gateway feature flags (`GatewayFlag`) |
 | `onReady`, `onDisconnect`, `onGatewayError`, `beforeIdentify` | lifecycle hooks |
-| `logger` | `{ info?, warn }`; receives `gateway ready`, `gateway resumed`, `gateway session invalidated` and `gateway disconnected` (with the close code and whether it reconnects) and the shard number |
+| `logger` | `{ info?, warn }`; receives gateway lifecycle events and member inventory sync failures (with the guild ID and error) and the shard number |
 | `onVoiceLost`, `onVoiceEmpty`, `onVoiceGrant` | voice hooks, see [Voice](voice.md) |
 
 A handler that throws is retried with the same event, so keep side effects safe to repeat. Wrap handlers with `safeHandler()` to log failures, time out slow work or replay only selected errors.

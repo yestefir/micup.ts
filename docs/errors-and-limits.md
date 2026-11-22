@@ -74,7 +74,7 @@ events.on('MESSAGE_CREATE', safeHandler(handle, {
 }));
 ```
 
-`safeHandler()` logs failures instead of crashing or forcing a reconnect, stops slow work after `timeoutMs` and rethrows only the errors `retry` selects, so the event is delivered again. `background(task, { timeoutMs, name, onError })` runs slow work outside the handler and never rejects.
+`safeHandler()` logs failures instead of crashing or forcing a reconnect, stops slow work after `timeoutMs` and rethrows only the errors `retry` selects, so the event is delivered again. Its `onError` callback can be synchronous or asynchronous; a callback failure is contained. `background(task, { timeoutMs, name, onError })` runs slow work outside the handler and never rejects, including when its error reporter fails.
 
 ## Limits
 

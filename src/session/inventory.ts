@@ -40,7 +40,10 @@ function abortable<T>(signal: AbortSignal, work: Promise<T>): Promise<T> {
 export class MemberInventory {
   readonly #guilds = new Map<string, InventoryEntry>();
 
-  constructor(private readonly page: MemberPageLookup) {}
+  constructor(
+    private readonly page: MemberPageLookup,
+    private readonly onError?: (guildId: string, error: unknown) => void,
+  ) {}
 
   clear(): void {
     this.#guilds.clear();
@@ -157,8 +160,13 @@ export class MemberInventory {
         if (!next || cursor !== undefined && compareSnowflakes(next, cursor) <= 0) throw new Error('Micup member pagination did not advance');
         cursor = next;
       }
-    } catch {
+    } catch (error) {
       entry.retryAt = performance.now() + 10_000;
+      if (!signal.aborted && this.#guilds.get(guildId) === entry && entry.available) {
+        try {
+          this.onError?.(guildId, error);
+        } catch {}
+      }
     } finally {
       entry.changes = undefined;
     }

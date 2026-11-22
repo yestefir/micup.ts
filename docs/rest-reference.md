@@ -74,6 +74,8 @@ await client.sendMessage(channelId, {
 });
 ```
 
+Signed attachment uploads require HTTPS. Loopback HTTP URLs are accepted for local testing; public HTTP URLs are rejected before file data is sent.
+
 Clear a nullable field by passing `null` (for example `setNickname(guildId, null)` or `edit(channelId, { topic: null })`); leave a field out to keep it.
 
 Call a route the SDK has no method for with `client.request(method, path, { body, query, reason, signal })`. Paths are relative to the versioned API.

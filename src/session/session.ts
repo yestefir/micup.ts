@@ -75,7 +75,12 @@ export class GatewaySession {
     this.#lookup = config.lookupChannel;
     if (options?.trackMembers) {
       if (!config.lookupMembers) throw new TypeError('Member tracking requires a member page lookup');
-      this.#inventory = new MemberInventory(config.lookupMembers);
+      this.#inventory = new MemberInventory(config.lookupMembers, (guildId, error) => {
+        this.#log('warn', 'member inventory sync failed', {
+          guild: guildId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
     }
     const id = config.shardId ?? 0;
     const count = config.shardCount ?? 1;

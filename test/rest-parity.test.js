@@ -73,6 +73,32 @@ test('validates every signed upload URL before writing any part', async (t) => {
   assert.equal(fetch.mock.callCount(), 3);
 });
 
+test('rejects public cleartext upload URLs before sending attachment data', async (t) => {
+  const { bot, fetch } = await mockBot(t, (url) => {
+    assert.equal(url.pathname, '/api/v1/channels/20/attachments');
+    return Response.json({ attachments: [{
+      upload_filename: 'uploads/example', upload_mode: 'singlepart', upload_url: 'http://storage.example/upload',
+    }] });
+  });
+  await assert.rejects(bot.attachments.upload('20', { name: 'sample', data: new Blob(['fixture']) }), /invalid upload URL/);
+  assert.equal(fetch.mock.callCount(), 3);
+});
+
+test('allows loopback HTTP upload URLs for local testing', async (t) => {
+  const { bot } = await mockBot(t, async (url, options) => {
+    if (url.pathname === '/api/v1/channels/20/attachments') {
+      return Response.json({ attachments: [{
+        upload_filename: 'uploads/example', upload_mode: 'singlepart', upload_url: 'http://127.0.0.1:8080/upload',
+      }] });
+    }
+    assert.equal(url.href, 'http://127.0.0.1:8080/upload');
+    assert.equal(options.headers.get('Authorization'), null);
+    return new Response(null, { status: 204 });
+  });
+  const uploaded = await bot.attachments.upload('20', { name: 'sample', data: new Blob(['fixture']) });
+  assert.equal(uploaded.upload_filename, 'uploads/example');
+});
+
 test('uses token-only webhook requests, forwards messages and searches in context', async (t) => {
   const { bot, fetch } = await mockBot(t, (url, options) => {
     if (url.pathname.startsWith('/api/v1/webhooks/60/')) {

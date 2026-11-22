@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { test } from 'node:test';
 import { WebSocketServer } from 'ws';
-import { EventMux, GatewayCloseError, GatewayOpcode as op, GatewaySession, ShardManager, shardForGuild } from 'micup.ts';
+import { EventMux, GatewayCloseError, GatewayOpcode as op, GatewaySession, safeHandler, ShardManager, shardForGuild } from 'micup.ts';
+import { MemberInventory } from '../dist/session/inventory.js';
 import { SessionRequests } from '../dist/session/requests.js';
 
 test('a cancelled slot waiter passes an available slot to the next waiter', async () => {
@@ -49,6 +50,21 @@ async function createGateway(t) {
 function send(socket, op, d, t, s) {
   socket.send(JSON.stringify({ op, d, t, s }));
 }
+
+test('safeHandler contains synchronous and asynchronous error reporter failures', async () => {
+  const event = { name: 'MESSAGE_CREATE', data: {}, sequence: 1, shardId: 0 };
+  const signal = new AbortController().signal;
+  const synchronous = safeHandler(() => { throw new Error('handler failure'); }, {
+    onError: () => { throw new Error('reporter failure'); },
+  });
+  const asynchronous = safeHandler(() => { throw new Error('handler failure'); }, {
+    onError: async () => { throw new Error('reporter failure'); },
+  });
+
+  await synchronous(event, signal);
+  await asynchronous(event, signal);
+  await new Promise((resolve) => setImmediate(resolve));
+});
 
 test('identifies a shard and resumes from the last successfully processed event', { timeout: 5000 }, async (t) => {
   const { server, endpoint } = await createGateway(t);
@@ -362,6 +378,22 @@ test('merges Gateway member changes into a paginated inventory without sharing i
     controller.abort();
     await running;
   }
+});
+
+test('reports member inventory lookup failures without stopping its worker', { timeout: 5000 }, async () => {
+  const controller = new AbortController();
+  let reported;
+  const inventory = new MemberInventory(async () => { throw new Error('temporary lookup failure'); }, (guildId, error) => {
+    reported = { guildId, error };
+    controller.abort();
+  });
+  inventory.observe({ name: 'READY', data: { guilds: [{ id: '10' }] } });
+
+  await inventory.run(() => true, controller.signal);
+
+  assert.equal(reported.guildId, '10');
+  assert.match(reported.error.message, /temporary lookup failure/);
+  assert.equal(inventory.snapshots()[0].complete, false);
 });
 
 test('sends Lazy Request subscriptions and exposes a one-connection runner', { timeout: 5000 }, async (t) => {
