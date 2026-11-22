@@ -128,6 +128,9 @@ test('runs a voice room stage and its effects', async (t) => {
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'video', url: 'https://youtube.com/watch?v=1', paused: 'false' } }), TypeError);
   assert.throws(() => bot.rooms.setStage('20', { host: { character: 'unknown' } }), TypeError);
   assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', scores: Array(11).fill({ name: 'a', value: 1 }) } }), RangeError);
+  assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', scores: 'invalid' } }), TypeError);
+  assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', scores: Array(1) } }), TypeError);
+  assert.throws(() => bot.rooms.setStage('20', { tv: { type: 'board', scores: [null] } }), TypeError);
   assert.throws(() => bot.rooms.stageEffect('20', { type: 'host_emote', emote: 'emoji' }), TypeError);
   assert.throws(() => bot.rooms.stageEffect('20', { type: 'host_emote', emote: 'emoji', emoji: 1 }), TypeError);
   assert.throws(() => bot.rooms.stageEffect('20', { type: 'rain' }), TypeError);
@@ -209,6 +212,75 @@ test('covers member, ownership and message clean-up routes', async (t) => {
 
   assert.throws(() => bot.guilds.findMembers('10', 'x', { limit: 0 }), RangeError);
   assert.throws(() => bot.guilds.setNickname('10', ''), RangeError);
+});
+
+test('validates guild member search filters before making a request', async (t) => {
+  const { bot, calls } = await mockBot(t, () => Response.json({
+    guild_id: '10', members: [], page_result_count: 0, total_result_count: 0, indexing: false,
+  }));
+  await bot.guilds.searchMembers('10', {
+    query: 'Ada', limit: 20, offset: 5, role_ids: ['11'], join_source_type: [1], source_invite_code: ['club'],
+    is_bot: false, joined_at_gte: 100, user_created_at_lte: 200, sort_by: 'joined_at', sort_order: 'desc',
+  });
+  assert.deepEqual(calls[0].body, {
+    query: 'Ada', limit: 20, offset: 5, role_ids: ['11'], join_source_type: [1], source_invite_code: ['club'],
+    is_bot: false, joined_at_gte: 100, user_created_at_lte: 200, sort_by: 'joined_at', sort_order: 'desc',
+  });
+  assert.throws(() => bot.guilds.searchMembers('10', { query: 3 }), TypeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { role_ids: '11' }), TypeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { role_ids: Array(1) }), TypeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { join_source_type: ['1'] }), TypeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { source_invite_code: [3] }), TypeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { is_bot: 'true' }), TypeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { joined_at_gte: -1 }), RangeError);
+  assert.throws(() => bot.guilds.searchMembers('10', { sort_order: 'sideways' }), TypeError);
+  assert.equal(calls.length, 1);
+});
+
+test('restricts archived thread requests to supported kinds', async (t) => {
+  const { bot, calls } = await mockBot(t, () => Response.json({ threads: [] }));
+  await bot.channels.archivedThreads('20', { kind: 'public', limit: 10 });
+  await bot.channels.archivedThreads('20', { kind: 'private', limit: 20 });
+  await bot.channels.archivedThreads('20', { kind: 'joined' });
+  assert.deepEqual(calls.map(({ path, query }) => path + query), [
+    '/channels/20/threads/archived/public?limit=10',
+    '/channels/20/threads/archived/private?limit=20',
+    '/channels/20/users/@me/threads/archived/private',
+  ]);
+  assert.throws(() => bot.channels.archivedThreads('20', { kind: '../members' }), TypeError);
+  assert.equal(calls.length, 3);
+});
+
+test('stops paginated iterators when service cursors stop advancing', async (t) => {
+  const { bot, calls } = await mockBot(t, (url) => {
+    const path = url.pathname.replace('/api/v1', '');
+    const after = url.searchParams.get('after');
+    const before = url.searchParams.get('before');
+    if (path === '/guilds/10/members') {
+      const last = after === null ? 1000 : 999;
+      return Response.json(Array.from({ length: 1000 }, (_, index) => ({ user: { id: String(index === 999 ? last : index + 1) } })));
+    }
+    if (path === '/guilds/10/audit-logs') {
+      return Response.json({ audit_log_entries: Array.from({ length: 100 }, (_, index) => ({ id: String(200 - index + (before === null ? 0 : 1)) })) });
+    }
+    if (path === '/channels/20/thread-members') {
+      const last = after === null ? 100 : 99;
+      return Response.json(Array.from({ length: 100 }, (_, index) => ({ user_id: String(index === 99 ? last : index + 1) })));
+    }
+    if (path === '/users/@me/guilds') {
+      const last = after === null ? 200 : 199;
+      return Response.json(Array.from({ length: 200 }, (_, index) => ({ id: String(index === 199 ? last : index + 1) })));
+    }
+    assert.fail('Unexpected path: ' + path);
+  });
+
+  for await (const _ of bot.guilds.iterateMembers('10')) {}
+  for await (const _ of bot.guilds.iterateAuditLog('10')) {}
+  for await (const _ of bot.channels.iterateThreadMembers('20')) {}
+  for await (const _ of bot.users.iterateGuilds()) {}
+  assert.deepEqual(calls.reduce((counts, call) => counts.set(call.path, (counts.get(call.path) ?? 0) + 1), new Map()), new Map([
+    ['/guilds/10/members', 2], ['/guilds/10/audit-logs', 2], ['/channels/20/thread-members', 2], ['/users/@me/guilds', 2],
+  ]));
 });
 
 test('moves channels, clears commands and edits the bot profile', async (t) => {

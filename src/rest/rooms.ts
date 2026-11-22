@@ -141,8 +141,10 @@ function stageBody({ tv, host, ttl_seconds }: VoiceRoomStageInput): object {
     plain(tv.title, 60, 1, 'Stage title');
     plain(tv.text, 280, 4, 'Stage text');
     if (tv.accent !== undefined) colour(tv.accent, 'Stage accent');
+    if (tv.scores !== undefined && !Array.isArray(tv.scores)) throw new TypeError('Stage scores must be an array');
     if ((tv.scores?.length ?? 0) > 10) throw new RangeError('A stage board takes up to 10 scores');
     for (const score of tv.scores ?? []) {
+      if (!score || typeof score !== 'object') throw new TypeError('A stage score must be an object');
       plain(score.name, 32, 1, 'Score name');
       if (!score.name || !Number.isSafeInteger(score.value) || Math.abs(score.value) > 1_000_000_000) throw new RangeError('Invalid stage score');
       if (score.user_id) snowflake(score.user_id, 'Score user ID');

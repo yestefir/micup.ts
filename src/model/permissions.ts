@@ -52,8 +52,15 @@ function bits(value?: string | number): bigint {
   return 0n;
 }
 
+function permissionMask(value: bigint, label: string): bigint {
+  if (typeof value !== 'bigint' || value < 0n) throw new TypeError(label + ' must be a nonnegative bigint');
+  return value;
+}
+
 export function hasPermissions(permissions: bigint, required: bigint): boolean {
-  return (permissions & required) === required;
+  const have = permissionMask(permissions, 'Permissions');
+  const need = permissionMask(required, 'Required permissions');
+  return (have & need) === need;
 }
 
 const permissionNameList: readonly (readonly [string, bigint])[] = [
@@ -80,7 +87,8 @@ export const ElevatedPermissions: bigint =
   Permission.ManageMessages | Permission.ManageRoles | Permission.ManageWebhooks | Permission.ModerateMembers | Permission.ManageThreads;
 
 export function permissionNames(permissions: bigint): string[] {
-  return permissionNameList.filter(([, bit]) => (permissions & bit) === bit).map(([name]) => name);
+  const mask = permissionMask(permissions, 'Permissions');
+  return permissionNameList.filter(([, bit]) => (mask & bit) === bit).map(([name]) => name);
 }
 
 export function parsePermission(name: string): bigint | undefined {
@@ -89,7 +97,9 @@ export function parsePermission(name: string): bigint | undefined {
 }
 
 export function missingPermissions(have: bigint, required: bigint): bigint {
-  return (have & Permission.Administrator) === Permission.Administrator ? 0n : required & ~have;
+  const permissions = permissionMask(have, 'Permissions');
+  const need = permissionMask(required, 'Required permissions');
+  return (permissions & Permission.Administrator) === Permission.Administrator ? 0n : need & ~permissions;
 }
 
 export function computePermissions(

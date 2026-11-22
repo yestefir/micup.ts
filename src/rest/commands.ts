@@ -5,6 +5,14 @@ import type { MicupRequestOptions, RestTransport } from './transport.js';
 
 const chatName = /^[-_\p{Ll}\p{Lo}\p{N}]{1,32}$/u;
 const lengthWithin = (value: string | undefined, limit: number) => Boolean(value && [...value].length <= limit);
+const maxPermissionMask = (1n << 64n) - 1n;
+
+function validateDefaultMemberPermissions(value: unknown): void {
+  if (value === undefined || value === null) return;
+  if (typeof value !== 'string' || !/^\d{1,20}$/.test(value) || BigInt(value) > maxPermissionMask) {
+    throw new TypeError('Default member permissions must be an unsigned 64-bit decimal value or null');
+  }
+}
 
 function validateLocalizations(values: Readonly<Record<string, string>> | undefined, validate: (text: string) => boolean, what: string): void {
   for (const [locale, text] of Object.entries(values ?? {})) {
@@ -77,6 +85,7 @@ function validateOptions(options: readonly CommandOption[], depth: number, group
 function commandBody(command: CommandDefinition): CommandDefinition {
   const type = command.type ?? CommandType.ChatInput;
   const { name, description, options, name_localizations, description_localizations, default_member_permissions, dm_permission } = command;
+  validateDefaultMemberPermissions(default_member_permissions);
   if (type === CommandType.ChatInput) {
     if (!chatName.test(name) || !lengthWithin(description, 100)) throw new TypeError('Invalid Micup command name or description');
     validateLocalizations(name_localizations, (text) => chatName.test(text), 'the name of command "' + name + '"');
@@ -120,6 +129,7 @@ export class MicupCommands {
   }
 
   edit(id: string, command: Partial<CommandDefinition>, scope: CommandScope = {}): Promise<MicupCommand> {
+    validateDefaultMemberPermissions(command.default_member_permissions);
     return this.rest.request('PATCH', this.#path(scope, id), { ...scope, body: command });
   }
 

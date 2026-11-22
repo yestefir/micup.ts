@@ -370,6 +370,8 @@ test('awaits the next matching interaction with a timeout and an abort signal', 
 });
 
 test('builds slash commands with options first, subcommands and localizations', () => {
+  assert.throws(() => new SlashCommand('bad', 'Bad').setDefaultMemberPermissions(-1n), TypeError);
+  assert.throws(() => new SlashCommand('bad', 'Bad').setDefaultMemberPermissions(1), TypeError);
   const command = new SlashCommand('tool', 'Small tools')
     .setNameLocalizations({ tr: 'arac' })
     .setDefaultMemberPermissions(Permission.ManageGuild)

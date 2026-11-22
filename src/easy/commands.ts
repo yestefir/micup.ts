@@ -167,6 +167,9 @@ export class SlashCommand extends OptionList {
   }
 
   setDefaultMemberPermissions(permissions: bigint | null): this {
+    if (permissions !== null && (typeof permissions !== 'bigint' || permissions < 0n)) {
+      throw new TypeError('Default member permissions must be a nonnegative bigint or null');
+    }
     this.#permissions = permissions ?? undefined;
     return this;
   }

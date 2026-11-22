@@ -99,7 +99,9 @@ export class MicupWebhooks {
     if (threadName !== undefined && (!threadName || [...threadName].length > 100 || threadId !== undefined)) {
       throw new TypeError('Choose either an existing thread or a new forum post name');
     }
-    if (appliedTags?.length && (!threadName || appliedTags.length > 5)) throw new TypeError('A forum post accepts up to five tags');
+    if (appliedTags !== undefined && !Array.isArray(appliedTags)) throw new TypeError('Forum post tags must be an array');
+    if ((appliedTags?.length ?? 0) > 5 || appliedTags?.length && !threadName) throw new TypeError('A forum post accepts up to five tags');
+    for (const tagId of appliedTags ?? []) snowflake(tagId, 'Forum tag ID');
     const query = threadQuery(threadId);
     if (wait) query.set('wait', 'true');
     return this.rest.request('POST', webhookPath(webhookId, token), {

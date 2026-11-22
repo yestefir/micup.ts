@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import {
   AuditAction, ChannelType, ElevatedPermissions, GatewayCloseCode, GuildFeature, Limits, MessageType, Permission, UserFlag, VoiceRefusalCode,
   buttonRow, channelSelect, commandOption, defaultChannel, defaultRole, defaultUser, dangerButton, disableButtons, focusedOption, guildHasFeature,
-  hasMessageFlag, imageData, interactionCustomId, interactionInvoker, isButtonInteraction, isDMChannel, isForumChannel, isReply, isSelectInteraction,
+  hasMessageFlag, hasPermissions, imageData, interactionCustomId, interactionInvoker, isButtonInteraction, isDMChannel, isForumChannel, isReply, isSelectInteraction,
   isThreadChannel, leafOptions, linkButton, memberTimedOut, missingPermissions, modalValue, optionBoolean, optionInteger, optionMember, optionNumber,
   optionString, optionUser, paragraphInput, parsePermission, permissionNames, primaryButton, roleSelect, secondaryButton, selectOption, selectRow,
   selectedMembers, selectedUsers, shortInput, stringSelect, successButton, targetMessage, targetUser, userSelect, mentionableSelect,
@@ -32,6 +32,12 @@ test('names, parses and compares permissions', () => {
   assert.equal(parsePermission('NOPE'), undefined);
   assert.equal(missingPermissions(Permission.ViewChannel, Permission.ViewChannel | Permission.SendMessages), Permission.SendMessages);
   assert.equal(missingPermissions(Permission.Administrator, Permission.SendMessages), 0n);
+  assert.equal(hasPermissions(Permission.ViewChannel | Permission.SendMessages, Permission.SendMessages), true);
+  assert.throws(() => hasPermissions(-1n, Permission.Administrator), TypeError);
+  assert.throws(() => hasPermissions(Permission.Administrator, -1n), TypeError);
+  assert.throws(() => missingPermissions(-1n, Permission.SendMessages), TypeError);
+  assert.throws(() => missingPermissions(Permission.ViewChannel, -1n), TypeError);
+  assert.throws(() => permissionNames(-1n), TypeError);
   assert.ok((ElevatedPermissions & Permission.KickMembers) !== 0n);
   assert.equal(ElevatedPermissions & Permission.SendMessages, 0n);
 });

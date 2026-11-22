@@ -1,5 +1,6 @@
 import type { MicupChannel, MicupGuild, MicupMember, MicupRole } from '../model/guild.js';
 import type { MicupUser } from '../model/entities.js';
+import { compareSnowflakes } from '../model/format.js';
 import { snowflake } from './messages.js';
 import type { MicupRequestOptions, RestTransport } from './transport.js';
 
@@ -246,13 +247,37 @@ export class MicupGuilds {
   }
 
   searchMembers(guildId: string, search: GuildMemberSearch, options?: MicupRequestOptions): Promise<GuildMemberSearchPage> {
+    if (!search || typeof search !== 'object' || Array.isArray(search)) throw new TypeError('A member search object is required');
     const { query = '', limit = 100, offset = 0, role_ids, join_source_type, source_invite_code } = search;
+    if (typeof query !== 'string') throw new TypeError('A member search query must be a string');
+    if ([role_ids, join_source_type, source_invite_code].some((values) => values !== undefined && !Array.isArray(values))) {
+      throw new TypeError('Member search filters must be arrays');
+    }
     if ([...query].length > 100 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100 ||
         !Number.isSafeInteger(offset) || offset < 0 ||
         [role_ids, join_source_type, source_invite_code].some((values) => (values?.length ?? 0) > 10)) {
       throw new RangeError('Invalid member search limit, offset, query or filters');
     }
-    role_ids?.forEach((id) => snowflake(id, 'Role ID'));
+    for (const id of role_ids ?? []) snowflake(id, 'Role ID');
+    for (const value of join_source_type ?? []) {
+      if (!Number.isSafeInteger(value) || value < 0) throw new TypeError('Member join source types must be nonnegative integers');
+    }
+    for (const value of source_invite_code ?? []) {
+      if (typeof value !== 'string' || !value) throw new TypeError('Member source invite codes must be nonempty strings');
+    }
+    if (search.is_bot !== undefined && typeof search.is_bot !== 'boolean') throw new TypeError('The member bot filter must be a boolean');
+    for (const [name, value] of Object.entries({
+      joined_at_gte: search.joined_at_gte,
+      joined_at_lte: search.joined_at_lte,
+      user_created_at_gte: search.user_created_at_gte,
+      user_created_at_lte: search.user_created_at_lte,
+    })) {
+      if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) throw new RangeError(name + ' must be a nonnegative integer timestamp');
+    }
+    if (search.sort_by !== undefined && (typeof search.sort_by !== 'string' || !search.sort_by)) throw new TypeError('Member search sort_by must be a nonempty string');
+    if (search.sort_order !== undefined && search.sort_order !== 'asc' && search.sort_order !== 'desc') {
+      throw new TypeError('Member search sort_order must be asc or desc');
+    }
     return this.rest.request('POST', guildPath(guildId) + '/members-search', { ...options, body: search, idempotent: true });
   }
 
@@ -325,7 +350,7 @@ export class MicupGuilds {
         yield member;
         next = member.user?.id ?? next;
       }
-      if (page.length < 1000 || next === after) return;
+      if (page.length < 1000 || !next || after !== undefined && compareSnowflakes(next, after) <= 0) return;
       after = next;
     }
   }
@@ -342,7 +367,7 @@ export class MicupGuilds {
       const page = await this.auditLog(guildId, query, { signal });
       for (const entry of page.audit_log_entries) yield entry;
       const last = page.audit_log_entries.at(-1)?.id;
-      if (page.audit_log_entries.length < 100 || !last || last === before) return;
+      if (page.audit_log_entries.length < 100 || !last || before !== undefined && compareSnowflakes(last, before) >= 0) return;
       before = last;
     }
   }

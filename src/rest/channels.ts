@@ -1,5 +1,6 @@
 import type { MicupChannel, MicupMember, PermissionOverwrite, ThreadMember } from '../model/guild.js';
 import type { MicupMessage, MicupUser } from '../model/entities.js';
+import { compareSnowflakes } from '../model/format.js';
 import { guildPath, type AuditOptions, type SudoProof } from './guilds.js';
 import { messageBody, messagesPath, snowflake, type MessageInput } from './messages.js';
 import type { MicupRequestOptions, RestTransport } from './transport.js';
@@ -182,7 +183,7 @@ export class MicupChannels {
         yield member;
         next = member.user_id ?? next;
       }
-      if (page.length < 100 || next === after) return;
+      if (page.length < 100 || !next || after !== undefined && compareSnowflakes(next, after) <= 0) return;
       after = next;
     }
   }
@@ -221,9 +222,11 @@ export class MicupChannels {
 
   createForumPost(channelId: string, { message, applied_tags, ...input }: ForumPostInput, options?: AuditOptions): Promise<ForumPost> {
     threadStart(input);
+    if (applied_tags !== undefined && !Array.isArray(applied_tags)) throw new TypeError('Forum post tags must be an array');
     if ((applied_tags?.length ?? 0) > 5 || message.nonce || message.enforce_nonce || message.tts) {
       throw new TypeError('Invalid forum post tags or message options');
     }
+    for (const tagId of applied_tags ?? []) snowflake(tagId, 'Forum tag ID');
     if (!message.content && !message.embeds?.length && !message.files?.length && !message.uploads?.length && !message.sticker_ids?.length) {
       throw new TypeError('A forum post requires content, an embed, an attachment or a sticker');
     }
@@ -237,6 +240,7 @@ export class MicupChannels {
   }
 
   archivedThreads(id: string, { before, limit, kind = 'public', signal }: ArchivedThreadOptions = {}): Promise<ThreadList> {
+    if (!['public', 'private', 'joined'].includes(kind)) throw new TypeError('Archived thread kind must be public, private or joined');
     const suffix = kind === 'joined' ? '/users/@me/threads/archived/private' : '/threads/archived/' + kind;
     const query = new URLSearchParams();
     if (before) query.set('before', before);

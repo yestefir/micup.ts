@@ -1,5 +1,6 @@
 import type { MicupUser } from '../model/entities.js';
 import type { MicupChannel, MicupGuild, MicupMember } from '../model/guild.js';
+import { compareSnowflakes } from '../model/format.js';
 import { snowflake } from './messages.js';
 import type { MicupRequestOptions, RestTransport } from './transport.js';
 
@@ -96,7 +97,7 @@ export class MicupUsers {
       const guilds: MicupGuild[] = await this.guilds({ limit: 200, after, signal });
       for (const guild of guilds) yield guild;
       const next = guilds.at(-1)?.id;
-      if (guilds.length < 200 || !next || next === after) return;
+      if (guilds.length < 200 || !next || after !== undefined && compareSnowflakes(next, after) <= 0) return;
       after = next;
     }
   }

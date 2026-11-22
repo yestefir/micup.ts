@@ -127,6 +127,10 @@ test('commands validate translations with the place in the message and drop empt
   await assert.rejects(async () => bot.commands.create({ name: 'play', description: 'Play', description_localizations: { tr: 'x'.repeat(101) } }), /description of command "play"/);
   await assert.rejects(async () => bot.commands.create({ name: 'play', description: 'Play', options: [{ type: 3, name: 'q', description: 'Q', name_localizations: { tr: 'BÜYÜK' } }] }), /name of option "q"/);
   await assert.rejects(async () => bot.commands.create({ name: 'play', description: 'Play', options: [{ type: 3, name: 'q', description: 'Q', choices: [{ name: 'A', value: 'a', name_localizations: { tr: '' } }] }] }), /choice "A" of option "q"/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', default_member_permissions: '-1' }), /unsigned 64-bit/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', default_member_permissions: '18446744073709551616' }), /unsigned 64-bit/);
+  assert.throws(() => bot.commands.create({ name: 'play', description: 'Play', default_member_permissions: 1 }), /unsigned 64-bit/);
+  assert.throws(() => bot.commands.edit('1', { default_member_permissions: '-1' }), /unsigned 64-bit/);
   await bot.commands.create({ name: 'plain', description: 'Plain', name_localizations: {}, description_localizations: {} });
   const body = calls.find((call) => call.method === 'POST').body;
   assert.equal('name_localizations' in body, false);

@@ -203,6 +203,9 @@ test('covers webhook management, thread options and token-authenticated message 
   assert.throws(() => bot.webhooks.execute('60', 'token', { content: 'x', components: [{}] }), /cannot carry components/);
   assert.throws(() => bot.webhooks.execute('60', 'token', 'x', { threadId: '30', threadName: 'new' }), /either an existing thread/);
   assert.throws(() => bot.webhooks.execute('60', 'token', 'x', { appliedTags: ['40'] }), /up to five tags/);
+  assert.throws(() => bot.webhooks.execute('60', 'token', 'x', { threadName: 'new', appliedTags: '40' }), TypeError);
+  assert.throws(() => bot.webhooks.execute('60', 'token', 'x', { threadName: 'new', appliedTags: Array(1) }), TypeError);
+  assert.throws(() => bot.webhooks.execute('60', 'token', 'x', { threadName: 'new', appliedTags: ['invalid'] }), TypeError);
   assert.throws(() => bot.webhooks.editMessage('60', 'token', '70', {}), /need a change/);
 });
 
@@ -231,6 +234,15 @@ test('keeps forum message attachments inside the starter message payload', async
     },
   });
   assert.equal(thread.message.id, '31');
+  assert.throws(() => bot.channels.createForumPost('20', {
+    name: 'Forum topic', applied_tags: '25', message: { content: 'First message' },
+  }), TypeError);
+  assert.throws(() => bot.channels.createForumPost('20', {
+    name: 'Forum topic', applied_tags: Array(1), message: { content: 'First message' },
+  }), TypeError);
+  assert.throws(() => bot.channels.createForumPost('20', {
+    name: 'Forum topic', applied_tags: ['invalid'], message: { content: 'First message' },
+  }), TypeError);
 });
 
 test('sends timed moderation and announcement follower requests through resource APIs', async (t) => {
