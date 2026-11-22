@@ -3,7 +3,10 @@ import { GatewaySession, type GatewaySessionConfig, type GatewaySessionOptions }
 import { ShardManager, type ShardManagerOptions } from '../shard/manager.js';
 
 import { MicupAPIError } from '../rest/errors.js';
-import { RestTransport, type MicupRequestOptions, type RestMethod, type RestRequestOptions } from '../rest/transport.js';
+import { RestTransport, type MicupLogger, type MicupRequestOptions, type RestMethod, type RestRequestOptions } from '../rest/transport.js';
+import { tokenId } from '../rest/identity.js';
+import { MessageFlag } from '../model/entities.js';
+import type { MicupApplication } from '../rest/users.js';
 
 import { messageBody, messageQuery, messagesPath, snowflake, type ListMessageOptions, type MessageForward, type MessageInput, type MessageSearch, type MessageSearchResult } from '../rest/messages.js';
 
@@ -20,6 +23,9 @@ import { MicupWebhooks } from '../rest/webhooks.js';
 import { MicupUsers } from '../rest/users.js';
 
 import { MicupExpressions } from '../rest/expressions.js';
+import { MicupSounds } from '../rest/sounds.js';
+import { MicupDiscovery } from '../rest/discovery.js';
+import { MicupVoiceRooms } from '../rest/rooms.js';
 
 import { discoverPublicBase, MicupMedia } from '../model/media.js';
 
@@ -30,6 +36,7 @@ export interface MicupClientOptions {
   token: string;
   origin?: string;
   maxRestAttempts?: number;
+  logger?: MicupLogger;
 }
 
 export class MicupClient {
@@ -37,6 +44,8 @@ export class MicupClient {
   readonly #rest: RestTransport;
   readonly #gateway?: string;
   #botId?: string;
+  #self?: MicupUser;
+  #application?: Promise<MicupApplication>;
   #commands?: MicupCommands;
   readonly interactions: MicupInteractions;
   readonly guilds: MicupGuilds;
@@ -45,16 +54,19 @@ export class MicupClient {
   readonly webhooks: MicupWebhooks;
   readonly users: MicupUsers;
   readonly expressions: MicupExpressions;
+  readonly sounds: MicupSounds;
+  readonly discovery: MicupDiscovery;
+  readonly rooms: MicupVoiceRooms;
   readonly media: MicupMedia;
   readonly inviteBase: string;
   readonly #origin: string;
 
-  private constructor(key: typeof connection, token: string, api: string, endpoints: { gateway?: string; media?: string; invite?: string }, maxAttempts?: number) {
+  private constructor(key: typeof connection, token: string, api: string, endpoints: { gateway?: string; media?: string; invite?: string }, maxAttempts?: number, logger?: MicupLogger) {
     if (key !== connection) {
       throw new TypeError('Use MicupClient.connect() to create a client');
     }
     this.#token = token;
-    this.#rest = new RestTransport(api, token, maxAttempts);
+    this.#rest = new RestTransport(api, token, maxAttempts, logger);
     this.interactions = new MicupInteractions(this.#rest);
     this.guilds = new MicupGuilds(this.#rest);
     this.channels = new MicupChannels(this.#rest);
@@ -62,6 +74,9 @@ export class MicupClient {
     this.webhooks = new MicupWebhooks(this.#rest);
     this.users = new MicupUsers(this.#rest);
     this.expressions = new MicupExpressions(this.#rest);
+    this.sounds = new MicupSounds(this.#rest);
+    this.discovery = new MicupDiscovery(this.#rest);
+    this.rooms = new MicupVoiceRooms(this.#rest);
     this.#gateway = endpoints.gateway;
     this.#origin = new URL(api).origin;
     this.media = new MicupMedia(endpoints.media ?? '');
@@ -69,7 +84,7 @@ export class MicupClient {
   }
 
   static async connect(
-    { token, origin = defaultOrigin, maxRestAttempts }: MicupClientOptions,
+    { token, origin = defaultOrigin, maxRestAttempts, logger }: MicupClientOptions,
     { signal }: MicupRequestOptions = {},
   ): Promise<MicupClient> {
     if (typeof token !== 'string' || !/^[\x21-\x7E]+$/.test(token)) {
@@ -110,13 +125,41 @@ export class MicupClient {
         throw new Error('Micup discovery returned an invalid Gateway endpoint');
       }
     }
-    const client = new MicupClient(connection, token, `${api.href.replace(/\/+$/, '')}/v1`, { ...discovery.endpoints, gateway }, maxRestAttempts);
+    const client = new MicupClient(connection, token, `${api.href.replace(/\/+$/, '')}/v1`, { ...discovery.endpoints, gateway }, maxRestAttempts, logger);
     const user = await client.getCurrentUser({ signal });
     if (user?.bot !== true) {
       throw new Error('The credential must belong to a Micup bot');
     }
     client.#botId = user.id;
+    client.#self = user;
     return client;
+  }
+
+  get self(): MicupUser {
+    if (!this.#self) throw new Error('Micup did not return the bot user');
+    return this.#self;
+  }
+
+  get tokenId(): string | undefined {
+    return tokenId(this.#token);
+  }
+
+  application(options?: MicupRequestOptions): Promise<MicupApplication> {
+    if (!this.#application) {
+      this.#application = this.users.application(options);
+      this.#application.catch(() => { this.#application = undefined; });
+    }
+    return this.#application;
+  }
+
+  async applicationId(options?: MicupRequestOptions): Promise<string> {
+    try {
+      return (await this.application(options)).id;
+    } catch (error) {
+      options?.signal?.throwIfAborted();
+      if (!this.#botId) throw error;
+      return this.#botId;
+    }
   }
 
   get commands(): MicupCommands {
@@ -222,6 +265,13 @@ export class MicupClient {
     channelId: string, messageId: string, edit: MessageInput, options?: MicupRequestOptions,
   ): Promise<MicupMessage> {
     return this.request('PATCH', messagesPath(channelId, messageId), { ...options, body: messageBody(edit) });
+  }
+
+  async suppressEmbeds(channelId: string, messageId: string, suppress = true, options?: MicupRequestOptions): Promise<MicupMessage> {
+    const current = await this.getMessage(channelId, messageId, options);
+    const settable = MessageFlag.SuppressEmbeds | MessageFlag.SuppressNotifications | MessageFlag.VoiceMessage;
+    const kept = (current.flags ?? 0) & settable & ~MessageFlag.SuppressEmbeds;
+    return this.editMessage(channelId, messageId, { flags: suppress ? kept | MessageFlag.SuppressEmbeds : kept }, options);
   }
 
   deleteMessage(

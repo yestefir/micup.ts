@@ -3,6 +3,7 @@ import type { Emoji } from '../model/format.js';
 import type { MicupMember, MicupVoiceState, ThreadMember } from '../model/guild.js';
 import type { Presence } from '../model/presence.js';
 import type { MicupInvite } from '../rest/channels.js';
+import type { MicupSoundboardSound } from '../rest/sounds.js';
 import type { ChannelMemberCount, GuildCount } from '../session/requests.js';
 
 export interface PresenceUpdate extends Presence {
@@ -58,6 +59,13 @@ export interface AdditionalGatewayEvents {
   APPLICATION_COMMANDS_UPDATE: { application_id: string; guild_id?: string; scope_id?: string; version: string };
   GUILD_EMOJIS_UPDATE: { guild_id: string; emojis: Emoji[] };
   GUILD_STICKERS_UPDATE: { guild_id: string; stickers: { id: string; name: string; description?: string; tags?: string; format_type?: number }[] };
+  GUILD_SOUNDBOARD_SOUNDS_UPDATE: {
+    guild_id: string; operation: 'create' | 'update' | 'delete'; sound_id: string; version: number; sound?: MicupSoundboardSound;
+  };
+  GUILD_SOUNDBOARD_SOUND_PLAY: {
+    guild_id: string; channel_id: string; actor_id: string; session_id: string; sound_id: string; event_id: string;
+    asset_version: string; volume: number; server_time: number; recipient_connection_id: string; recipient_soundboard_epoch?: number;
+  };
   GUILD_MEMBER_LIST_UPDATE: {
     guild_id: string; id: string; channel_id?: string; member_count: number; online_count: number;
     groups?: MemberListGroup[]; ops?: { op: string; range?: number[]; items?: MemberListItem[] }[];

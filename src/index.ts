@@ -10,7 +10,7 @@ export { ShardManager, shardForGuild } from './shard/manager.js';
 export type { ShardManagerOptions } from './shard/manager.js';
 export { VoiceRefusedError } from './session/voice.js';
 export type { VoiceJoinOptions, VoiceServerUpdate, VoiceSessionOptions } from './session/voice.js';
-export { MicupAPIError } from './rest/errors.js';
+export { MicupAPIError, MicupErrorCode } from './rest/errors.js';
 export type { MicupFieldError } from './rest/errors.js';
 export type { MicupRequestOptions, RestMethod, RestRequestOptions } from './rest/transport.js';
 export type { AllowedMentions, ListMessageOptions, MessageInput, MicupEmbed, MicupFile } from './rest/messages.js';
@@ -27,6 +27,7 @@ export type { ChannelEdit, MicupChannels, MicupInvite, ThreadList, ThreadStart }
 export type { CustomStatus, Presence, PresenceStatus } from './model/presence.js';
 export { GatewayRequestError } from './session/requests.js';
 export type { ChannelMemberCount, GuildCount, GuildMembersRequest } from './session/requests.js';
+export { MessageFlag } from './model/entities.js';
 export type { MicupMessage, MicupUser, MessageAttachment, MessageReference } from './model/entities.js';
 export type { AttachmentUpload, MicupAttachments, RefreshedAttachmentURL, UploadedAttachment } from './rest/attachments.js';
 export type { MicupWebhook, MicupWebhooks, WebhookEdit, WebhookExecuteOptions } from './rest/webhooks.js';
@@ -49,7 +50,24 @@ export { MicupMedia, inviteURL } from './model/media.js';
 export type { MediaOptions } from './model/media.js';
 export type { ArchivedThreadOptions, ForumPost, ForumPostInput, ForumTag, ReactionUsersPage } from './rest/channels.js';
 export { safeHandler } from './events/safe.js';
+export { background } from './events/background.js';
+export type { BackgroundOptions } from './events/background.js';
+export { tokenId } from './rest/identity.js';
+export type { MicupLogger } from './rest/transport.js';
 export type { SafeHandlerOptions } from './events/safe.js';
 export { onGuildTagChange } from './events/guild-tag.js';
 export type { GuildTagChange } from './events/guild-tag.js';
-export type { GuildMemberSearch, GuildMemberSearchPage } from './rest/guilds.js';
+export type { ChannelPosition, CurrentMemberEdit, GuildMemberSearch, GuildMemberSearchPage, SudoProof } from './rest/guilds.js';
+export type { CrosspostSource } from './rest/channels.js';
+export type { ExpressionSourceGuild } from './rest/expressions.js';
+export type { BotProfileEdit, MicupPublicApplication } from './rest/users.js';
+export { MicupDiscovery } from './rest/discovery.js';
+export type { DiscoveryApplication, DiscoveryApplicationEdit, DiscoveryApplicationInput, DiscoveryApplicationStatus, DiscoveryStatus } from './rest/discovery.js';
+export { MicupSounds, encodeAudio } from './rest/sounds.js';
+export type { AudioInput, MicupSoundboardSound, SoundboardPlayOptions, SoundboardSoundEdit, SoundboardSoundInput } from './rest/sounds.js';
+export { MicupVoiceRooms } from './rest/rooms.js';
+export type {
+  RoomTournament, StageBoardInput, StageBoardStyle, StageEffect, StageEffectType, StageHostCharacter, StageHostInput, StageScore,
+  StageVideoInput, TournamentCurrentMatch, TournamentGame, TournamentInput, TournamentMatch, TournamentReadOptions, TournamentSize,
+  TournamentTable, VoiceRoomStage, VoiceRoomStageInput,
+} from './rest/rooms.js';

@@ -42,6 +42,7 @@ export const Permission = {
   BypassSlowmode: 1n << 52n,
   UpdateRTCRegion: 1n << 53n,
   ViewChannelMembers: 1n << 54n,
+  ManageRoomStage: 1n << 62n,
   All: (1n << 63n) - 1n,
 } as const;
 

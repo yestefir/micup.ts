@@ -1,6 +1,6 @@
 import type { MicupChannel, MicupMember, PermissionOverwrite, ThreadMember } from '../model/guild.js';
 import type { MicupMessage, MicupUser } from '../model/entities.js';
-import { guildPath, type AuditOptions } from './guilds.js';
+import { guildPath, type AuditOptions, type SudoProof } from './guilds.js';
 import { messageBody, messagesPath, snowflake, type MessageInput } from './messages.js';
 import type { MicupRequestOptions, RestTransport } from './transport.js';
 
@@ -18,6 +18,14 @@ export interface ChannelEdit {
   auto_archive_duration?: number;
   rate_limit_per_user?: number;
   nsfw?: boolean;
+}
+
+export interface CrosspostSource {
+  guild: {
+    id: string; name: string; icon: string | null; banner: string | null; description: string | null;
+    features: string[]; badge_ids: string[]; approximate_member_count: number | null;
+    approximate_presence_count: number | null; discoverable: boolean;
+  };
 }
 
 export interface ThreadStart {
@@ -141,6 +149,44 @@ export class MicupChannels {
     return this.rest.request('GET', messagesPath(id) + '/pins', { ...options, query });
   }
 
+  async *iteratePins(id: string, { signal }: MicupRequestOptions = {}): AsyncGenerator<{ message: MicupMessage; pinned_at: string }> {
+    const seen = new Set<string>();
+    let before: string | undefined;
+    while (true) {
+      const query = new URLSearchParams({ limit: '50' });
+      if (before !== undefined) query.set('before', before);
+      const page = await this.pins(id, query, { signal });
+      let fresh = 0;
+      for (const pin of page.items) {
+        if (seen.has(pin.message.id)) continue;
+        seen.add(pin.message.id);
+        fresh++;
+        yield pin;
+      }
+      if (!page.has_more || fresh === 0) return;
+      before = page.items.at(-1)!.pinned_at;
+    }
+  }
+
+  async *iterateThreadMembers(
+    threadId: string, { withMember = false, signal }: MicupRequestOptions & { withMember?: boolean } = {},
+  ): AsyncGenerator<ThreadMember> {
+    let after: string | undefined;
+    while (true) {
+      const query = new URLSearchParams({ limit: '100' });
+      if (withMember) query.set('with_member', 'true');
+      if (after !== undefined) query.set('after', snowflake(after, 'Thread member cursor'));
+      const page: ThreadMember[] = await this.threadMembers(threadId, query, { signal });
+      let next = after;
+      for (const member of page) {
+        yield member;
+        next = member.user_id ?? next;
+      }
+      if (page.length < 100 || next === after) return;
+      after = next;
+    }
+  }
+
   addReaction(id: string, messageId: string, emoji: string, options?: MicupRequestOptions): Promise<void> {
     return this.rest.request('PUT', reactionPath(id, messageId, emoji) + '/@me', options);
   }
@@ -244,6 +290,31 @@ export class MicupChannels {
     if (userId !== undefined && emoji === undefined) throw new TypeError('A user reaction needs an emoji');
     const path = emoji === undefined ? messagesPath(id, messageId) + '/reactions' : reactionPath(id, messageId, emoji);
     return this.rest.request('DELETE', path + (userId === undefined ? '' : '/' + snowflake(userId, 'User ID')), options);
+  }
+
+  addRecipient(channelId: string, userId: string, options?: MicupRequestOptions): Promise<void> {
+    return this.rest.request('PUT', channelPath(channelId) + '/recipients/' + snowflake(userId, 'User ID'), options);
+  }
+
+  removeRecipient(channelId: string, userId: string, { silent, signal }: MicupRequestOptions & { silent?: boolean } = {}): Promise<void> {
+    const query = silent === undefined ? undefined : new URLSearchParams({ silent: String(silent) });
+    return this.rest.request('DELETE', channelPath(channelId) + '/recipients/' + snowflake(userId, 'User ID'), { query, signal });
+  }
+
+  deleteOwnMessages(channelId: string, { signal, ...proof }: MicupRequestOptions & SudoProof = {}): Promise<void> {
+    return this.rest.request('POST', messagesPath(channelId) + '/bulk-delete-mine', { signal, body: proof });
+  }
+
+  crosspostSource(channelId: string, messageId: string, options?: MicupRequestOptions): Promise<CrosspostSource> {
+    return this.rest.request('GET', messagesPath(channelId, messageId) + '/crosspost-source', options);
+  }
+
+  archiveThread(threadId: string, archived = true, options?: AuditOptions): Promise<MicupChannel> {
+    return this.edit(threadId, { archived }, options);
+  }
+
+  lockThread(threadId: string, locked = true, options?: AuditOptions): Promise<MicupChannel> {
+    return this.edit(threadId, { locked }, options);
   }
 
   follow(announcementId: string, targetId: string, options?: AuditOptions): Promise<{ channel_id: string; webhook_id: string }> {

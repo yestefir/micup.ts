@@ -1,3 +1,16 @@
+export const MessageFlag = {
+  Crossposted: 1 << 0,
+  IsCrosspost: 1 << 1,
+  SuppressEmbeds: 1 << 2,
+  SourceMessageDeleted: 1 << 3,
+  HasThread: 1 << 5,
+  Ephemeral: 1 << 6,
+  FailedToMentionSomeRolesInThread: 1 << 8,
+  SuppressNotifications: 1 << 12,
+  VoiceMessage: 1 << 13,
+  IsComponentsV2: 1 << 15,
+} as const;
+
 export interface MicupUser {
   id: string;
   username: string;

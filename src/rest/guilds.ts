@@ -23,6 +23,34 @@ export interface GuildMemberEdit {
   timeout_reason?: string;
 }
 
+export interface ChannelPosition {
+  id: string;
+  position?: number;
+  parent_id?: string | null;
+  preceding_sibling_id?: string | null;
+  lock_permissions?: boolean;
+}
+
+export interface SudoProof {
+  password?: string;
+  mfa_method?: 'totp' | 'webauthn' | 'email_code';
+  mfa_code?: string;
+  webauthn_response?: unknown;
+  webauthn_challenge?: string;
+  email_code_ticket?: string;
+  email_code?: string;
+}
+
+export interface CurrentMemberEdit extends Omit<GuildMemberEdit, 'roles'> {
+  avatar?: string | null;
+  banner?: string | null;
+  bio?: string | null;
+  pronouns?: string | null;
+  accent_color?: number | null;
+  profile_flags?: number;
+  mention_flags?: number;
+}
+
 export interface GuildRoleEdit {
   name?: string;
   permissions?: bigint | string;
@@ -226,6 +254,97 @@ export class MicupGuilds {
     }
     role_ids?.forEach((id) => snowflake(id, 'Role ID'));
     return this.rest.request('POST', guildPath(guildId) + '/members-search', { ...options, body: search, idempotent: true });
+  }
+
+  moveChannels(guildId: string, positions: readonly ChannelPosition[], options?: MicupRequestOptions): Promise<void> {
+    if (!positions.length) throw new RangeError('Moving channels needs at least one position');
+    const body = positions.map(({ id, parent_id, preceding_sibling_id, ...position }) => ({
+      ...position,
+      id: snowflake(id, 'Channel ID'),
+      ...(parent_id !== undefined && { parent_id: parent_id === null ? null : snowflake(parent_id, 'Parent ID') }),
+      ...(preceding_sibling_id !== undefined && {
+        preceding_sibling_id: preceding_sibling_id === null ? null : snowflake(preceding_sibling_id, 'Sibling ID'),
+      }),
+    }));
+    return this.rest.request('PATCH', guildPath(guildId) + '/channels', { ...options, body });
+  }
+
+  getBan(guildId: string, userId: string, options?: MicupRequestOptions): Promise<GuildBan> {
+    return this.rest.request('GET', guildPath(guildId) + '/bans/' + snowflake(userId, 'User ID'), options);
+  }
+
+  role(guildId: string, roleId: string, options?: MicupRequestOptions): Promise<MicupRole> {
+    return this.rest.request('GET', guildPath(guildId) + '/roles/' + snowflake(roleId, 'Role ID'), options);
+  }
+
+  vanityUrl(guildId: string, options?: MicupRequestOptions): Promise<{ code: string | null; uses: number }> {
+    return this.rest.request('GET', guildPath(guildId) + '/vanity-url', options);
+  }
+
+  editVanityUrl(guildId: string, code: string | null, options?: AuditOptions): Promise<{ code: string | null }> {
+    if (code !== null && (code.length > 32 || !/^[A-Za-z0-9][A-Za-z0-9 -]*[A-Za-z0-9]$/.test(code))) {
+      throw new TypeError('A custom invite code takes 2 to 32 letters, digits, spaces or inner hyphens');
+    }
+    return this.rest.request('PATCH', guildPath(guildId) + '/vanity-url', { ...options, body: { code } });
+  }
+
+  editCurrentMember(guildId: string, edit: CurrentMemberEdit, options?: AuditOptions): Promise<MicupMember> {
+    return this.rest.request('PATCH', guildPath(guildId) + '/members/@me', { ...options, body: edit });
+  }
+
+  setNickname(guildId: string, nick: string | null, options?: AuditOptions): Promise<MicupMember> {
+    if (nick !== null && ([...nick].length < 1 || [...nick].length > 32)) throw new RangeError('A nickname takes 1 to 32 characters');
+    return this.editCurrentMember(guildId, { nick }, options);
+  }
+
+  findMembers(guildId: string, query: string, { limit = 1, signal }: MicupRequestOptions & { limit?: number } = {}): Promise<MicupMember[]> {
+    if (typeof query !== 'string' || [...query].length > 100 || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
+      throw new RangeError('A name search takes a query of up to 100 characters and a limit of 1 to 1000');
+    }
+    return this.rest.request('GET', guildPath(guildId) + '/members/search', {
+      query: new URLSearchParams({ query, limit: String(limit) }), signal,
+    });
+  }
+
+  transferOwnership(guildId: string, newOwnerId: string, { signal, reason, ...proof }: AuditOptions & SudoProof = {}): Promise<MicupGuild> {
+    return this.rest.request('POST', guildPath(guildId) + '/transfer-ownership', {
+      signal, reason, body: { new_owner_id: snowflake(newOwnerId, 'New owner ID'), ...proof },
+    });
+  }
+
+  deleteOwnMessages(guildId: string, { signal, ...proof }: MicupRequestOptions & SudoProof = {}): Promise<void> {
+    return this.rest.request('POST', '/users/@me' + guildPath(guildId) + '/messages/bulk-delete-mine', { signal, body: proof });
+  }
+
+  async *iterateMembers(guildId: string, { signal }: MicupRequestOptions = {}): AsyncGenerator<MicupMember> {
+    let after: string | undefined;
+    while (true) {
+      const page: MicupMember[] = await this.members(guildId, { limit: 1000, after, signal });
+      let next = after;
+      for (const member of page) {
+        yield member;
+        next = member.user?.id ?? next;
+      }
+      if (page.length < 1000 || next === after) return;
+      after = next;
+    }
+  }
+
+  async *iterateAuditLog(
+    guildId: string, { userId, actionType, signal }: MicupRequestOptions & { userId?: string; actionType?: number } = {},
+  ): AsyncGenerator<GuildAuditLog['audit_log_entries'][number]> {
+    let before: string | undefined;
+    while (true) {
+      const query = new URLSearchParams({ limit: '100' });
+      if (before !== undefined) query.set('before', before);
+      if (userId !== undefined) query.set('user_id', snowflake(userId, 'User ID'));
+      if (actionType !== undefined) query.set('action_type', String(actionType));
+      const page = await this.auditLog(guildId, query, { signal });
+      for (const entry of page.audit_log_entries) yield entry;
+      const last = page.audit_log_entries.at(-1)?.id;
+      if (page.audit_log_entries.length < 100 || !last || last === before) return;
+      before = last;
+    }
   }
 
   auditLog(guildId: string, query?: URLSearchParams, options?: MicupRequestOptions): Promise<GuildAuditLog> {

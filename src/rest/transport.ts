@@ -3,6 +3,10 @@ import { MicupAPIError, retryDelay } from './errors.js';
 
 export type RestMethod = 'GET' | 'HEAD' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
+export interface MicupLogger {
+  warn(message: string, fields?: Record<string, unknown>): void;
+}
+
 export interface MicupRequestOptions {
   signal?: AbortSignal;
 }
@@ -15,6 +19,8 @@ export interface RestRequestOptions extends MicupRequestOptions {
   idempotent?: boolean;
 }
 
+const permissionLogWindow = 60_000;
+const permissionLogLimit = 512;
 const majorParameters = new Set(['channels', 'guilds', 'webhooks']);
 const maxRetryDelay = 30_000;
 const repeatable = new Set<RestMethod>(['GET', 'HEAD', 'PUT', 'DELETE']);
@@ -90,12 +96,32 @@ async function readJson(response: Response, limit: number): Promise<unknown> {
 export class RestTransport {
   readonly #limits = new RateLimits();
   readonly #api: URL;
+  readonly #denied = new Map<string, number>();
 
-  constructor(api: string, private readonly token: string, private readonly attempts = 5) {
+  constructor(api: string, private readonly token: string, private readonly attempts = 5, private readonly logger?: MicupLogger) {
     this.#api = new URL(api + '/');
     if (!Number.isSafeInteger(attempts) || attempts < 1 || attempts > 5) {
       throw new RangeError('Micup REST attempts must be between 1 and 5');
     }
+  }
+
+  #notePermissionDenied(method: RestMethod, path: string, error: MicupAPIError): void {
+    if (!this.logger || error.status !== 403 || (error.code !== 'MISSING_PERMISSIONS' && error.code !== 'MISSING_ACCESS')) return;
+    const key = method + ' ' + path;
+    const now = performance.now();
+    const last = this.#denied.get(key);
+    if (last !== undefined && now - last < permissionLogWindow) return;
+    if (this.#denied.size >= permissionLogLimit) {
+      for (const [stored, at] of this.#denied) if (now - at >= permissionLogWindow) this.#denied.delete(stored);
+      if (this.#denied.size >= permissionLogLimit) this.#denied.clear();
+    }
+    this.#denied.set(key, now);
+    const guildId = /^\/guilds\/(\d+)/.exec(path)?.[1];
+    try {
+      this.logger.warn('bot lacks permission for this request', {
+        method, path, code: error.code, ...(guildId && { guild: guildId }), ...(error.message && { message: error.message }),
+      });
+    } catch {}
   }
 
   async request<T>(method: RestMethod, path: string, { body, signal, query, reason, anonymous, idempotent }: RestRequestOptions = {}): Promise<T> {
@@ -147,6 +173,7 @@ export class RestTransport {
       signal?.throwIfAborted();
       const error = new MicupAPIError(response, errorBody as ConstructorParameters<typeof MicupAPIError>[1]);
       last = error;
+      this.#notePermissionDenied(method, target.pathname.slice(this.#api.pathname.length - 1), error);
       let wait = 0;
       if (response.status === 429) {
         wait = Math.max(error.retryAfterMs, 1);

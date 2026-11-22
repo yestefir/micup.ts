@@ -81,6 +81,12 @@ Use `session.subscribe()` or `manager.subscribe()` for Lazy Request subscription
 
 The SDK exports message catalogs, mention and snowflake helpers, media URLs, and builders for embeds, buttons, selects and modals. Pass `client.media` an entity to build its discovered CDN URL.
 
+## Soundboard, voice rooms and identity
+
+`client.sounds` manages guild soundboard sounds, plays them in a voice channel and sets guild or channel notification sounds. `client.rooms` runs the 3D room stage (board or video on the room TV, host character, effects) and room tournaments of a guild voice channel. Both need a bot token, and the server decides whether the feature is switched on. `MicupErrorCode` names the error codes, and `MicupAPIError` has `notFound`, `forbidden`, `rateLimited` and `hasFieldCode()`.
+
+`client.self`, `client.application()`, `client.applicationId()` and `client.tokenId` read the bot identity without repeating requests. Pass `logger: { warn }` to `MicupClient.connect()` to log a request the bot lacks permission for, at most once a minute per route. `client.guilds.iterateMembers()`, `iterateAuditLog()`, `client.channels.iteratePins()`, `iterateThreadMembers()` and `iterateMessages()` page through large collections. `background()` runs slow work outside a Gateway handler with a timeout and a contained error. `client.suppressEmbeds()` hides or shows the embeds of a message and keeps its other flags.
+
 ## Voice
 
 The optional [`@micupts/voice`](packages/voice) workspace publishes audio to LiveKit. Install it with `npm install @micupts/voice` when your bot needs audio playback.

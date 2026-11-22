@@ -12,6 +12,24 @@ export interface MicupApplication {
   flags?: number | null;
 }
 
+export interface BotProfileEdit {
+  username?: string;
+  avatar?: string | null;
+  banner?: string | null;
+}
+
+export interface MicupPublicApplication {
+  id: string;
+  name: string;
+  icon: string | null;
+  description: string | null;
+  redirect_uris: string[];
+  scopes: string[];
+  bot_public: boolean;
+  bot: { id: string; username: string; discriminator: string; avatar?: string | null; banner?: string | null; bio: string | null } | null;
+  current_user?: MicupUser | null;
+}
+
 export interface UserProfileOptions extends MicupRequestOptions {
   guildId?: string;
   withMutualFriends?: boolean;
@@ -46,6 +64,17 @@ export class MicupUsers {
 
   application(options?: MicupRequestOptions): Promise<MicupApplication> {
     return this.rest.request('GET', '/applications/@me', options);
+  }
+
+  editCurrentUser(edit: BotProfileEdit, options?: MicupRequestOptions): Promise<MicupUser> {
+    if (edit.username !== undefined && !/^[A-Za-z0-9_]{1,32}$/.test(edit.username)) {
+      throw new TypeError('A bot username takes 1 to 32 ASCII letters, digits or underscores');
+    }
+    return this.rest.request('PATCH', '/users/@me', { ...options, body: edit });
+  }
+
+  publicApplication(applicationId: string, options?: MicupRequestOptions): Promise<MicupPublicApplication> {
+    return this.rest.request('GET', '/oauth2/applications/' + snowflake(applicationId, 'Application ID') + '/public', { ...options, anonymous: true });
   }
 
   guilds(

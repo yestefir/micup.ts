@@ -32,6 +32,13 @@ export interface ExpressionMetadata {
   allow_cloning: boolean;
 }
 
+export interface ExpressionSourceGuild {
+  id: string;
+  name: string;
+  icon: string | null;
+  features: string[];
+}
+
 export interface ExpressionBulkResult<T> {
   success: T[];
   failed: { name?: string; error?: string; index?: number }[];
@@ -120,6 +127,18 @@ export class MicupExpressions {
   delete(guildId: string, kind: Resource, id: string, { purge, ...options }: AuditOptions & { purge?: boolean } = {}): Promise<void> {
     const query = purge ? new URLSearchParams({ purge: 'true' }) : undefined;
     return this.rest.request('DELETE', this.#path(guildId, kind, id), { ...options, query });
+  }
+
+  emoji(guildId: string, id: string, options?: MicupRequestOptions): Promise<Emoji> {
+    return this.rest.request('GET', this.#path(guildId, 'emojis', id), options);
+  }
+
+  sticker(guildId: string, id: string, options?: MicupRequestOptions): Promise<MicupSticker> {
+    return this.rest.request('GET', this.#path(guildId, 'stickers', id), options);
+  }
+
+  source(kind: Resource, id: string, options?: MicupRequestOptions): Promise<ExpressionSourceGuild> {
+    return this.rest.request('GET', '/' + kind + '/' + snowflake(id, 'Expression ID') + '/source', options);
   }
 
   metadata(kind: Resource, id: string, options?: MicupRequestOptions): Promise<ExpressionMetadata> {

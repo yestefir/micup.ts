@@ -104,6 +104,10 @@ export class MicupCommands {
     return this.rest.request('DELETE', this.#path(scope, id), scope);
   }
 
+  clear(scope: CommandScope = {}): Promise<void> {
+    return this.rest.request('DELETE', this.#path(scope), scope);
+  }
+
   set(commands: readonly CommandDefinition[], scope: CommandScope = {}): Promise<MicupCommand[]> {
     if (commands.length > 100) throw new RangeError('Micup accepts up to 100 commands per scope');
     return this.rest.request('PUT', this.#path(scope), { ...scope, body: commands.map(commandBody) });
