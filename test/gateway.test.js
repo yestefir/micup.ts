@@ -413,6 +413,61 @@ test('completes a voice join while a Gateway event handler waits for the grant',
   assert.equal(session.voice('123'), undefined);
 });
 
+test('serializes voice joins so an unscoped Gateway refusal belongs to the active request', { timeout: 5000 }, async (t) => {
+  const { server, endpoint } = await createGateway(t);
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const writes = [];
+  let results;
+  server.on('connection', (socket) => {
+    send(socket, op.Hello, { heartbeat_interval: 100 });
+    socket.on('message', (raw) => {
+      const packet = JSON.parse(raw);
+      if (packet.op === op.Identify) {
+        send(socket, op.Dispatch, { session_id: 'voice-queue', user: { id: '202' } }, 'READY', 1);
+        send(socket, op.Dispatch, {}, 'MESSAGE_CREATE', 2);
+      } else if (packet.op === op.VoiceStateUpdate) {
+        writes.push(packet.d);
+        if (packet.d.guild_id === '123') {
+          send(socket, op.Dispatch, {
+            guild_id: '123', channel_id: '456', connection_id: 'first', endpoint: 'voice.example', token: 'first',
+          }, 'VOICE_SERVER_UPDATE', 3);
+        } else if (packet.d.guild_id === '456') {
+          send(socket, op.GatewayError, { code: 'VOICE_CHANNEL_FULL' });
+        }
+      } else if (packet.op === op.Heartbeat) {
+        send(socket, op.HeartbeatAck);
+      }
+    });
+  });
+
+  const session = new GatewaySession({ endpoint, token: 'fixture' }, {
+    handler: async (event, signal) => {
+      if (event.name !== 'MESSAGE_CREATE') return;
+      const first = session.joinVoice('123', '456', { signal });
+      const queuedController = new AbortController();
+      const queued = session.joinVoice('789', '101112', { signal: queuedController.signal });
+      queuedController.abort(new Error('queued join cancelled'));
+      const last = session.joinVoice('456', '789', { signal });
+      results = await Promise.allSettled([
+        first,
+        queued,
+        last,
+      ]);
+      controller.abort();
+    },
+  });
+
+  await session.run({ signal: controller.signal });
+  assert.equal(results[0].status, 'fulfilled');
+  assert.equal(results[1].status, 'rejected');
+  assert.match(results[1].reason.message, /queued join cancelled/);
+  assert.equal(results[2].status, 'rejected');
+  assert.equal(results[2].reason.name, 'VoiceRefusedError');
+  assert.equal(results[2].reason.guildId, '456');
+  assert.deepEqual(writes.map(({ guild_id, channel_id }) => [guild_id, channel_id]), [['123', '456'], ['456', '789']]);
+});
+
 test('publishes presence and correlates count replies and out-of-order member chunks', { timeout: 5000 }, async (t) => {
   const { server, endpoint } = await createGateway(t);
   const controller = new AbortController();

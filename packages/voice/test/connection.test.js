@@ -243,6 +243,24 @@ test('the typed emitter supports once, off and listener counts without Node type
   assert.equal(emitter.listenerCount('a'), 0);
 });
 
+test('the typed emitter preserves duplicate registrations and removes only one at a time', async () => {
+  const { TypedEmitter } = await import('@micup.ts/voice');
+  const emitter = new TypedEmitter();
+  const seen = [];
+  const listener = (value) => seen.push(value);
+  emitter.on('tick', listener).on('tick', listener).once('tick', listener);
+  assert.equal(emitter.listenerCount('tick'), 3);
+  emitter.emit('tick', 1);
+  assert.deepEqual(seen, [1, 1, 1]);
+  assert.equal(emitter.listenerCount('tick'), 2);
+  emitter.emit('tick', 2);
+  assert.deepEqual(seen, [1, 1, 1, 2, 2]);
+  emitter.off('tick', listener);
+  assert.equal(emitter.listenerCount('tick'), 1);
+  emitter.off('tick', listener);
+  assert.equal(emitter.emit('tick', 3), false);
+});
+
 test('the typed emitter contains sync and async listener failures', async () => {
   const { TypedEmitter } = await import('@micup.ts/voice');
   const emitter = new TypedEmitter();

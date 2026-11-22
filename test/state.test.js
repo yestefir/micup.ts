@@ -66,3 +66,11 @@ test('computes permissions above 53 bits and inherits thread overwrites', () => 
   assert.equal(state.permissions('100', '900', '300'), Permission.All);
   assert.equal(state.permissions('100', 'missing', '300'), undefined);
 });
+
+test('keeps the guild owner permission override when a partial snapshot omits roles', () => {
+  const state = new GatewayState();
+  apply(state, 'GUILD_CREATE', { id: '100', owner_id: '900' });
+  assert.equal(state.permissions('100', '900'), Permission.All);
+  assert.equal(state.permissions('100', '901'), undefined);
+  assert.equal(state.permissions('100', '900', 'missing-channel'), undefined);
+});

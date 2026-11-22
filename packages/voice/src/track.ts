@@ -38,11 +38,11 @@ export class LiveKitVoiceTrack implements VoiceTrack {
       throw error;
     }
     const published = new LiveKitVoiceTrack(sdk, source, track, participant, roomSignal, onClose);
-    const attempt = participant.publishTrack(track, new sdk.TrackPublishOptions({
+    const attempt = Promise.resolve().then(() => participant.publishTrack(track, new sdk.TrackPublishOptions({
       source: sdk.TrackSource.SOURCE_MICROPHONE,
       audioEncoding: { maxBitrate: BigInt(bitrate) },
       dtx: false,
-    }));
+    })));
     try {
       await withAbort(attempt, signal);
       signal.throwIfAborted();

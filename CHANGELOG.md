@@ -10,6 +10,8 @@
 - REST preserves the caller's abort reason when cancellation interrupts a successful response body.
 - Compressed Gateway sends stop promptly when aborted during a flush; an interrupted caller send also closes the connection so later packets cannot reuse a desynchronized compression stream.
 - Gateway guild snapshots replace cached members so stale members cannot affect lookups or permission checks after a sync.
+- Gateway permission lookups retain the guild owner override when a partial snapshot omits role data.
+- Voice joins are serialized within a Gateway session because refusal opcodes do not identify a guild or request.
 - Voice playback waits for asynchronous PCM source cleanup when playback is cancelled, keeps the player busy during cleanup, and closes connection-owned sources only once.
 - Voice connection regrants run sequentially so overlapping Gateway updates cannot leave an older LiveKit room active.
 - Easy Client destruction aborts an in-progress REST connection attempt during login.
@@ -19,6 +21,9 @@
 - Errors from `awaitInteraction()` filters reject only their waiter and do not suppress normal interaction routing.
 - `awaitInteraction()` validates filters and timer durations before registering a waiter.
 - Easy Client preserves duplicate listener registrations independently so `once()` remains one-shot alongside `on()`.
+- Voice event emitters preserve duplicate listener registrations independently, including one-shot listeners.
+- Voice track publishing cleans up created tracks when the LiveKit publisher throws synchronously.
+- Voice room connections clean up the room when LiveKit throws synchronously during connect.
 - REST validates forum tag IDs, archived thread kinds, reaction-user cursors, discovery and sticker tags, message mention rules, sticker IDs and attachment references before sending requests.
 - Raw REST requests validate methods, query objects and retry/authentication flags, and reject GET or HEAD bodies before sending requests.
 - Guild channel moves reject sparse position arrays instead of serializing holes as null values.

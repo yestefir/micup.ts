@@ -1,6 +1,6 @@
 import type { GatewayDispatch } from '../gateway/protocol.js';
 import type { MicupChannel, MicupGuild, MicupGuildCreate, MicupMember, MicupMembersChunk, MicupRole, MicupVoiceState } from '../model/guild.js';
-import { computePermissions } from '../model/permissions.js';
+import { computePermissions, Permission } from '../model/permissions.js';
 
 interface CachedGuild {
   info: MicupGuild;
@@ -88,9 +88,7 @@ export class GatewayState {
 
   permissions(guildId: string, userId: string, channelId?: string): bigint | undefined {
     const guild = this.#guilds.get(guildId);
-    if (!guild || guild.info.unavailable || !guild.roles.has(guildId)) return undefined;
-    const member = guild.members.get(userId);
-    if (!member && userId !== guild.info.owner_id) return undefined;
+    if (!guild || guild.info.unavailable) return undefined;
     let channel: MicupChannel | undefined;
     if (channelId !== undefined) {
       channel = this.#channels.get(channelId);
@@ -100,6 +98,10 @@ export class GatewayState {
         if (channel?.guild_id !== guildId) return undefined;
       }
     }
+    if (userId === guild.info.owner_id) return Permission.All;
+    if (!guild.roles.has(guildId)) return undefined;
+    const member = guild.members.get(userId);
+    if (!member) return undefined;
     return computePermissions(guildId, guild.info.owner_id, userId, guild.roles, member?.roles ?? [], channel?.permission_overwrites);
   }
 

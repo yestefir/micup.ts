@@ -52,14 +52,21 @@ export class VoiceRoom extends TypedEmitter<VoiceRoomEvents> implements PCMTrack
       throw new TypeError('Invalid LiveKit endpoint');
     }
 
-    const { signal: caller, publishOnConnect = true, ...trackOptions } = options;
+    const { signal: caller } = options;
     const timeout = AbortSignal.timeout(10_000);
     const signal = caller ? AbortSignal.any([caller, timeout]) : timeout;
     signal.throwIfAborted();
     const sdk = await import('@livekit/rtc-node');
     signal.throwIfAborted();
+    return this.connectWithSDK(sdk, endpoint, grant, options, signal);
+  }
+
+  private static async connectWithSDK(
+    sdk: RTC, endpoint: URL, grant: VoiceGrant, options: VoiceRoomOptions, signal: AbortSignal,
+  ): Promise<VoiceRoom> {
+    const { publishOnConnect = true, ...trackOptions } = options;
     const room = new sdk.Room();
-    const attempt = room.connect(endpoint.href, grant.token, { autoSubscribe: false, dynacast: false });
+    const attempt = Promise.resolve().then(() => room.connect(endpoint.href, grant.token, { autoSubscribe: false, dynacast: false }));
 
     try {
       await withAbort(attempt, signal);

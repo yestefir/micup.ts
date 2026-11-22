@@ -1,31 +1,45 @@
 type Listener = (...args: unknown[]) => unknown;
 
+interface Entry {
+  key: unknown;
+  wrapper: Listener;
+}
+
 export class TypedEmitter<Events extends { [K in keyof Events]: unknown[] }> {
-  readonly #listeners = new Map<keyof Events, Map<unknown, Listener>>();
+  readonly #listeners = new Map<keyof Events, Entry[]>();
 
   on<K extends keyof Events>(event: K, listener: (...args: Events[K]) => unknown): this {
-    return this.#add(event, listener, (...args) => listener(...args as Events[K]));
+    this.#add(event, listener, (...args) => listener(...args as Events[K]));
+    return this;
   }
 
   once<K extends keyof Events>(event: K, listener: (...args: Events[K]) => unknown): this {
+    let remove!: () => void;
     const wrapper = (...args: Events[K]) => {
-      this.off(event, listener);
+      remove();
       return listener(...args);
     };
-    return this.#add(event, listener, (...args) => wrapper(...args as Events[K]));
+    remove = this.#add(event, listener, (...args) => wrapper(...args as Events[K]));
+    return this;
   }
 
   off<K extends keyof Events>(event: K, listener: (...args: Events[K]) => unknown): this {
     const entries = this.#listeners.get(event);
-    entries?.delete(listener);
-    if (entries && !entries.size) this.#listeners.delete(event);
+    if (!entries) return this;
+    for (let index = entries.length - 1; index >= 0; index--) {
+      if (entries[index].key === listener) {
+        entries.splice(index, 1);
+        break;
+      }
+    }
+    if (!entries.length) this.#listeners.delete(event);
     return this;
   }
 
   emit<K extends keyof Events>(event: K, ...args: Events[K]): boolean {
     const entries = this.#listeners.get(event);
-    if (!entries?.size) return false;
-    for (const wrapper of [...entries.values()]) {
+    if (!entries?.length) return false;
+    for (const { wrapper } of [...entries]) {
       try {
         const result = wrapper(...args);
         if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
@@ -39,7 +53,7 @@ export class TypedEmitter<Events extends { [K in keyof Events]: unknown[] }> {
   }
 
   listenerCount(event: keyof Events): number {
-    return this.#listeners.get(event)?.size ?? 0;
+    return this.#listeners.get(event)?.length ?? 0;
   }
 
   removeAllListeners(event?: keyof Events): this {
@@ -48,14 +62,23 @@ export class TypedEmitter<Events extends { [K in keyof Events]: unknown[] }> {
     return this;
   }
 
-  #add<K extends keyof Events>(event: K, key: unknown, wrapper: Listener): this {
+  #add<K extends keyof Events>(event: K, key: unknown, wrapper: Listener): () => void {
     let entries = this.#listeners.get(event);
     if (!entries) {
-      entries = new Map();
+      entries = [];
       this.#listeners.set(event, entries);
     }
-    entries.set(key, wrapper);
-    return this;
+    const entry = { key, wrapper };
+    entries.push(entry);
+    return () => this.#remove(event, entry);
+  }
+
+  #remove(event: keyof Events, entry: Entry): void {
+    const entries = this.#listeners.get(event);
+    if (!entries) return;
+    const index = entries.indexOf(entry);
+    if (index >= 0) entries.splice(index, 1);
+    if (!entries.length) this.#listeners.delete(event);
   }
 
   #reportListenerError(error: unknown, event: keyof Events): void {
@@ -64,9 +87,9 @@ export class TypedEmitter<Events extends { [K in keyof Events]: unknown[] }> {
       return;
     }
     const handlers = this.#listeners.get('error' as keyof Events);
-    if (!handlers?.size) return;
+    if (!handlers?.length) return;
     const failure = error instanceof Error ? error : new Error(String(error));
-    for (const handler of [...handlers.values()]) {
+    for (const { wrapper: handler } of [...handlers]) {
       try {
         const result = handler(failure);
         if (result && typeof (result as PromiseLike<unknown>).then === 'function') {

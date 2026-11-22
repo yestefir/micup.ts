@@ -47,9 +47,32 @@ const refusalCodes = new Set(['VOICE_CHANNEL_FULL', 'VOICE_P2P_CONSENT_REQUIRED'
 const validId = (id: string) => typeof id === 'string' && /^\d{1,20}$/.test(id);
 type Send = (op: number, data: object, options?: { signal?: AbortSignal }) => Promise<void>;
 
+function waitForTurn(previous: Promise<void>, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener('abort', abort);
+    const abort = () => {
+      cleanup();
+      reject(signal.reason);
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    previous.then(() => {
+      cleanup();
+      resolve();
+    }, (error) => {
+      cleanup();
+      reject(error);
+    });
+    if (signal.aborted) abort();
+  });
+}
+
 export class SessionVoice {
   readonly #joins = new Map<string, PendingJoin>();
+  readonly #joining = new Set<string>();
   readonly #grants = new Map<string, VoiceServerUpdate>();
+  #joinTail: Promise<void> = Promise.resolve();
+  #generation = 0;
   #botId?: string;
 
   constructor(botId: string | undefined, private readonly send: Send, private readonly options: VoiceSessionOptions) {
@@ -63,18 +86,28 @@ export class SessionVoice {
 
   async join(guildId: string, channelId: string, { signal: parent, ...options }: VoiceJoinOptions = {}): Promise<VoiceServerUpdate> {
     if (!validId(guildId) || !validId(channelId)) throw new TypeError('Guild and voice channel IDs must be numeric strings');
-    if (this.#joins.has(guildId)) throw new Error('A voice join is already pending for this guild');
+    if (this.#joining.has(guildId)) throw new Error('A voice join is already pending for this guild');
     const timeout = AbortSignal.timeout(12_000);
     const signal = parent ? AbortSignal.any([parent, timeout]) : timeout;
     signal.throwIfAborted();
 
+    this.#joining.add(guildId);
+    const generation = this.#generation;
+    const previous = this.#joinTail;
+    let release!: () => void;
+    const turn = new Promise<void>((resolve) => { release = resolve; });
+    this.#joinTail = previous.then(() => turn, () => turn);
     let join!: PendingJoin;
-    const pending = new Promise<void>((wake) => { join = { channelId, wake }; });
-    const abort = () => this.#fail(join, signal.reason);
-    this.#joins.set(guildId, join);
-    signal.addEventListener('abort', abort, { once: true });
+    let abort: (() => void) | undefined;
 
     try {
+      await waitForTurn(previous, signal);
+      signal.throwIfAborted();
+      if (generation !== this.#generation) throw new Error('Micup Gateway voice session ended');
+      const pending = new Promise<void>((wake) => { join = { channelId, wake }; });
+      abort = () => this.#fail(join, signal.reason);
+      this.#joins.set(guildId, join);
+      signal.addEventListener('abort', abort, { once: true });
       await Promise.all([
         this.send(GatewayOpcode.VoiceStateUpdate, {
           guild_id: guildId, channel_id: channelId,
@@ -89,8 +122,10 @@ export class SessionVoice {
       this.#grants.set(guildId, join.grant);
       return { ...join.grant };
     } finally {
-      signal.removeEventListener('abort', abort);
-      if (this.#joins.get(guildId) === join) this.#joins.delete(guildId);
+      if (abort) signal.removeEventListener('abort', abort);
+      if (join && this.#joins.get(guildId) === join) this.#joins.delete(guildId);
+      this.#joining.delete(guildId);
+      release();
     }
   }
 
@@ -133,6 +168,7 @@ export class SessionVoice {
   }
 
   invalidate(): void {
+    this.#generation++;
     const joins = [...this.#joins.values()];
     const grants = [...this.#grants.values()];
     this.#joins.clear();
