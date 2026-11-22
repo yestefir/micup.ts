@@ -36,6 +36,12 @@ try {
 
 The grant accepts the `endpoint` and `token` from a Micup Gateway voice-server update. Keep grants out of logs and persistent storage. The publisher supports unencrypted LiveKit rooms. The player supports pause, resume, skip and volume. Queue and playlist management belong to the application.
 
+## Track lifecycle
+
+`VoiceRoom.connect()` publishes a default track. Pass `publishOnConnect: false` to connect first and call `room.openTrack()` when you are ready to publish. A track can be closed independently of its room. Use `Player.playing` and `Player.paused` to inspect playback. Skipping stops the current source and clears queued PCM.
+
 ## Local LiveKit test
 
 Start a LiveKit server in development mode on loopback. Set `MICUP_TEST_LIVEKIT_ENDPOINT` to its WebSocket URL and run `npm test --workspace @micupts/voice`. The integration test publishes an audible PCM signal and verifies that a second participant receives it.
+
+Set `MICUP_TEST_FFMPEG` to an FFmpeg binary to run that test with a decoded WAV source.

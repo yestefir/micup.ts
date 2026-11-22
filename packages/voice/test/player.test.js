@@ -49,3 +49,31 @@ test('skip wakes a paused player and leaves it available for reuse', async () =>
   await player.play(source());
   assert.equal(written.length, 1);
 });
+
+test('skipping a stalled input closes the source and clears queued audio before playback ends', async () => {
+  let resolveClosed;
+  const closed = new Promise((resolve) => { resolveClosed = resolve; });
+  let resolveRead;
+  let cleared = false;
+  const source = {
+    [Symbol.asyncIterator]() {
+      return { next: () => new Promise((resolve) => { resolveRead = resolve; }) };
+    },
+    async close() {
+      resolveRead?.({ done: true });
+      resolveClosed();
+    },
+  };
+  const player = new Player({
+    async write() { assert.fail('The stalled source cannot yield samples'); },
+    async clear() { cleared = true; },
+  });
+  const playback = player.play(source);
+  assert.equal(player.playing, true);
+  await Promise.resolve();
+  assert.equal(player.skip(), true);
+  await assert.rejects(playback, PlaybackSkippedError);
+  await closed;
+  assert.equal(player.playing, false);
+  assert.equal(cleared, true);
+});

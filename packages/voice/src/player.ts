@@ -9,11 +9,28 @@ export class PlaybackSkippedError extends Error {
   }
 }
 
+export class PlaybackBusyError extends Error {
+  constructor() {
+    super('Micup audio player is busy');
+    this.name = 'PlaybackBusyError';
+  }
+}
+
+type PCMInput = AsyncIterable<Uint8Array> & { close?(): void | Promise<void> };
+
 export class Player {
   #active?: { controller: AbortController; resume?: () => void; paused?: Promise<void> };
   #volume = 1;
 
   constructor(private readonly track: PCMTrack) {}
+
+  get playing(): boolean {
+    return this.#active !== undefined;
+  }
+
+  get paused(): boolean {
+    return this.#active?.paused !== undefined;
+  }
 
   get volume(): number {
     return this.#volume;
@@ -47,8 +64,8 @@ export class Player {
     return true;
   }
 
-  async play(pcm: AsyncIterable<Uint8Array>, { signal }: { signal?: AbortSignal } = {}): Promise<void> {
-    if (this.#active) throw new Error('Micup audio player is busy');
+  async play(pcm: PCMInput, { signal }: { signal?: AbortSignal } = {}): Promise<void> {
+    if (this.#active) throw new PlaybackBusyError();
     const controller = new AbortController();
     signal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
     signal.throwIfAborted();
@@ -58,22 +75,32 @@ export class Player {
     let used = 0;
     let nextFrameAt = performance.now();
     const frame = Buffer.allocUnsafe(bytesPerFrame);
+    const closeSource = () => { void Promise.resolve().then(() => pcm.close?.()).catch(() => {}); };
+    signal.addEventListener('abort', closeSource, { once: true });
+
+    const waitWhilePaused = async () => {
+      while (this.#active?.paused) {
+        await withAbort(this.#active.paused, signal);
+        nextFrameAt = performance.now();
+      }
+      signal.throwIfAborted();
+    };
 
     const write = async (bytes: number) => {
       const remaining = nextFrameAt - performance.now();
       if (remaining > 0) await delay(Math.ceil(remaining), undefined, { signal });
-      while (this.#active?.paused) await withAbort(this.#active.paused, signal);
-      signal.throwIfAborted();
+      await waitWhilePaused();
 
       const samples = new Int16Array(bytes / 2);
       for (let i = 0; i < samples.length; i++) samples[i] = frame.readInt16LE(i * 2);
-      nextFrameAt = performance.now() + frameDurationMs;
+      const now = performance.now();
+      nextFrameAt = Math.max(nextFrameAt + frameDurationMs, now + frameDurationMs / 2);
       await withAbort(this.track.write(this.#volume === 1 ? samples : scaleVolume(samples, this.#volume), { signal }), signal);
     };
 
     try {
       while (!exhausted) {
-        signal.throwIfAborted();
+        await waitWhilePaused();
         const result = await withAbort(iterator.next(), signal);
         exhausted = result.done === true;
         if (exhausted) break;
@@ -93,7 +120,11 @@ export class Player {
       if (used) await write(used);
       const drain = this.track.drain?.({ signal });
       if (drain) await withAbort(drain, signal);
+    } catch (error) {
+      await Promise.resolve().then(() => this.track.clear?.()).catch(() => {});
+      throw error;
     } finally {
+      signal.removeEventListener('abort', closeSource);
       this.#active = undefined;
       if (!exhausted) void Promise.resolve().then(() => iterator.return?.()).catch(() => {});
     }
