@@ -3,14 +3,36 @@ import type { MicupMessage, MicupUser } from '../rest/client.js';
 
 import type { VoiceServerUpdate } from '../session/voice.js';
 
+import type { MicupChannel, MicupGuildCreate, MicupMember, MicupMembersChunk, MicupRole, MicupVoiceState } from '../model/guild.js';
+
 export interface MicupEvents {
-  READY: { session_id: string; user: MicupUser };
+  READY: { session_id: string; user: MicupUser; guilds?: MicupGuildCreate[]; private_channels?: MicupChannel[] };
   RESUMED: Record<string, never>;
   MESSAGE_CREATE: MicupMessage;
   MESSAGE_UPDATE: Partial<MicupMessage> & Pick<MicupMessage, 'id' | 'channel_id'>;
   MESSAGE_DELETE: Pick<MicupMessage, 'id' | 'channel_id'> & { guild_id?: string };
   USER_UPDATE: MicupUser;
-  VOICE_STATE_UPDATE: { guild_id: string; user_id: string; channel_id: string | null; connection_id?: string };
+  VOICE_STATE_UPDATE: MicupVoiceState;
+  GUILD_CREATE: MicupGuildCreate;
+  GUILD_SYNC: MicupGuildCreate;
+  GUILD_UPDATE: Partial<MicupGuildCreate> & { guild_id?: string };
+  GUILD_DELETE: { id: string; unavailable?: boolean };
+  GUILD_ROLE_CREATE: { guild_id: string; role: MicupRole };
+  GUILD_ROLE_UPDATE: { guild_id: string; role: MicupRole };
+  GUILD_ROLE_DELETE: { guild_id: string; role_id: string };
+  GUILD_ROLE_UPDATE_BULK: { guild_id: string; roles: MicupRole[] };
+  GUILD_MEMBER_ADD: MicupMember & { guild_id: string };
+  GUILD_MEMBER_UPDATE: MicupMember & { guild_id: string };
+  GUILD_MEMBER_REMOVE: { guild_id: string; user: MicupUser };
+  GUILD_MEMBERS_CHUNK: MicupMembersChunk;
+  CHANNEL_CREATE: MicupChannel;
+  CHANNEL_UPDATE: MicupChannel;
+  CHANNEL_DELETE: MicupChannel;
+  CHANNEL_UPDATE_BULK: { guild_id?: string; channels: MicupChannel[] };
+  THREAD_CREATE: MicupChannel;
+  THREAD_UPDATE: MicupChannel;
+  THREAD_DELETE: MicupChannel;
+  THREAD_LIST_SYNC: { guild_id: string; channel_ids?: string[]; threads: MicupChannel[] };
   VOICE_SERVER_UPDATE: VoiceServerUpdate;
 }
 

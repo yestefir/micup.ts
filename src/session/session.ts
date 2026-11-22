@@ -4,6 +4,9 @@ import { GatewayCloseError, gatewayEndpoint, type GatewayDispatch } from '../gat
 
 import { SessionVoice, type VoiceJoinOptions, type VoiceServerUpdate, type VoiceSessionOptions } from './voice.js';
 
+import { Permission, hasPermissions } from '../model/permissions.js';
+import { GatewayState } from '../state/cache.js';
+
 export interface GatewaySessionConfig {
   readonly endpoint: string;
   readonly token: string;
@@ -33,6 +36,8 @@ export class GatewaySession {
   readonly #ignoredEvents: string[];
   readonly #flags: number;
   readonly #voice: SessionVoice;
+  readonly state = new GatewayState();
+  #botId?: string;
   readonly #minBackoff: number;
   readonly #maxBackoff: number;
   #running = false;
@@ -43,6 +48,7 @@ export class GatewaySession {
     this.#endpoint = gatewayEndpoint(config.endpoint);
     if (!/^[\x21-\x7E]+$/.test(config.token ?? '')) throw new TypeError('Gateway token is required');
     this.#token = config.token;
+    this.#botId = config.botId;
     const id = config.shardId ?? 0;
     const count = config.shardCount ?? 1;
     if (!Number.isSafeInteger(id) || !Number.isSafeInteger(count) || id < 0 || id >= count) {
@@ -87,7 +93,11 @@ export class GatewaySession {
     await this.#connection.send(opcode, data, signal);
   }
 
-  joinVoice(guildId: string, channelId: string, options?: VoiceJoinOptions): Promise<VoiceServerUpdate> {
+  async joinVoice(guildId: string, channelId: string, options?: VoiceJoinOptions): Promise<VoiceServerUpdate> {
+    const permission = this.#botId && this.state.permissions(guildId, this.#botId, channelId);
+    if (typeof permission === 'bigint' && !hasPermissions(permission, Permission.ViewChannel | Permission.Connect)) {
+      throw new Error('The bot needs View Channel and Connect permissions for this voice channel');
+    }
     return this.#voice.join(guildId, channelId, options);
   }
 
@@ -118,7 +128,13 @@ export class GatewaySession {
             ignoredEvents: this.#ignoredEvents,
             resume: this.#resume,
             beforeIdentify: this.#options.beforeIdentify,
-            dispatch: async (event, lifetime) => this.#options.handler(event, lifetime),
+            dispatch: async (event, lifetime) => {
+              if (event.name === 'READY') {
+                this.#botId = (event.data as { user?: { id?: string } } | null)?.user?.id ?? this.#botId;
+              }
+              this.state.apply(event);
+              await this.#options.handler(event, lifetime);
+            },
             receive: (event) => this.#voice.receive(event),
             onGatewayError: (data) => {
               this.#voice.refuse(data);
@@ -127,6 +143,7 @@ export class GatewaySession {
             onInvalidate: () => {
               this.#ready = false;
               this.#voice.invalidate();
+              this.state.clear();
             },
             onReady: (resumed) => {
               this.#ready = true;
@@ -140,6 +157,7 @@ export class GatewaySession {
           if (signal.aborted) return;
           if (error instanceof GatewayCloseError && error.resetsSession) {
             this.#voice.invalidate();
+            this.state.clear();
             this.#resume.sessionId = undefined;
             this.#resume.sequence = null;
           }

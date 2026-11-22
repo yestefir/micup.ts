@@ -14,3 +14,6 @@ export { MicupAPIError } from './rest/errors.js';
 export type { MicupFieldError } from './rest/errors.js';
 export type { MicupRequestOptions, RestMethod, RestRequestOptions } from './rest/transport.js';
 export type { AllowedMentions, ListMessageOptions, MessageInput, MicupEmbed, MicupFile } from './rest/messages.js';
+export { GatewayState } from './state/cache.js';
+export { Permission, computePermissions, hasPermissions } from './model/permissions.js';
+export type { MicupChannel, MicupGuild, MicupGuildCreate, MicupMember, MicupMembersChunk, MicupRole, MicupVoiceState, PermissionOverwrite } from './model/guild.js';
