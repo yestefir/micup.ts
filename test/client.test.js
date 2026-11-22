@@ -53,10 +53,44 @@ test('exposes HTTP rate limit details', async (t) => {
     });
   });
 
-  await assert.rejects(MicupClient.connect({ token: 'fixture', origin }), (error) => {
+  await assert.rejects(MicupClient.connect({ token: 'fixture', origin, maxRestAttempts: 1 }), (error) => {
     assert.ok(error instanceof MicupAPIError);
     assert.equal(error.status, 429);
     assert.equal(error.retryAfter, '2');
     return true;
   });
+});
+
+test('retries an explicit rate limit, preserves file metadata, and never retries an ambiguous POST', async (t) => {
+  let attempts = 0;
+  const fetch = t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (String(url) === origin + '/.well-known/fluxer') {
+      return Response.json({ endpoints: { api_public: origin + '/api' } });
+    }
+    if (String(url).endsWith('/users/@me')) return Response.json(bot);
+    assert.equal(String(url), origin + '/api/v1/channels/202/messages');
+    assert.equal(options.method, 'POST');
+    if (++attempts === 1) return Response.json({ retry_after: 0.001 }, { status: 429 });
+    if (attempts === 2) {
+      assert.equal(options.headers.get('Content-Type'), null);
+      assert.equal(await options.body.get('files[0]').text(), 'fixture');
+      assert.deepEqual(JSON.parse(options.body.get('payload_json')), {
+        content: 'file',
+        attachments: [{ id: 0, filename: 'fixture.txt', description: 'fixture' }],
+      });
+      return Response.json({ id: '42' });
+    }
+    return Response.json({ code: 'SERVER_ERROR' }, { status: 503 });
+  });
+
+  const client = await MicupClient.connect({ token: 'fixture', origin });
+  const sent = await client.sendMessage('202', {
+    content: 'file',
+    files: [{ name: 'fixture.txt', data: new Blob(['fixture']), description: 'fixture' }],
+  });
+  assert.equal(sent.id, '42');
+  await assert.rejects(client.sendMessage('202', 'ambiguous'), (error) => error.status === 503);
+  assert.equal(attempts, 3);
+  await assert.rejects(client.request('GET', '/%2e%2e/escape'), /relative to the versioned API/);
+  assert.equal(fetch.mock.callCount(), 5);
 });

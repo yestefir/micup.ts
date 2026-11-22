@@ -1,5 +1,5 @@
-export { MicupClient, MicupAPIError } from './rest/client.js';
-export type { MicupClientOptions, MicupMessage, MicupRequestOptions, MicupUser } from './rest/client.js';
+export { MicupClient } from './rest/client.js';
+export type { MicupClientOptions, MicupMessage, MicupUser } from './rest/client.js';
 export { EventMux } from './events/mux.js';
 export type { MicupEvents } from './events/mux.js';
 export { GatewayCloseError, GatewayOpcode } from './gateway/protocol.js';
@@ -10,3 +10,7 @@ export { ShardManager, shardForGuild } from './shard/manager.js';
 export type { ShardManagerOptions } from './shard/manager.js';
 export { VoiceRefusedError } from './session/voice.js';
 export type { VoiceJoinOptions, VoiceServerUpdate, VoiceSessionOptions } from './session/voice.js';
+export { MicupAPIError } from './rest/errors.js';
+export type { MicupFieldError } from './rest/errors.js';
+export type { MicupRequestOptions, RestMethod, RestRequestOptions } from './rest/transport.js';
+export type { AllowedMentions, ListMessageOptions, MessageInput, MicupEmbed, MicupFile } from './rest/messages.js';

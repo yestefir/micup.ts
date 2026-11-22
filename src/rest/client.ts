@@ -2,16 +2,18 @@ import { GatewaySession, type GatewaySessionConfig, type GatewaySessionOptions }
 
 import { ShardManager, type ShardManagerOptions } from '../shard/manager.js';
 
+import { MicupAPIError } from './errors.js';
+import { RestTransport, type MicupRequestOptions, type RestMethod, type RestRequestOptions } from './transport.js';
+
+import { messageBody, messageQuery, messagesPath, snowflake, type ListMessageOptions, type MessageInput } from './messages.js';
+
 const defaultOrigin = 'https://micup.gg';
 const connection = Symbol('Micup connection');
 
 export interface MicupClientOptions {
   token: string;
   origin?: string;
-}
-
-export interface MicupRequestOptions {
-  signal?: AbortSignal;
+  maxRestAttempts?: number;
 }
 
 export interface MicupUser {
@@ -27,42 +29,23 @@ export interface MicupMessage {
   author: MicupUser;
 }
 
-interface APIErrorBody {
-  message?: string;
-  code?: string;
-}
-
-export class MicupAPIError extends Error {
-  readonly status: number;
-  readonly code?: string;
-  readonly retryAfter: string | null;
-
-  constructor(response: Response, body?: APIErrorBody) {
-    super(body?.message ?? `Micup API returned HTTP ${response.status}`);
-    this.name = 'MicupAPIError';
-    this.status = response.status;
-    this.code = body?.code;
-    this.retryAfter = response.headers.get('retry-after');
-  }
-}
-
 export class MicupClient {
   readonly #token: string;
-  readonly #api: string;
+  readonly #rest: RestTransport;
   readonly #gateway?: string;
   #botId?: string;
 
-  private constructor(key: typeof connection, token: string, api: string, gateway?: string) {
+  private constructor(key: typeof connection, token: string, api: string, gateway?: string, maxAttempts?: number) {
     if (key !== connection) {
       throw new TypeError('Use MicupClient.connect() to create a client');
     }
     this.#token = token;
-    this.#api = api;
+    this.#rest = new RestTransport(api, token, maxAttempts);
     this.#gateway = gateway;
   }
 
   static async connect(
-    { token, origin = defaultOrigin }: MicupClientOptions,
+    { token, origin = defaultOrigin, maxRestAttempts }: MicupClientOptions,
     { signal }: MicupRequestOptions = {},
   ): Promise<MicupClient> {
     if (typeof token !== 'string' || !/^[\x21-\x7E]+$/.test(token)) {
@@ -103,7 +86,7 @@ export class MicupClient {
         throw new Error('Micup discovery returned an invalid Gateway endpoint');
       }
     }
-    const client = new MicupClient(connection, token, `${api.href.replace(/\/+$/, '')}/v1`, gateway);
+    const client = new MicupClient(connection, token, `${api.href.replace(/\/+$/, '')}/v1`, gateway, maxRestAttempts);
     const user = await client.getCurrentUser({ signal });
     if (user?.bot !== true) {
       throw new Error('The credential must belong to a Micup bot');
@@ -123,51 +106,75 @@ export class MicupClient {
   }
 
   getCurrentUser({ signal }: MicupRequestOptions = {}): Promise<MicupUser> {
-    return this.#request('GET', '/users/@me', { signal });
+    return this.request('GET', '/users/@me', { signal });
   }
 
   sendMessage(
     channelId: string,
-    content: string,
+    content: string | MessageInput,
     { replyTo, signal }: MicupRequestOptions & { replyTo?: string } = {},
   ): Promise<MicupMessage> {
-    if (typeof channelId !== 'string' || !/^\d+$/.test(channelId)) {
-      throw new TypeError('Channel ID must be a numeric string');
+    const path = messagesPath(channelId);
+    const input = typeof content === 'string' ? { content } : content;
+    if (!input?.content?.trim() && !input?.embeds?.length && !input?.components?.length &&
+        !input?.files?.length && !input?.attachments?.length) {
+      throw new TypeError('Message content, embeds, components or attachments are required');
     }
-    if (typeof content !== 'string' || !content.trim()) {
-      throw new TypeError('Message content is required');
-    }
-    const body: { content: string; message_reference?: { message_id: string; channel_id: string } } = { content };
-    if (replyTo !== undefined) {
-      if (typeof replyTo !== 'string' || !/^\d+$/.test(replyTo)) {
-        throw new TypeError('Reply message ID must be a numeric string');
-      }
-      body.message_reference = { message_id: replyTo, channel_id: channelId };
-    }
-    return this.#request('POST', `/channels/${channelId}/messages`, { body, signal });
+    const reply = replyTo === undefined ? undefined : { message_id: snowflake(replyTo, 'Reply message ID'), channel_id: channelId };
+    return this.request('POST', path, { body: messageBody(input, reply), signal });
   }
 
-  async #request<T>(
-    method: string,
-    path: string,
-    { body, signal }: MicupRequestOptions & { body?: object },
-  ): Promise<T> {
-    const headers = new Headers({ Authorization: `Bot ${this.#token}` });
-    if (body !== undefined) {
-      headers.set('Content-Type', 'application/json');
-    }
+  getMessage(channelId: string, messageId: string, options?: MicupRequestOptions): Promise<MicupMessage> {
+    return this.request('GET', messagesPath(channelId, messageId), options);
+  }
 
-    const response = await fetch(`${this.#api}${path}`, {
-      method,
-      headers,
-      body: JSON.stringify(body),
-      redirect: 'error',
-      signal,
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => undefined);
-      throw new MicupAPIError(response, error);
+  listMessages(channelId: string, options: ListMessageOptions = {}): Promise<MicupMessage[]> {
+    return this.request('GET', messagesPath(channelId), { query: messageQuery(options), signal: options.signal });
+  }
+
+  async *iterateMessages(channelId: string, options: Omit<ListMessageOptions, 'around' | 'limit'> = {}): AsyncGenerator<MicupMessage> {
+    if (options.before !== undefined && options.after !== undefined) throw new TypeError('Only one message cursor can be used');
+    let cursor = options.after ?? options.before;
+    const forward = options.after !== undefined;
+    while (true) {
+      const page = await this.listMessages(channelId, {
+        ...(forward ? { after: cursor } : { before: cursor }), limit: 100, signal: options.signal,
+      });
+      if (!page.length) return;
+      page.sort((a, b) => {
+        const x = BigInt(a.id);
+        const y = BigInt(b.id);
+        if (x === y) return 0;
+        return (x < y) === forward ? -1 : 1;
+      });
+      for (const message of page) {
+        if (cursor === undefined || (forward ? BigInt(message.id) > BigInt(cursor) : BigInt(message.id) < BigInt(cursor))) {
+          yield message;
+        }
+      }
+      const next = page.at(-1)!.id;
+      if (page.length < 100 || next === cursor || (cursor !== undefined && (forward ? BigInt(next) <= BigInt(cursor) : BigInt(next) >= BigInt(cursor)))) return;
+      cursor = next;
     }
-    return response.json();
+  }
+
+  editMessage(
+    channelId: string, messageId: string, edit: MessageInput, options?: MicupRequestOptions,
+  ): Promise<MicupMessage> {
+    return this.request('PATCH', messagesPath(channelId, messageId), { ...options, body: messageBody(edit) });
+  }
+
+  deleteMessage(
+    channelId: string, messageId: string, options?: MicupRequestOptions & { reason?: string },
+  ): Promise<void> {
+    return this.request('DELETE', messagesPath(channelId, messageId), options);
+  }
+
+  triggerTyping(channelId: string, options?: MicupRequestOptions): Promise<void> {
+    return this.request('POST', '/channels/' + snowflake(channelId, 'Channel ID') + '/typing', options);
+  }
+
+  request<T = unknown>(method: RestMethod, path: string, options?: RestRequestOptions): Promise<T> {
+    return this.#rest.request(method, path, options);
   }
 }
