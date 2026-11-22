@@ -23,7 +23,11 @@ export interface AudioSource extends AsyncIterable<Uint8Array> {
 const reconnectArgs = ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5'];
 
 function isReadable(input: unknown): input is Readable {
-  return typeof input === 'object' && input !== null && typeof (input as Readable).pipe === 'function' && typeof (input as Readable).on === 'function';
+  return typeof input === 'object' && input !== null &&
+    typeof (input as Readable).pipe === 'function' &&
+    typeof (input as Readable).unpipe === 'function' &&
+    typeof (input as Readable).destroy === 'function' &&
+    typeof (input as Readable).on === 'function';
 }
 
 export function openSource(input: string | AudioInputStream, options: AudioSourceOptions = {}): AudioSource {
@@ -34,6 +38,9 @@ export function openSource(input: string | AudioInputStream, options: AudioSourc
   }
   if (!Number.isFinite(startSeconds) || startSeconds < 0) {
     throw new RangeError('Audio start position must be a nonnegative number');
+  }
+  if (typeof ffmpeg !== 'string' || !ffmpeg.trim() || ffmpeg.includes('\0')) {
+    throw new TypeError('FFmpeg executable must be a nonempty path');
   }
   if (!Array.isArray(ffmpegArgs) || ffmpegArgs.some((arg) => typeof arg !== 'string' || arg.includes('\0'))) {
     throw new TypeError('FFmpeg arguments must be strings');
@@ -53,11 +60,18 @@ export function openSource(input: string | AudioInputStream, options: AudioSourc
   let closed = false;
   let started = false;
   let spawnFailed = false;
+  let spawnError: Error | undefined;
+  let inputError: Error | undefined;
+  let onInputError: ((error: Error) => void) | undefined;
 
   if (stream) {
     const upstream = input as Readable;
     child.stdin!.on('error', () => {});
-    upstream.on('error', () => child.stdin!.destroy());
+    onInputError = (error) => {
+      inputError = error;
+      child.stdin!.destroy();
+    };
+    upstream.on('error', onInputError);
     upstream.pipe(child.stdin!);
   }
 
@@ -72,9 +86,13 @@ export function openSource(input: string | AudioInputStream, options: AudioSourc
     if (child.exitCode === null && !child.killed) child.kill();
   };
   const completed = new Promise<number | null>((resolve) => {
-    child.once('error', () => { spawnFailed = true; });
+    child.once('error', (error) => {
+      spawnFailed = true;
+      spawnError = error;
+    });
     child.once('close', (code) => {
       signal?.removeEventListener('abort', terminate);
+      if (stream && onInputError) (input as Readable).removeListener('error', onInputError);
       resolve(code);
     });
   });
@@ -89,7 +107,8 @@ export function openSource(input: string | AudioInputStream, options: AudioSourc
         for await (const chunk of stdout) yield chunk;
         const code = await completed;
         signal?.throwIfAborted();
-        if (spawnFailed) throw new Error('FFmpeg could not be started: install FFmpeg, or set the FFMPEG_PATH environment variable or the ffmpeg option to its location');
+        if (spawnFailed) throw new Error('FFmpeg could not be started: install FFmpeg, or set the FFMPEG_PATH environment variable or the ffmpeg option to its location', { cause: spawnError });
+        if (inputError) throw new Error('Audio input stream failed', { cause: inputError });
         if (code !== 0 && !closed) throw new Error('FFmpeg failed to decode the audio source');
       } finally {
         terminate();

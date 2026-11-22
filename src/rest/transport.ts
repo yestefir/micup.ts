@@ -34,6 +34,7 @@ const majorParameters = new Set(['channels', 'guilds', 'webhooks']);
 const maxRetryDelay = 30_000;
 const repeatable = new Set<RestMethod>(['GET', 'HEAD', 'PUT', 'DELETE']);
 const snowflake = /^\d+$/;
+const routeTableLimit = 4096;
 
 function routeKey(method: RestMethod, path: string): string {
   const parts = path.split('/');
@@ -68,7 +69,12 @@ class RateLimits {
   #global = 0;
 
   #bucket(route: string): Bucket {
-    const key = this.#routes.get(route) ?? route;
+    const mapped = this.#routes.get(route);
+    if (mapped !== undefined) {
+      this.#routes.delete(route);
+      this.#routes.set(route, mapped);
+    }
+    const key = mapped ?? route;
     let bucket = this.#buckets.get(key);
     if (!bucket) {
       bucket = { known: false, limit: Infinity, tokens: Infinity, at: 0, rate: 0, inFlight: 0, blockedUntil: 0, waiters: new Set(), fifo: [] };
@@ -144,7 +150,12 @@ class RateLimits {
       const shared = this.#buckets.get(id);
       if (shared) bucket = shared;
       else this.#buckets.set(id, leased);
+      this.#routes.delete(route);
       this.#routes.set(route, id);
+      if (this.#routes.size > routeTableLimit) {
+        const oldest = this.#routes.keys().next().value;
+        if (oldest !== undefined) this.#routes.delete(oldest);
+      }
     }
     const limit = Number(headers.get('x-ratelimit-limit'));
     const remaining = Number(headers.get('x-ratelimit-remaining'));
@@ -174,20 +185,27 @@ class RateLimits {
   #sleep(bucket: Bucket, wait: number, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
+      let settled = false;
       const finish = () => {
+        if (settled) return;
+        settled = true;
         if (timer) clearTimeout(timer);
         bucket.waiters.delete(finish);
         signal?.removeEventListener('abort', abort);
         resolve();
       };
       const abort = () => {
+        if (settled) return;
+        settled = true;
         if (timer) clearTimeout(timer);
         bucket.waiters.delete(finish);
+        signal?.removeEventListener('abort', abort);
         reject(signal?.reason);
       };
       bucket.waiters.add(finish);
       signal?.addEventListener('abort', abort, { once: true });
       if (wait > 0) timer = setTimeout(finish, Math.ceil(wait));
+      if (signal?.aborted) abort();
     });
   }
 
@@ -350,10 +368,10 @@ export class RestTransport {
       let response: Response;
       try {
         response = await fetch(target.href, { method, headers, body: payload, signal, redirect: 'error' });
-      } catch {
+      } catch (cause) {
         lease.complete();
         signal?.throwIfAborted();
-        last = new Error('Micup API connection failed');
+        last = new Error('Micup API connection failed', { cause });
         if (!remaining || !canRetry) throw last;
         await delay(backoff, undefined, { signal });
         continue;

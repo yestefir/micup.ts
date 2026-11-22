@@ -1,4 +1,4 @@
-type Listener = (...args: any[]) => unknown;
+type Listener = (...args: unknown[]) => unknown;
 
 export class Emitter {
   readonly #listeners = new Map<string, Map<Listener, Listener>>();

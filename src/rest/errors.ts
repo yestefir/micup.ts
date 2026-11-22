@@ -7,15 +7,23 @@ export interface MicupFieldError {
 interface APIErrorBody {
   message?: unknown;
   code?: unknown;
-  errors?: MicupFieldError[];
+  errors?: unknown;
   retry_after?: unknown;
   global?: unknown;
 }
 
 export function retryDelay(value: unknown): number {
-  if (typeof value !== 'number' && typeof value !== 'string') return 0;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? Math.min(2_147_483_647, Math.ceil(value * 1000)) : 0;
+  }
+  if (typeof value !== 'string' || !value.trim()) return 0;
+
   const seconds = Number(value);
-  return Number.isFinite(seconds) && seconds > 0 ? Math.min(2_147_483_647, Math.ceil(seconds * 1000)) : 0;
+  if (Number.isFinite(seconds) && seconds > 0) return Math.min(2_147_483_647, Math.ceil(seconds * 1000));
+
+  const date = Date.parse(value);
+  const now = Date.now();
+  return Number.isFinite(date) && date > now ? Math.min(2_147_483_647, date - now) : 0;
 }
 
 export const MicupErrorCode = Object.freeze({
@@ -71,7 +79,13 @@ export class MicupAPIError extends Error {
     this.retryAfterMs = retryDelay(body?.retry_after) || retryDelay(this.retryAfter);
     this.requestId = response.headers.get('x-request-id');
     this.global = body?.global === true || response.headers.get('x-ratelimit-global') === 'true';
-    this.errors = Array.isArray(body?.errors) ? body.errors : [];
+    this.errors = Array.isArray(body?.errors)
+      ? body.errors.filter((error): error is MicupFieldError =>
+        error !== null && typeof error === 'object'
+        && typeof error.path === 'string'
+        && typeof error.code === 'string'
+        && typeof error.message === 'string')
+      : [];
   }
 
   get notFound(): boolean {

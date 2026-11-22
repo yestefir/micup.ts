@@ -24,7 +24,7 @@ try {
 | `status` | HTTP status |
 | `code` | Micup error code, for example `MISSING_PERMISSIONS` |
 | `errors` | field errors: `{ path, code, message }` |
-| `retryAfter`, `retryAfterMs` | wait before retrying, from the response |
+| `retryAfter`, `retryAfterMs` | raw `Retry-After` header and its delay in milliseconds; HTTP dates are converted to a relative delay |
 | `global` | the rate limit is global |
 | `requestId` | the `x-request-id` header, for support requests |
 | `notFound`, `forbidden`, `rateLimited` | status checks |
@@ -32,13 +32,13 @@ try {
 
 `MicupErrorCode` names the codes the SDK knows, including `NEW_DM_RATE_LIMITED` (the bot messaged too many new people) and `SPAM_BLOCKED`. A request can also fail with `FEATURE_TEMPORARILY_DISABLED` when the service has a feature switched off.
 
-Other errors: `GatewayCloseError` (the Gateway closed; `fatal` says whether the SDK stops), `GatewayRequestError` (a member or count request failed), `VoiceRefusedError` (the channel is full or a voice option is unavailable) and plain `TypeError` or `RangeError` when an argument is invalid. The SDK checks arguments before it sends a request.
+Other errors: `GatewayCloseError` (the Gateway closed; `fatal` says whether the SDK stops), `GatewayRequestError` (a member or count request failed), `VoiceRefusedError` (the channel is full or a voice option is unavailable), and REST, Gateway or attachment-upload connection `Error` objects with the original network error in `cause`. Invalid arguments raise `TypeError` or `RangeError`. The SDK checks arguments before it sends a request.
 
 ## Rate limits and retries
 
 The SDK waits for rate-limit windows and retries on its own:
 
-- `429` waits for `Retry-After` and tries again; waits longer than 30 seconds fail instead.
+- `429` waits for `retry_after` in the response body, falling back to the `Retry-After` header (delta-seconds or HTTP date), and tries again; waits longer than 30 seconds fail instead.
 - `423` retries after at least one second.
 - `5xx` and network errors retry with exponential backoff for requests that are safe to repeat (`GET`, `PUT`, `DELETE`, and `POST` calls marked idempotent).
 - `maxRestAttempts` (1 to 5, default 5) limits the tries.

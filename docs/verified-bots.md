@@ -13,7 +13,7 @@ A bot that applies for Micup's verified status has three mandatory requirements:
 ### REST
 
 - **Route buckets.** When a response carries `X-RateLimit-Remaining: 0`, the next request to that route waits for `X-RateLimit-Reset-After`, so the bucket is not denied in the first place.
-- **429.** The SDK waits for `retry_after` from the body (the `Retry-After` header is rounded up and only used when the body has none) and sends the request again, up to `maxRestAttempts` (default 5). A wait of more than 30 seconds is not slept: the `MicupAPIError` is thrown at once with `retryAfterMs` so your code decides.
+- **429.** The SDK waits for `retry_after` from the body, falling back to the `Retry-After` header in delta-seconds or HTTP-date form, and sends the request again, up to `maxRestAttempts` (default 5). A wait of more than 30 seconds is not slept: the `MicupAPIError` is thrown at once with `retryAfterMs` so your code decides.
 - **Global 429.** When `global` is true, every request of the token pauses, not only the route.
 - **Global bucket.** Micup allows 50 requests per second for each caller. The SDK keeps a margin and sends at most 45 per second, so a burst of 500 calls is spread out instead of being denied. Webhook token requests and interaction callbacks do not count against the bucket on the server and are not slowed either.
 - **Server errors.** `5xx` and network errors are retried with exponential backoff only for requests that are safe to repeat; `4xx` errors other than 429 are never retried.

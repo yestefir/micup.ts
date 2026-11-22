@@ -48,9 +48,9 @@ async function put(url: URL, data: Blob, signal?: AbortSignal, contentType?: str
   let response: Response;
   try {
     response = await fetch(url.href, { method: 'PUT', body: data, headers, signal, redirect: 'error' });
-  } catch {
+  } catch (cause) {
     signal?.throwIfAborted();
-    throw new Error('Micup attachment upload failed');
+    throw new Error('Micup attachment upload failed', { cause });
   }
   await response.body?.cancel();
   if (!response.ok) throw new Error('Micup attachment upload returned HTTP ' + response.status);

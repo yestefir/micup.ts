@@ -102,6 +102,11 @@ export class GatewayCompression {
       await new Promise<void>((resolve, reject) => {
         const abort = () => reject(this.#signal.reason);
         this.#signal.addEventListener('abort', abort, { once: true });
+        if (this.#signal.aborted) {
+          this.#signal.removeEventListener('abort', abort);
+          reject(this.#signal.reason);
+          return;
+        }
         this.#encoder.write(text);
         this.#encoder.flush(zlib.constants.ZSTD_e_flush, () => {
           this.#signal.removeEventListener('abort', abort);

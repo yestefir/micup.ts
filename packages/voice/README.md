@@ -17,7 +17,7 @@ Requires Node.js 20.3 or later. Install [FFmpeg](https://ffmpeg.org) to decode f
 | Debian and Ubuntu | `sudo apt install ffmpeg` |
 | Docker | install `ffmpeg` in the image, for example `apt-get install -y ffmpeg` |
 
-If FFmpeg cannot be started, `play()` and `openSource()` fail with an error that says so and names `FFMPEG_PATH`.
+If FFmpeg cannot be started, `play()` and `openSource()` fail with an error that says so and names `FFMPEG_PATH`; the original process error is available as `cause`. Errors from a readable input stream are reported as `Audio input stream failed` with the stream error in `cause`. A failed `VoiceRoom.connect()` reports the LiveKit error in `cause`.
 
 ## Quick start
 

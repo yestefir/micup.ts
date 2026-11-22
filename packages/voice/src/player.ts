@@ -66,6 +66,10 @@ export class Player {
 
   async play(pcm: PCMInput, { signal }: { signal?: AbortSignal } = {}): Promise<void> {
     if (this.#active) throw new PlaybackBusyError();
+    if (!pcm || typeof pcm[Symbol.asyncIterator] !== 'function' ||
+        pcm.close !== undefined && typeof pcm.close !== 'function') {
+      throw new TypeError('PCM input must be an async iterable with an optional close method');
+    }
     const controller = new AbortController();
     signal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
     signal.throwIfAborted();

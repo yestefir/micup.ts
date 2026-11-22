@@ -100,7 +100,7 @@ export class GatewayConnection {
         else reject(error);
       };
       const onAbort = () => finish();
-      this.#socket.on('error', () => finish(new Error('Micup Gateway connection failed')));
+      this.#socket.on('error', (cause) => finish(new Error('Micup Gateway connection failed', { cause })));
       this.#socket.on('close', (code, reason) => finish(new GatewayCloseError(code, reason.toString())));
       const receive = (packet: string) => this.#receive(packet, finish);
       if (this.options.endpoint.searchParams.get('compress') === 'zstd-stream') {

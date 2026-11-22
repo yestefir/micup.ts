@@ -487,6 +487,7 @@ export class Client {
           reject(new Error('Timed out waiting for an interaction'));
         }, timeoutMs);
       }
+      if (signal?.aborted) abort();
     });
   }
 

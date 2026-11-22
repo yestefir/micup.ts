@@ -41,7 +41,8 @@ export class VoiceRoom extends TypedEmitter<VoiceRoomEvents> implements PCMTrack
   }
 
   static async connect(grant: VoiceGrant, options: VoiceRoomOptions = {}): Promise<VoiceRoom> {
-    if (!grant?.endpoint || !grant.token || grant.p2p || grant.e2ee_key) {
+    if (!grant || typeof grant.endpoint !== 'string' || !grant.endpoint.trim() ||
+        typeof grant.token !== 'string' || !grant.token.trim() || grant.p2p || grant.e2ee_key) {
       throw new TypeError('A LiveKit grant for unencrypted Micup voice is required');
     }
     const endpoint = new URL(grant.endpoint.includes('://') ? grant.endpoint : 'wss://' + grant.endpoint);
@@ -63,11 +64,11 @@ export class VoiceRoom extends TypedEmitter<VoiceRoomEvents> implements PCMTrack
     try {
       await withAbort(attempt, signal);
       signal.throwIfAborted();
-    } catch {
+    } catch (cause) {
       const cleanup = attempt.catch(() => {}).then(() => room.disconnect()).catch(() => {});
       if (!signal.aborted) await cleanup;
       signal.throwIfAborted();
-      throw new Error('LiveKit audio connection failed');
+      throw new Error('LiveKit audio connection failed', { cause });
     }
 
     const connection = new VoiceRoom(sdk, room, trackOptions);

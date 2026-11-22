@@ -65,11 +65,13 @@ class Slots {
           resolve();
         };
         const abort = () => {
+          signal.removeEventListener('abort', abort);
           this.#waiters.delete(wake);
           reject(signal.reason);
         };
         this.#waiters.add(wake);
         signal.addEventListener('abort', abort, { once: true });
+        if (signal.aborted) abort();
       });
     }
     signal.throwIfAborted();

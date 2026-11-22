@@ -79,6 +79,8 @@ const session = client.newSession({
 
 `VoiceRoom.connect(grant)` connects without the player; it emits `memberJoin`, `memberLeave` and `disconnected` and gives `openTrack()` for several independent tracks. `Player` plays any PCM source on a track, with `pause()`, `resume()`, `skip()` and `setVolume()`. `openSource(input, options)` decodes with FFmpeg. See the [package README](../packages/voice/README.md).
 
+When `VoiceRoom.connect()` fails, the connection error preserves the underlying LiveKit error in its `cause` property.
+
 ## Soundboard
 
 Guild soundboard sounds play in the voice channel the bot is in. Upload and play with `client.sounds`:
