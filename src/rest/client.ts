@@ -1,3 +1,7 @@
+import { GatewaySession, type GatewaySessionConfig, type GatewaySessionOptions } from '../session/session.js';
+
+import { ShardManager, type ShardManagerOptions } from '../shard/manager.js';
+
 const defaultOrigin = 'https://micup.gg';
 const connection = Symbol('Micup connection');
 
@@ -45,13 +49,15 @@ export class MicupAPIError extends Error {
 export class MicupClient {
   readonly #token: string;
   readonly #api: string;
+  readonly #gateway?: string;
 
-  private constructor(key: typeof connection, token: string, api: string) {
+  private constructor(key: typeof connection, token: string, api: string, gateway?: string) {
     if (key !== connection) {
       throw new TypeError('Use MicupClient.connect() to create a client');
     }
     this.#token = token;
     this.#api = api;
+    this.#gateway = gateway;
   }
 
   static async connect(
@@ -77,7 +83,7 @@ export class MicupClient {
       throw new MicupAPIError(response);
     }
 
-    const discovery: { endpoints?: { api_public?: string } } = await response.json();
+    const discovery: { endpoints?: { api_public?: string; gateway?: string } } = await response.json();
     const endpoint = discovery?.endpoints?.api_public;
     if (typeof endpoint !== 'string') {
       throw new Error('Micup discovery returned no API endpoint');
@@ -87,12 +93,31 @@ export class MicupClient {
       throw new Error('Micup discovery returned an invalid API endpoint');
     }
 
-    const client = new MicupClient(connection, token, `${api.href.replace(/\/+$/, '')}/v1`);
+    const gateway = discovery.endpoints?.gateway;
+    if (gateway !== undefined) {
+      if (typeof gateway !== 'string') throw new Error('Micup discovery returned an invalid Gateway endpoint');
+      const endpoint = new URL(gateway);
+      if (endpoint.protocol !== 'wss:' || endpoint.host !== url.host || endpoint.username ||
+          endpoint.password || endpoint.hash) {
+        throw new Error('Micup discovery returned an invalid Gateway endpoint');
+      }
+    }
+    const client = new MicupClient(connection, token, `${api.href.replace(/\/+$/, '')}/v1`, gateway);
     const user = await client.getCurrentUser({ signal });
     if (user?.bot !== true) {
       throw new Error('The credential must belong to a Micup bot');
     }
     return client;
+  }
+
+  newSession(options: GatewaySessionOptions, shard: Pick<GatewaySessionConfig, 'shardId' | 'shardCount'> = {}): GatewaySession {
+    if (!this.#gateway) throw new Error('Micup discovery returned no Gateway endpoint');
+    return new GatewaySession({ ...shard, endpoint: this.#gateway, token: this.#token }, options);
+  }
+
+  newShardManager(options: ShardManagerOptions): ShardManager {
+    if (!this.#gateway) throw new Error('Micup discovery returned no Gateway endpoint');
+    return new ShardManager({ endpoint: this.#gateway, token: this.#token }, options);
   }
 
   getCurrentUser({ signal }: MicupRequestOptions = {}): Promise<MicupUser> {

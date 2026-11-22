@@ -1,2 +1,10 @@
 export { MicupClient, MicupAPIError } from './rest/client.js';
 export type { MicupClientOptions, MicupMessage, MicupRequestOptions, MicupUser } from './rest/client.js';
+export { EventMux } from './events/mux.js';
+export type { MicupEvents } from './events/mux.js';
+export { GatewayCloseError, GatewayOpcode } from './gateway/protocol.js';
+export type { GatewayDispatch } from './gateway/protocol.js';
+export { GatewaySession } from './session/session.js';
+export type { GatewaySessionConfig, GatewaySessionOptions } from './session/session.js';
+export { ShardManager, shardForGuild } from './shard/manager.js';
+export type { ShardManagerOptions } from './shard/manager.js';

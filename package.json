@@ -1,7 +1,7 @@
 {
   "name": "micup.ts",
   "version": "0.1.0",
-  "description": "JavaScript REST client for Micup bots",
+  "description": "TypeScript SDK for Micup bots (Fluxer API)",
   "type": "module",
   "exports": {
     "types": "./dist/index.d.ts",
@@ -29,6 +29,10 @@
     "url": "git+https://github.com/yestefir/micup.ts.git"
   },
   "devDependencies": {
+    "@types/ws": "8.18.2",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "ws": "8.23.0"
   }
 }
