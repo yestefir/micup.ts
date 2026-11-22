@@ -338,7 +338,8 @@ export class RestTransport {
   }
 
   async request<T>(method: RestMethod, path: string, { body, signal, query, reason, anonymous, idempotent }: RestRequestOptions = {}): Promise<T> {
-    if (!path.startsWith('/') || path.startsWith('//') || /[\\?#\u0000-\u0020]/.test(path)) {
+    if (!path.startsWith('/') || path.startsWith('//') || /[\\?#\u0000-\u0020]/.test(path) ||
+        path.split('/').some((part) => /^(?:\.|%2e){1,2}$/i.test(part))) {
       throw new TypeError('Micup REST path must be relative to the versioned API');
     }
     const target = new URL('.' + path, this.#api);

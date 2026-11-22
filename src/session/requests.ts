@@ -56,30 +56,35 @@ class Slots {
   constructor(private readonly capacity: number) {}
 
   async acquire(signal: AbortSignal): Promise<() => void> {
-    while (this.#active >= this.capacity) {
+    try {
+      while (this.#active >= this.capacity) {
+        signal.throwIfAborted();
+        await new Promise<void>((resolve, reject) => {
+          const wake = () => {
+            signal.removeEventListener('abort', abort);
+            this.#waiters.delete(wake);
+            resolve();
+          };
+          const abort = () => {
+            signal.removeEventListener('abort', abort);
+            this.#waiters.delete(wake);
+            reject(signal.reason);
+          };
+          this.#waiters.add(wake);
+          signal.addEventListener('abort', abort, { once: true });
+          if (signal.aborted) abort();
+        });
+      }
       signal.throwIfAborted();
-      await new Promise<void>((resolve, reject) => {
-        const wake = () => {
-          signal.removeEventListener('abort', abort);
-          this.#waiters.delete(wake);
-          resolve();
-        };
-        const abort = () => {
-          signal.removeEventListener('abort', abort);
-          this.#waiters.delete(wake);
-          reject(signal.reason);
-        };
-        this.#waiters.add(wake);
-        signal.addEventListener('abort', abort, { once: true });
-        if (signal.aborted) abort();
-      });
+      this.#active++;
+      return () => {
+        this.#active--;
+        this.#waiters.values().next().value?.();
+      };
+    } catch (error) {
+      if (this.#active < this.capacity) this.#waiters.values().next().value?.();
+      throw error;
     }
-    signal.throwIfAborted();
-    this.#active++;
-    return () => {
-      this.#active--;
-      this.#waiters.values().next().value?.();
-    };
   }
 }
 

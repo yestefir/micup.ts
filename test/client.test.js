@@ -34,12 +34,79 @@ test('discovers the API, authenticates the bot and sends replies', async (t) => 
   assert.equal(fetch.mock.callCount(), 4);
 });
 
+test('an aborted application lookup does not cancel an uncancelled lookup', async (t) => {
+  const application = { id: '102', name: 'Fixture' };
+  let markStarted;
+  const started = new Promise((resolve) => { markStarted = resolve; });
+  const fetch = t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (String(url) === origin + '/.well-known/fluxer') return Response.json({ endpoints: { api_public: origin + '/api' } });
+    if (String(url) === origin + '/api/v1/users/@me') return Response.json(bot);
+    if (String(url) === origin + '/api/v1/applications/@me' && options.signal) {
+      markStarted();
+      return new Promise((resolve, reject) => {
+        options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+      });
+    }
+    assert.equal(String(url), origin + '/api/v1/applications/@me');
+    return Response.json(application);
+  });
+
+  const client = await MicupClient.connect({ token: 'fixture', origin });
+  const controller = new AbortController();
+  const cancelled = client.application({ signal: controller.signal });
+  await started;
+  const uncancelled = client.application();
+  controller.abort(new Error('caller stopped waiting'));
+
+  await assert.rejects(cancelled, /caller stopped waiting/);
+  assert.deepEqual(await uncancelled, application);
+  assert.equal(fetch.mock.callCount(), 4);
+});
+
 test('rejects discovery on a different origin before sending the token', async (t) => {
   const fetch = t.mock.method(globalThis, 'fetch', async () =>
     Response.json({ endpoints: { api_public: 'https://other.example/api' } }),
   );
   await assert.rejects(MicupClient.connect({ token: 'fixture', origin }), /invalid API endpoint/);
   assert.equal(fetch.mock.callCount(), 1);
+});
+
+test('rejects bot identity responses without a numeric bot ID', async (t) => {
+  const identities = [
+    { username: 'missing-id', bot: true },
+    { id: 'not-a-snowflake', username: 'invalid-id', bot: true },
+  ];
+  let index = 0;
+  const fetch = t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url) === origin + '/.well-known/fluxer') {
+      return Response.json({ endpoints: { api_public: origin + '/api' } });
+    }
+    return Response.json(identities[index++]);
+  });
+
+  for (let item = 0; item < identities.length; item++) {
+    await assert.rejects(MicupClient.connect({ token: 'fixture', origin }), /valid bot ID/);
+  }
+  assert.equal(index, identities.length);
+  assert.equal(fetch.mock.callCount(), identities.length * 2);
+});
+
+test('rejects malformed discovery documents before authenticating', async (t) => {
+  const documents = [
+    null,
+    { endpoints: null },
+    { endpoints: [] },
+    { endpoints: { api_public: 'not a URL' } },
+    { endpoints: { api_public: origin + '/api', gateway: 'not a URL' } },
+  ];
+  let index = 0;
+  const fetch = t.mock.method(globalThis, 'fetch', async () => Response.json(documents[index++]));
+
+  for (let item = 0; item < documents.length; item++) {
+    await assert.rejects(MicupClient.connect({ token: 'fixture', origin }), /Micup discovery returned an invalid/);
+  }
+  assert.equal(index, documents.length);
+  assert.equal(fetch.mock.callCount(), documents.length);
 });
 
 test('exposes HTTP rate limit details', async (t) => {
@@ -133,5 +200,7 @@ test('retries an explicit rate limit, preserves file metadata, and never retries
   await assert.rejects(client.sendMessage('202', 'ambiguous'), (error) => error.status === 503);
   assert.equal(attempts, 3);
   await assert.rejects(client.request('GET', '/%2e%2e/escape'), /relative to the versioned API/);
+  await assert.rejects(client.request('GET', '/users/../users/@me'), /relative to the versioned API/);
+  await assert.rejects(client.request('GET', '/users/%2e%2e/users/@me'), /relative to the versioned API/);
   assert.equal(fetch.mock.callCount(), 5);
 });

@@ -3,6 +3,38 @@ import { once } from 'node:events';
 import { test } from 'node:test';
 import { WebSocketServer } from 'ws';
 import { EventMux, GatewayCloseError, GatewayOpcode as op, GatewaySession, ShardManager, shardForGuild } from 'micup.ts';
+import { SessionRequests } from '../dist/session/requests.js';
+
+test('a cancelled slot waiter passes an available slot to the next waiter', async () => {
+  const sent = [];
+  const requests = new SessionRequests(async (opcode, data) => { sent.push({ opcode, data }); });
+  const first = requests.members('10', { query: 'first', limit: 1 });
+  const cancelled = new AbortController();
+  const skipped = requests.members('11', { query: 'skipped', limit: 1, signal: cancelled.signal });
+  const next = requests.members('12', { query: 'next', limit: 1 });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(sent.length, 1);
+
+  requests.receive({
+    name: 'GUILD_MEMBERS_CHUNK',
+    sequence: 1,
+    shardId: 0,
+    data: { guild_id: '10', nonce: sent[0].data.nonce, chunk_count: 1, chunk_index: 0, members: [] },
+  });
+  queueMicrotask(() => cancelled.abort());
+
+  await first;
+  await assert.rejects(skipped, (error) => error === cancelled.signal.reason);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(sent.length, 2);
+  requests.receive({
+    name: 'GUILD_MEMBERS_CHUNK',
+    sequence: 2,
+    shardId: 0,
+    data: { guild_id: '12', nonce: sent[1].data.nonce, chunk_count: 1, chunk_index: 0, members: [] },
+  });
+  assert.deepEqual(await next, []);
+});
 
 async function createGateway(t) {
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });

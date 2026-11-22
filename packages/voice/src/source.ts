@@ -14,6 +14,7 @@ export interface AudioInputStream {
   unpipe(destination?: any): unknown;
   destroy(error?: Error): unknown;
   on(event: 'error', listener: (error: Error) => void): unknown;
+  removeListener(event: 'error', listener: (error: Error) => void): unknown;
 }
 
 export interface AudioSource extends AsyncIterable<Uint8Array> {
@@ -27,7 +28,8 @@ function isReadable(input: unknown): input is Readable {
     typeof (input as Readable).pipe === 'function' &&
     typeof (input as Readable).unpipe === 'function' &&
     typeof (input as Readable).destroy === 'function' &&
-    typeof (input as Readable).on === 'function';
+    typeof (input as Readable).on === 'function' &&
+    typeof (input as Readable).removeListener === 'function';
 }
 
 export function openSource(input: string | AudioInputStream, options: AudioSourceOptions = {}): AudioSource {

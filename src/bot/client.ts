@@ -107,29 +107,59 @@ export class MicupClient {
       throw new MicupAPIError(response);
     }
 
-    const discovery: { endpoints?: { api_public?: string; gateway?: string; media?: string; invite?: string } } = await response.json();
-    const endpoint = discovery?.endpoints?.api_public;
+    const discovery: unknown = await response.json();
+    if (!discovery || typeof discovery !== 'object' || Array.isArray(discovery)) {
+      throw new Error('Micup discovery returned an invalid response');
+    }
+    const endpoints = (discovery as { endpoints?: unknown }).endpoints;
+    if (!endpoints || typeof endpoints !== 'object' || Array.isArray(endpoints)) {
+      throw new Error('Micup discovery returned an invalid endpoint list');
+    }
+    const discoveredEndpoints = endpoints as {
+      api_public?: unknown;
+      gateway?: unknown;
+      media?: unknown;
+      invite?: unknown;
+    };
+    const endpoint = discoveredEndpoints.api_public;
     if (typeof endpoint !== 'string') {
       throw new Error('Micup discovery returned no API endpoint');
     }
-    const api = new URL(endpoint);
+    let api: URL;
+    try {
+      api = new URL(endpoint);
+    } catch {
+      throw new Error('Micup discovery returned an invalid API endpoint');
+    }
     if (api.origin !== url.origin || api.username || api.password || api.search || api.hash) {
       throw new Error('Micup discovery returned an invalid API endpoint');
     }
 
-    const gateway = discovery.endpoints?.gateway;
+    const gateway = discoveredEndpoints.gateway;
     if (gateway !== undefined) {
       if (typeof gateway !== 'string') throw new Error('Micup discovery returned an invalid Gateway endpoint');
-      const endpoint = new URL(gateway);
-      if (endpoint.protocol !== 'wss:' || endpoint.host !== url.host || endpoint.username ||
-          endpoint.password || endpoint.hash) {
+      let gatewayEndpoint: URL;
+      try {
+        gatewayEndpoint = new URL(gateway);
+      } catch {
+        throw new Error('Micup discovery returned an invalid Gateway endpoint');
+      }
+      if (gatewayEndpoint.protocol !== 'wss:' || gatewayEndpoint.host !== url.host || gatewayEndpoint.username ||
+          gatewayEndpoint.password || gatewayEndpoint.hash) {
         throw new Error('Micup discovery returned an invalid Gateway endpoint');
       }
     }
-    const client = new MicupClient(connection, token, `${api.href.replace(/\/+$/, '')}/v1`, { ...discovery.endpoints, gateway }, maxRestAttempts, logger, rejectedRequestLimit);
+    const client = new MicupClient(connection, token, `${api.href.replace(/\/+$/, '')}/v1`, {
+      gateway,
+      media: typeof discoveredEndpoints.media === 'string' ? discoveredEndpoints.media : undefined,
+      invite: typeof discoveredEndpoints.invite === 'string' ? discoveredEndpoints.invite : undefined,
+    }, maxRestAttempts, logger, rejectedRequestLimit);
     const user = await client.getCurrentUser({ signal });
     if (user?.bot !== true) {
       throw new Error('The credential must belong to a Micup bot');
+    }
+    if (typeof user.id !== 'string' || !/^\d+$/.test(user.id)) {
+      throw new Error('Micup did not return a valid bot ID');
     }
     client.#botId = user.id;
     client.#self = user;
@@ -146,6 +176,7 @@ export class MicupClient {
   }
 
   application(options?: MicupRequestOptions): Promise<MicupApplication> {
+    if (options?.signal) return this.users.application(options);
     if (!this.#application) {
       this.#application = this.users.application(options);
       this.#application.catch(() => { this.#application = undefined; });

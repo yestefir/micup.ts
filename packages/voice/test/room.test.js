@@ -21,3 +21,13 @@ test('reports a missing FFmpeg binary instead of treating it as end of audio', a
   await assert.rejects(consume(), /FFmpeg could not be started/);
   await source.close();
 });
+
+test('rejects stream inputs that cannot detach their error listener', () => {
+  const input = {
+    pipe() {},
+    unpipe() {},
+    destroy() {},
+    on() {},
+  };
+  assert.throws(() => openSource(input), /Audio input must be a file path/);
+});
