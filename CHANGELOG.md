@@ -25,6 +25,13 @@
 - Voice track publishing cleans up created tracks when the LiveKit publisher throws synchronously.
 - Voice room connections clean up the room when LiveKit throws synchronously during connect.
 - REST validates forum tag IDs, archived thread kinds, reaction-user cursors, discovery and sticker tags, message mention rules, sticker IDs and attachment references before sending requests.
+- REST validates forum tag names, moderation flags and emoji field shapes before sending requests.
+- Discovery applications validate supported categories, languages and custom tag characters before sending requests.
+- Discovery application status types retain known-value autocomplete while accepting new server statuses.
+- Thread creation validates slowmode, type and invitable fields before sending requests.
+- Invite creation validates expiry, use-count and boolean options before sending requests.
+- Channel creation requires a supported guild channel type and validates shared field ranges before sending requests.
+- Single channel permission overwrites use the same target, type and permission-bit validation as channel creation.
 - Raw REST requests validate methods, query objects and retry/authentication flags, and reject GET or HEAD bodies before sending requests.
 - Guild channel moves reject sparse position arrays instead of serializing holes as null values.
 - Room tournament ordering rejects sparse entrant arrays before building the request body.

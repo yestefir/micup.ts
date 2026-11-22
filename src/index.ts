@@ -25,7 +25,7 @@ export type { CommandChoice, CommandData, CommandDefinition, CommandOption, Comm
 export type { CommandScope, MicupCommands } from './rest/commands.js';
 export type { InteractionReplyOptions, MicupInteractions, MicupModal } from './rest/interactions.js';
 export type { AuditOptions, GuildAuditLog, GuildBan, GuildBanInput, GuildMemberEdit, GuildMemberQuery, GuildRoleEdit, MicupGuilds } from './rest/guilds.js';
-export type { ChannelEdit, MicupChannels, MicupInvite, ThreadList, ThreadStart } from './rest/channels.js';
+export type { ChannelEdit, GuildChannelType, MicupChannels, MicupInvite, ThreadList, ThreadStart } from './rest/channels.js';
 export type { CustomStatus, Presence, PresenceStatus } from './model/presence.js';
 export { GatewayRequestError } from './session/requests.js';
 export type { ChannelMemberCount, GuildCount, GuildMembersRequest } from './session/requests.js';

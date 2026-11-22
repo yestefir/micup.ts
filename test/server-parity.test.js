@@ -579,6 +579,7 @@ test('iterates members, audit log entries, pins and thread members page by page'
   assert.equal(collected.members.at(-1), '1003');
   assert.equal(collected.entries.length, 140);
   assert.deepEqual(collected.pins, ['1', '2']);
+  assert.ok(calls.some(({ path, query }) => path === '/channels/20/messages/pins' && query === '?limit=50&before=2026-01-01'));
   assert.equal(collected.threadMembers.length, 101);
   assert.equal(calls.find(({ path, query }) => path === '/guilds/10/members' && query.includes('after')).query, '?limit=1000&after=1000');
   assert.ok(calls.some(({ path, query }) => path === '/guilds/10/audit-logs' && query.includes('before=201') && query.includes('action_type=1')));
@@ -593,7 +594,7 @@ test('manages a guild discovery listing', async (t) => {
   });
   assert.equal((await bot.discovery.status('10')).min_member_count, 50);
   await bot.discovery.apply('10', { description: 'A place to talk.', category_type: 4, custom_tags: ['rust'] });
-  await bot.discovery.edit('10', { custom_tags: [] });
+  await bot.discovery.edit('10', { custom_tags: ['Türkçe & oyun'] });
   await bot.discovery.withdraw('10');
   assert.deepEqual(calls.map(({ method, path }) => method + ' ' + path), [
     'GET /guilds/10/discovery', 'POST /guilds/10/discovery', 'PATCH /guilds/10/discovery', 'DELETE /guilds/10/discovery',
@@ -604,5 +605,11 @@ test('manages a guild discovery listing', async (t) => {
   assert.throws(() => bot.discovery.edit('10', { custom_tags: 'rust' }), TypeError);
   assert.throws(() => bot.discovery.edit('10', { custom_tags: Array(1) }), TypeError);
   assert.throws(() => bot.discovery.edit('10', { custom_tags: ['rust', 4] }), TypeError);
+  assert.throws(() => bot.discovery.edit('10', { custom_tags: ['x'] }), RangeError);
+  assert.throws(() => bot.discovery.edit('10', { custom_tags: ['rust!'] }), TypeError);
+  assert.throws(() => bot.discovery.edit('10', { custom_tags: ['x'.repeat(31)] }), RangeError);
+  assert.throws(() => bot.discovery.edit('10', { category_type: 9 }), RangeError);
+  assert.throws(() => bot.discovery.edit('10', { category_type: -1 }), RangeError);
   assert.throws(() => bot.discovery.edit('10', { primary_language: 4 }), TypeError);
+  assert.throws(() => bot.discovery.edit('10', { primary_language: 'en' }), TypeError);
 });

@@ -5,7 +5,7 @@ export type DiscoveryApplicationStatus = 'pending' | 'approved' | 'rejected' | '
 
 export interface DiscoveryApplication {
   guild_id: string;
-  status: DiscoveryApplicationStatus | string;
+  status: DiscoveryApplicationStatus | (string & {});
   description: string;
   category_type: number;
   primary_language: string | null;
@@ -32,16 +32,29 @@ export interface DiscoveryApplicationInput {
 
 export type DiscoveryApplicationEdit = Partial<DiscoveryApplicationInput>;
 
+const categories = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+const languages = new Set([
+  'ar', 'bg', 'cs', 'da', 'de', 'el', 'en-US', 'es-ES', 'es-419', 'fi', 'fr', 'he', 'hi', 'hr', 'hu', 'id', 'it', 'ja', 'ko', 'lt',
+  'nl', 'no', 'pl', 'pt-BR', 'ro', 'ru', 'sv-SE', 'th', 'tr', 'uk', 'vi', 'zh-CN', 'zh-TW',
+]);
+
 function check({ description, category_type, primary_language, custom_tags }: DiscoveryApplicationEdit): void {
   if (description !== undefined && (typeof description !== 'string' || [...description].length < 10 || [...description].length > 300)) {
     throw new RangeError('A discovery description takes 10 to 300 characters');
   }
   if (category_type !== undefined && !Number.isSafeInteger(category_type)) throw new TypeError('A discovery category is an integer');
-  if (primary_language !== undefined && typeof primary_language !== 'string') throw new TypeError('A discovery language must be a string');
+  if (category_type !== undefined && !categories.has(category_type)) throw new RangeError('Invalid Micup discovery category');
+  if (primary_language !== undefined && (typeof primary_language !== 'string' || !languages.has(primary_language))) {
+    throw new TypeError('Invalid Micup discovery language');
+  }
   if (custom_tags !== undefined) {
     if (!Array.isArray(custom_tags)) throw new TypeError('Discovery custom tags must be an array of strings');
     for (const tag of custom_tags) {
       if (typeof tag !== 'string') throw new TypeError('Discovery custom tags must be an array of strings');
+      const normalized = tag.trim();
+      const length = [...normalized].length;
+      if (length < 2 || length > 30) throw new RangeError('Discovery custom tags must contain 2 to 30 characters');
+      if (!/^[\p{L}\p{N}][\p{L}\p{N} _+&-]*$/u.test(normalized)) throw new TypeError('Invalid Micup discovery custom tag');
     }
   }
   if (custom_tags !== undefined && custom_tags.length > 10) throw new RangeError('A discovery listing takes up to 10 custom tags');

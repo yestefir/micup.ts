@@ -14,12 +14,14 @@ export interface ChannelEdit {
   user_limit?: number;
   position?: number;
   permission_overwrites?: readonly PermissionOverwrite[];
-  archived?: boolean;
-  locked?: boolean;
+  archived?: boolean | null;
+  locked?: boolean | null;
   auto_archive_duration?: number;
   rate_limit_per_user?: number;
   nsfw?: boolean;
 }
+
+export type GuildChannelType = 0 | 2 | 4 | 5 | 15 | 16 | 998;
 
 export interface CrosspostSource {
   guild: {
@@ -78,16 +80,85 @@ export interface ArchivedThreadOptions extends MicupRequestOptions {
   kind?: 'public' | 'private' | 'joined';
 }
 
-function threadStart(input: Pick<ThreadStart, 'name' | 'auto_archive_duration' | 'rate_limit_per_user'>): typeof input {
-  if (!input.name || [...input.name].length > 100) throw new TypeError('Thread names must contain 1 to 100 characters');
+const guildChannelTypes = new Set<GuildChannelType>([0, 2, 4, 5, 15, 16, 998]);
+
+function permissionOverwrite(overwrite: PermissionOverwrite): PermissionOverwrite {
+  if (!overwrite || typeof overwrite !== 'object' || Array.isArray(overwrite) ||
+      (overwrite.type !== 0 && overwrite.type !== 1)) {
+    throw new TypeError('Invalid Micup channel permission overwrite');
+  }
+  snowflake(overwrite.id, 'Permission overwrite ID');
+  const validBits = (value: string | number) => typeof value === 'string' ? /^\d+$/.test(value) : Number.isSafeInteger(value) && value >= 0;
+  if (!validBits(overwrite.allow) || !validBits(overwrite.deny)) throw new TypeError('Invalid Micup channel permission overwrite');
+  return overwrite;
+}
+
+function channelEdit(body: ChannelEdit, creating = false): ChannelEdit {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('Micup channel options must be an object');
+  if ((creating && (typeof body.name !== 'string' || !body.name)) || (body.name !== undefined && typeof body.name !== 'string')) {
+    throw new TypeError('A Micup channel name must be a nonempty string');
+  }
+  if (creating && body.type === undefined) throw new TypeError('A Micup guild channel needs a channel type');
+  if (body.name !== undefined && [...body.name].length > 100) throw new RangeError('Micup channel names can contain up to 100 characters');
+  if (body.type !== undefined && !guildChannelTypes.has(body.type as GuildChannelType)) throw new RangeError('Invalid Micup guild channel type');
+  if (body.topic !== undefined && body.topic !== null && typeof body.topic !== 'string') throw new TypeError('Micup channel topic must be a string or null');
+  if (typeof body.topic === 'string' && (!body.topic || [...body.topic].length > 4096)) {
+    throw new RangeError('Micup channel topics must contain 1 to 4,096 characters');
+  }
+  if (body.parent_id !== undefined && body.parent_id !== null) snowflake(body.parent_id, 'Parent channel ID');
+  if (body.bitrate !== undefined && (!Number.isSafeInteger(body.bitrate) || body.bitrate < 8000 || body.bitrate > 384_000)) {
+    throw new RangeError('Micup voice bitrate must be between 8,000 and 384,000');
+  }
+  if (body.user_limit !== undefined && (!Number.isSafeInteger(body.user_limit) || body.user_limit < 0 || body.user_limit > 99)) {
+    throw new RangeError('Micup voice user limit must be between 0 and 99');
+  }
+  if (body.position !== undefined && (!Number.isSafeInteger(body.position) || body.position < 0)) {
+    throw new RangeError('Micup channel position must be a nonnegative integer');
+  }
+  if (body.permission_overwrites !== undefined) {
+    if (!Array.isArray(body.permission_overwrites)) throw new TypeError('Micup permission overwrites must be an array');
+    for (const overwrite of body.permission_overwrites) permissionOverwrite(overwrite);
+  }
+  if ((body.archived !== undefined && body.archived !== null && typeof body.archived !== 'boolean') ||
+      (body.locked !== undefined && body.locked !== null && typeof body.locked !== 'boolean') ||
+      (body.nsfw !== undefined && typeof body.nsfw !== 'boolean')) {
+    throw new TypeError('Micup channel state fields must be booleans or null');
+  }
+  if (body.auto_archive_duration !== undefined && ![60, 1440, 4320, 10080].includes(body.auto_archive_duration)) {
+    throw new RangeError('Invalid Micup auto archive duration');
+  }
+  if (body.rate_limit_per_user !== undefined &&
+      (!Number.isSafeInteger(body.rate_limit_per_user) || body.rate_limit_per_user < 0 || body.rate_limit_per_user > 21_600)) {
+    throw new RangeError('Micup channel slowmode must be between 0 and 21,600 seconds');
+  }
+  return body;
+}
+
+function threadStart(input: ThreadStart): typeof input {
+  if (typeof input.name !== 'string' || !input.name || [...input.name].length > 100) throw new TypeError('Thread names must contain 1 to 100 characters');
+  if (input.type !== undefined && ![10, 11, 12].includes(input.type)) throw new RangeError('Invalid Micup thread type');
   if (input.auto_archive_duration !== undefined && ![60, 1440, 4320, 10080].includes(input.auto_archive_duration)) {
     throw new RangeError('Invalid Micup auto archive duration');
   }
+  if (input.rate_limit_per_user !== undefined &&
+      (!Number.isSafeInteger(input.rate_limit_per_user) || input.rate_limit_per_user < 0 || input.rate_limit_per_user > 21_600)) {
+    throw new RangeError('Micup thread slowmode must be between 0 and 21,600 seconds');
+  }
+  if (input.invitable !== undefined && typeof input.invitable !== 'boolean') throw new TypeError('Micup thread invitable must be a boolean');
   return input;
 }
 
 function forumTag(tag: ForumTag): ForumTag {
-  if (!tag.name || [...tag.name].length > 50 || tag.emoji_id && tag.emoji_name) throw new TypeError('Invalid Micup forum tag');
+  if (!tag || typeof tag !== 'object' || Array.isArray(tag) || typeof tag.name !== 'string' || !tag.name || [...tag.name].length > 50 ||
+      tag.moderated !== undefined && typeof tag.moderated !== 'boolean') {
+    throw new TypeError('Invalid Micup forum tag');
+  }
+  if (tag.emoji_id !== undefined && tag.emoji_id !== null) snowflake(tag.emoji_id, 'Forum tag emoji ID');
+  if (tag.emoji_name !== undefined && tag.emoji_name !== null &&
+      (typeof tag.emoji_name !== 'string' || !tag.emoji_name || [...tag.emoji_name].length > 64)) {
+    throw new TypeError('Invalid Micup forum tag emoji');
+  }
+  if (tag.emoji_id != null && tag.emoji_name != null) throw new TypeError('Invalid Micup forum tag');
   return tag;
 }
 
@@ -118,19 +189,20 @@ export class MicupChannels {
     return this.rest.request('GET', channelPath(id), options);
   }
 
-  create(guildId: string, body: ChannelEdit & { name: string }, options?: AuditOptions): Promise<MicupChannel> {
-    return this.rest.request('POST', guildPath(guildId) + '/channels', { ...options, body });
+  create(guildId: string, body: ChannelEdit & { name: string; type: GuildChannelType }, options?: AuditOptions): Promise<MicupChannel> {
+    return this.rest.request('POST', guildPath(guildId) + '/channels', { ...options, body: channelEdit(body, true) });
   }
 
   edit(id: string, body: ChannelEdit, options?: AuditOptions): Promise<MicupChannel> {
-    return this.rest.request('PATCH', channelPath(id), { ...options, body });
+    return this.rest.request('PATCH', channelPath(id), { ...options, body: channelEdit(body) });
   }
 
   delete(id: string, options?: AuditOptions): Promise<void> {
     return this.rest.request('DELETE', channelPath(id), options);
   }
 
-  setPermission(id: string, { id: target, ...body }: PermissionOverwrite, options?: AuditOptions): Promise<void> {
+  setPermission(id: string, overwrite: PermissionOverwrite, options?: AuditOptions): Promise<void> {
+    const { id: target, ...body } = permissionOverwrite(overwrite);
     return this.rest.request('PUT', channelPath(id) + '/permissions/' + snowflake(target, 'Overwrite ID'), { ...options, body });
   }
 
@@ -222,6 +294,7 @@ export class MicupChannels {
 
   createForumPost(channelId: string, { message, applied_tags, ...input }: ForumPostInput, options?: AuditOptions): Promise<ForumPost> {
     threadStart(input);
+    if (('type' in input && input.type !== 11) || 'invitable' in input) throw new TypeError('Invalid Micup forum post thread options');
     if (applied_tags !== undefined && !Array.isArray(applied_tags)) throw new TypeError('Forum post tags must be an array');
     if ((applied_tags?.length ?? 0) > 5 || message.nonce || message.enforce_nonce || message.tts) {
       throw new TypeError('Invalid forum post tags or message options');
@@ -374,6 +447,21 @@ export class MicupChannels {
   createInvite(
     channelId: string, body: { max_uses?: number; max_age?: number; temporary?: boolean; unique?: boolean } = {}, options?: AuditOptions,
   ): Promise<MicupInvite> {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('Micup invite options must be an object');
+    if ((body.max_age !== undefined && !Number.isSafeInteger(body.max_age)) ||
+        (body.max_uses !== undefined && !Number.isSafeInteger(body.max_uses))) {
+      throw new TypeError('Micup invite limits must be integers');
+    }
+    if (body.max_age !== undefined && (body.max_age < 0 || body.max_age > 604_800)) {
+      throw new RangeError('Micup invite max_age must be between 0 and 604,800 seconds');
+    }
+    if (body.max_uses !== undefined && (body.max_uses < 0 || body.max_uses > 100)) {
+      throw new RangeError('Micup invite max_uses must be between 0 and 100');
+    }
+    if ((body.temporary !== undefined && typeof body.temporary !== 'boolean') ||
+        (body.unique !== undefined && typeof body.unique !== 'boolean')) {
+      throw new TypeError('Micup invite temporary and unique options must be booleans');
+    }
     return this.rest.request('POST', channelPath(channelId) + '/invites', { ...options, body });
   }
 }

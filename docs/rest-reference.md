@@ -35,6 +35,8 @@
 | Forums | `createForumPost`, `createForumTag`, `editForumTag`, `deleteForumTag`, `forumPostData` |
 | Invites | `createInvite`, `invites`, `guildInvites`, `getInvite`, `deleteInvite` |
 
+`channels.create` requires a `GuildChannelType`: `0` text, `2` voice, `4` category, `5` announcement, `15` forum, `16` media or `998` link. Channel create and edit validate the fields exposed by `ChannelEdit` before sending a request.
+
 ## Other resources
 
 | Object | Methods |

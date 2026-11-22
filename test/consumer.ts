@@ -1,12 +1,19 @@
-import { GatewaySession, MicupClient, knownGatewayEvents, type GatewaySubscription, type MessageForward } from 'micup.ts';
+import { GatewaySession, MicupClient, knownGatewayEvents, type DiscoveryApplication, type GatewaySubscription, type GuildChannelType, type MessageForward } from 'micup.ts';
 import { Player, VoiceRoom, type VoiceTrack } from '@micup.ts/voice';
 
 export const exportsForTypeCheck = { GatewaySession, MicupClient, Player, VoiceRoom, knownGatewayEvents };
 export const subscription: GatewaySubscription = { active: true };
 export const reference: MessageForward = { channel_id: '1', message_id: '2' };
+export const discoveryStatus: DiscoveryApplication['status'] = 'pending';
+export const futureDiscoveryStatus: DiscoveryApplication['status'] = 'future_status';
+export const forumChannelType: GuildChannelType = 15;
 
 export async function openAudioTrack(room: VoiceRoom): Promise<VoiceTrack> {
   return room.openTrack();
+}
+
+export async function createTypedChannel(client: MicupClient): Promise<void> {
+  await client.channels.create('1', { name: 'general', type: 0 });
 }
 
 import { InteractionRouter as ConsumerRouter, EventMux as ConsumerMux, MicupClient as ConsumerClient } from 'micup.ts';

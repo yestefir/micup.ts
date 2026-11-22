@@ -268,6 +268,15 @@ test('keeps forum message attachments inside the starter message payload', async
   assert.throws(() => bot.channels.createForumPost('20', {
     name: 'Forum topic', applied_tags: ['invalid'], message: { content: 'First message' },
   }), TypeError);
+  assert.throws(() => bot.channels.createForumPost('20', {
+    name: 'Forum topic', rate_limit_per_user: 21_601, message: { content: 'First message' },
+  }), RangeError);
+  assert.throws(() => bot.channels.createForumPost('20', {
+    name: 'Forum topic', type: 10, message: { content: 'First message' },
+  }), TypeError);
+  assert.throws(() => bot.channels.createForumPost('20', {
+    name: 'Forum topic', invitable: true, message: { content: 'First message' },
+  }), TypeError);
 });
 
 test('sends timed moderation and announcement follower requests through resource APIs', async (t) => {
