@@ -99,6 +99,12 @@
 - Voice players reject PCM sources that yield non-byte chunks instead of silently skipping them.
 - Voice `AudioInputStream` describes pipe destinations structurally without exposing `any` or requiring Node.js types in consumer declarations.
 - Voice event emitters contain synchronous listener throws and asynchronous listener rejections, forwarding failures to registered `error` listeners.
+- Reject null values for user profile mention flags.
+- Disable pagination controls when its wait is aborted.
+- Validate pagination options before sending the initial page.
+- Avoid sending a page when pagination starts with an aborted signal.
+- Acknowledge failed lazy page loads and stop pagination without reloading a page.
+- Clear cached member and voice state when a guild ban is received.
 
 ## 1.3.0 - 2026-11-22
 
@@ -201,8 +207,3 @@
 - Added slash and context menu commands, interaction routing, autocomplete, modals, deferred replies and follow-ups.
 - Added channel, thread, member, role, moderation, invite, pin and reaction operations.
 - Added Gateway voice grants and the separate `@micupts/voice` package for outgoing LiveKit audio with an FFmpeg source and a PCM player.
-- Reject null values for user profile mention flags.
-- Disable pagination controls when its wait is aborted.
-- Validate pagination options before sending the initial page.
-- Avoid sending a page when pagination starts with an aborted signal.
-- Acknowledge failed lazy page loads and stop pagination without reloading a page.

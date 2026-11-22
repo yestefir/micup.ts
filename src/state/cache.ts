@@ -165,7 +165,8 @@ export class GatewayState {
         if (member.guild_id) this.#storeMember(this.#guild(member.guild_id), member);
         break;
       }
-      case 'GUILD_MEMBER_REMOVE': {
+      case 'GUILD_MEMBER_REMOVE':
+      case 'GUILD_BAN_ADD': {
         const { guild_id, user } = data as MicupMember & { guild_id: string };
         if (!user?.id) return;
         this.#guilds.get(guild_id)?.members.delete(user.id);
