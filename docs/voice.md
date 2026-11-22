@@ -6,7 +6,7 @@ Micup carries voice over LiveKit. micup.ts joins a voice channel through the Gat
 npm install @micup.ts/voice
 ```
 
-Install FFmpeg to decode files, URLs and streams. You can skip it if you only play raw PCM. The package supports unencrypted rooms; a grant with `e2ee_key` or `p2p` is refused.
+Install FFmpeg to decode files, URLs and streams (`winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on macOS, `sudo apt install ffmpeg` on Debian and Ubuntu; check with `ffmpeg -version`). You can skip it if you only play raw PCM. The package supports unencrypted rooms; a grant with `e2ee_key` or `p2p` is refused.
 
 ## Play audio
 

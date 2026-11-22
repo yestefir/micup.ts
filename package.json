@@ -57,10 +57,11 @@
   "files": [
     "dist",
     "docs",
-    "README.tr.md"
+    "README.tr.md",
+    "CHANGELOG.md"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=20.3.0"
   },
   "scripts": {
     "build": "tsc",

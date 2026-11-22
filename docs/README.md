@@ -11,4 +11,4 @@
 | [Errors and limits](errors-and-limits.md) | handle failures, rate limits and cancellation, and log permission problems |
 | [Migrating](migrating.md) | move a bot from micup.js, micup.gg.js or discord.js |
 
-The package README has a [feature overview](../README.md#what-is-inside). Every method takes an optional `AbortSignal`. Examples are ES modules for Node.js 22 or later.
+The package README has a [feature overview](../README.md#what-is-inside). Every method takes an optional `AbortSignal`. Examples are ES modules for Node.js 20.3 or later.

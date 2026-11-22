@@ -6,7 +6,18 @@ Voice for [micup.ts](https://github.com/yestefir/micup.ts) bots. It joins a voic
 npm install @micup.ts/voice
 ```
 
-Requires Node.js 22 or later. Install [FFmpeg](https://ffmpeg.org) to decode files, URLs and streams; it is not needed for raw PCM. Rooms with end-to-end encryption or peer-to-peer voice are not supported, and such grants are refused.
+Requires Node.js 20.3 or later. Install [FFmpeg](https://ffmpeg.org) to decode files, URLs and streams; it is not needed for raw PCM. Check it with `ffmpeg -version`, or point to a binary with the `FFMPEG_PATH` environment variable or the `ffmpeg` option. Rooms with end-to-end encryption or peer-to-peer voice are not supported, and such grants are refused.
+
+## Installing FFmpeg
+
+| System | Command |
+| --- | --- |
+| Windows | `winget install Gyan.FFmpeg` (or `choco install ffmpeg`), then reopen the terminal |
+| macOS | `brew install ffmpeg` |
+| Debian and Ubuntu | `sudo apt install ffmpeg` |
+| Docker | install `ffmpeg` in the image, for example `apt-get install -y ffmpeg` |
+
+If FFmpeg cannot be started, `play()` and `openSource()` fail with an error that says so and names `FFMPEG_PATH`.
 
 ## Quick start
 

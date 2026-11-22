@@ -10,10 +10,12 @@ export function background(task: (signal: AbortSignal) => void | Promise<void>, 
   if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647)) {
     throw new RangeError('Background task timeout must be a positive timer duration');
   }
-  const signals = [parent, timeoutMs === undefined ? undefined : AbortSignal.timeout(timeoutMs)].filter((value): value is AbortSignal => value !== undefined);
-  const signal = signals.length ? AbortSignal.any(signals) : new AbortController().signal;
+  const deadline = new AbortController();
+  const signals = [parent, deadline.signal].filter((value): value is AbortSignal => value !== undefined);
+  const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
   return new Promise<void>((resolve) => {
     setImmediate(() => {
+      const timer = timeoutMs === undefined ? undefined : setTimeout(() => deadline.abort(new Error('Background task timed out')), timeoutMs);
       void Promise.resolve()
         .then(() => task(signal))
         .catch((error) => {
@@ -22,7 +24,10 @@ export function background(task: (signal: AbortSignal) => void | Promise<void>, 
             onError(error, name);
           } catch {}
         })
-        .finally(resolve);
+        .finally(() => {
+          if (timer) clearTimeout(timer);
+          resolve();
+        });
     });
   });
 }

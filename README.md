@@ -8,7 +8,7 @@ The TypeScript SDK for [Micup](https://micup.gg) bots. It connects a bot to the 
 npm install micup.ts
 ```
 
-Requires Node.js 22 or later and a Micup bot token. Based on [micup.go](https://github.com/yestefir/micup.go), the Go library that runs production bots.
+Requires Node.js 20.3 or later and a Micup bot token (Zstandard Gateway compression needs 22.15). Based on [micup.go](https://github.com/yestefir/micup.go), the Go library that runs production bots.
 
 ## Quick start
 

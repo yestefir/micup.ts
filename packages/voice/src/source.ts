@@ -89,7 +89,7 @@ export function openSource(input: string | AudioInputStream, options: AudioSourc
         for await (const chunk of stdout) yield chunk;
         const code = await completed;
         signal?.throwIfAborted();
-        if (spawnFailed) throw new Error('FFmpeg could not be started');
+        if (spawnFailed) throw new Error('FFmpeg could not be started: install FFmpeg, or set the FFMPEG_PATH environment variable or the ffmpeg option to its location');
         if (code !== 0 && !closed) throw new Error('FFmpeg failed to decode the audio source');
       } finally {
         terminate();

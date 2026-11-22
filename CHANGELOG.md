@@ -2,6 +2,13 @@
 
 ## 1.3.0 - 2026-11-22
 
+### Compatibility and packaging
+
+- Node.js 20.3 or later is enough (it was 22). Zstandard Gateway compression still needs 22.15. The test suites pass on Node.js 20.20 and 24, and the native LiveKit module loads on Node.js 20.
+- `background()` uses its own timer for `timeoutMs`, so a task that only waits for its timeout is not dropped when nothing else keeps the process alive (Node.js 20 does not keep the event loop alive for `AbortSignal.timeout()`).
+- `CHANGELOG.md` is published with the package.
+- `@micup.ts/voice` 1.1.2: a missing FFmpeg now fails with a message that explains how to install it or set `FFMPEG_PATH`; the README has installation commands for every system; Node.js 20.3 or later.
+
 ### The easy client
 
 - `micup.ts/easy`: a discord.js-style `Client` on top of the SDK. `new Client()` reads `MICUP_BOT_TOKEN`; `login()` connects, waits for the Gateway and the initial servers, registers commands and emits `ready`. REST-only mode with `gateway: false`; `shards: 'auto'` or a number for sharding.

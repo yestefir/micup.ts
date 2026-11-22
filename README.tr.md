@@ -8,7 +8,7 @@
 npm install micup.ts
 ```
 
-Node.js 22 veya üstü ve bir Micup bot token'ı gerekir. Üretimdeki botları çalıştıran Go kütüphanesi [micup.go](https://github.com/yestefir/micup.go) temel alınmıştır.
+Node.js 20.3 veya üstü ve bir Micup bot token'ı gerekir (Zstandard Gateway sıkıştırması için 22.15). Üretimdeki botları çalıştıran Go kütüphanesi [micup.go](https://github.com/yestefir/micup.go) temel alınmıştır.
 
 ## Hızlı başlangıç
 
